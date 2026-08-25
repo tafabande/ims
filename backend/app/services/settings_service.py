@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from typing import List, Optional, Any
 from fastapi import HTTPException
-from sqlalchemy.orm import Session
+from sqlmodel import select, Session
 from app.models import SystemSetting
 
 DEFAULT_SYSTEM_SETTINGS = [
@@ -51,10 +51,11 @@ DEFAULT_SYSTEM_SETTINGS = [
 
 def seed_default_settings(db: Session):
     """
-    Ensure all dynamic database business settings exist upon startup.
+    Ensure all dynamic database business settings exist upon startup using SQLModel select.
     """
     for default in DEFAULT_SYSTEM_SETTINGS:
-        existing = db.query(SystemSetting).filter(SystemSetting.key == default["key"]).first()
+        statement = select(SystemSetting).where(SystemSetting.key == default["key"])
+        existing = db.exec(statement).first() if hasattr(db, "exec") else db.query(SystemSetting).filter(SystemSetting.key == default["key"]).first()
         if not existing:
             setting = SystemSetting(
                 key=default["key"],
@@ -69,9 +70,10 @@ def seed_default_settings(db: Session):
 
 def get_setting_value(db: Session, key: str, fallback: Any = None) -> Any:
     """
-    Fetch a typed setting value directly from database configuration.
+    Fetch a typed setting value directly from database configuration using SQLModel select.
     """
-    setting = db.query(SystemSetting).filter(SystemSetting.key == key).first()
+    statement = select(SystemSetting).where(SystemSetting.key == key)
+    setting = db.exec(statement).first() if hasattr(db, "exec") else db.query(SystemSetting).filter(SystemSetting.key == key).first()
     if not setting:
         return fallback
 
@@ -89,7 +91,8 @@ def get_setting_value(db: Session, key: str, fallback: Any = None) -> Any:
         return fallback
 
 def update_setting(db: Session, key: str, new_value: str) -> SystemSetting:
-    setting = db.query(SystemSetting).filter(SystemSetting.key == key).first()
+    statement = select(SystemSetting).where(SystemSetting.key == key)
+    setting = db.exec(statement).first() if hasattr(db, "exec") else db.query(SystemSetting).filter(SystemSetting.key == key).first()
     if not setting:
         raise HTTPException(status_code=404, detail=f"System setting '{key}' not found.")
 
@@ -99,9 +102,17 @@ def update_setting(db: Session, key: str, new_value: str) -> SystemSetting:
     db.refresh(setting)
     return setting
 
-def list_settings(db: Session, category_filter: Optional[str] = None) -> List[SystemSetting]:
+def list_settings(db: Session, category: Optional[str] = None) -> List[SystemSetting]:
     seed_default_settings(db)
+    statement = select(SystemSetting)
+    if category:
+        statement = statement.where(SystemSetting.category == category)
+    if hasattr(db, "exec"):
+        return db.exec(statement).all()
     query = db.query(SystemSetting)
-    if category_filter:
-        query = query.filter(SystemSetting.category == category_filter)
-    return query.order_by(SystemSetting.category.asc(), SystemSetting.key.asc()).all()
+    if category:
+        query = query.filter(SystemSetting.category == category)
+    return query.order_by(SystemSetting.id.asc()).all()
+
+def list_all_settings(db: Session) -> List[SystemSetting]:
+    return list_settings(db)

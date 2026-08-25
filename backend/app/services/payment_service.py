@@ -2,14 +2,16 @@ import uuid
 from datetime import datetime, timezone
 from typing import List, Optional
 from fastapi import HTTPException
-from sqlalchemy.orm import Session
+from sqlmodel import select, Session
 from app.models import PaymentMethod, POPVerification, Sale
 
 def seed_default_payment_methods(db: Session):
     """
-    Seed default Zimbabwean & regional payment options if table is empty.
+    Seed default Zimbabwean & regional payment options if table is empty using SQLModel select.
     """
-    if db.query(PaymentMethod).count() == 0:
+    statement = select(PaymentMethod)
+    existing_count = len(db.exec(statement).all()) if hasattr(db, "exec") else db.query(PaymentMethod).count()
+    if existing_count == 0:
         defaults = [
             PaymentMethod(
                 code="CASH_USD",
@@ -68,7 +70,8 @@ def create_payment_method(
     instructions: Optional[str] = None,
     requires_pop: bool = True
 ) -> PaymentMethod:
-    existing = db.query(PaymentMethod).filter(PaymentMethod.code == code).first()
+    statement = select(PaymentMethod).where(PaymentMethod.code == code)
+    existing = db.exec(statement).first() if hasattr(db, "exec") else db.query(PaymentMethod).filter(PaymentMethod.code == code).first()
     if existing:
         raise HTTPException(status_code=400, detail=f"Payment method with code '{code}' already exists.")
 
@@ -91,6 +94,11 @@ def create_payment_method(
 
 def list_payment_methods(db: Session, active_only: bool = True) -> List[PaymentMethod]:
     seed_default_payment_methods(db)
+    statement = select(PaymentMethod)
+    if active_only:
+        statement = statement.where(PaymentMethod.is_active == True)
+    if hasattr(db, "exec"):
+        return db.exec(statement).all()
     query = db.query(PaymentMethod)
     if active_only:
         query = query.filter(PaymentMethod.is_active == True)
@@ -104,7 +112,8 @@ def submit_proof_of_payment(
     sale_id: Optional[int] = None,
     pop_file_key: Optional[str] = None
 ) -> POPVerification:
-    pm = db.query(PaymentMethod).filter(PaymentMethod.id == payment_method_id).first()
+    statement = select(PaymentMethod).where(PaymentMethod.id == payment_method_id)
+    pm = db.exec(statement).first() if hasattr(db, "exec") else db.query(PaymentMethod).filter(PaymentMethod.id == payment_method_id).first()
     if not pm:
         raise HTTPException(status_code=404, detail="Payment method not found.")
 
@@ -133,7 +142,8 @@ def submit_proof_of_payment(
 
     # If associated with a sale, update sale payment status
     if sale_id:
-        sale = db.query(Sale).filter(Sale.id == sale_id).first()
+        sale_stmt = select(Sale).where(Sale.id == sale_id)
+        sale = db.exec(sale_stmt).first() if hasattr(db, "exec") else db.query(Sale).filter(Sale.id == sale_id).first()
         if sale:
             sale.payment_method = pm.name
             sale.payment_status = "PENDING_VERIFICATION"
@@ -147,7 +157,8 @@ def verify_pop(
     pop_id: int,
     verifier_user_id: int
 ) -> POPVerification:
-    pop = db.query(POPVerification).filter(POPVerification.id == pop_id).first()
+    statement = select(POPVerification).where(POPVerification.id == pop_id)
+    pop = db.exec(statement).first() if hasattr(db, "exec") else db.query(POPVerification).filter(POPVerification.id == pop_id).first()
     if not pop:
         raise HTTPException(status_code=404, detail="POP verification record not found.")
 
@@ -161,7 +172,8 @@ def verify_pop(
 
     # Update associated sale payment status to PAID
     if pop.sale_id:
-        sale = db.query(Sale).filter(Sale.id == pop.sale_id).first()
+        sale_stmt = select(Sale).where(Sale.id == pop.sale_id)
+        sale = db.exec(sale_stmt).first() if hasattr(db, "exec") else db.query(Sale).filter(Sale.id == pop.sale_id).first()
         if sale:
             sale.payment_status = "PAID"
 
@@ -175,7 +187,8 @@ def reject_pop(
     verifier_user_id: int,
     rejection_reason: str
 ) -> POPVerification:
-    pop = db.query(POPVerification).filter(POPVerification.id == pop_id).first()
+    statement = select(POPVerification).where(POPVerification.id == pop_id)
+    pop = db.exec(statement).first() if hasattr(db, "exec") else db.query(POPVerification).filter(POPVerification.id == pop_id).first()
     if not pop:
         raise HTTPException(status_code=404, detail="POP verification record not found.")
 
@@ -186,7 +199,8 @@ def reject_pop(
     pop.verified_at = now
 
     if pop.sale_id:
-        sale = db.query(Sale).filter(Sale.id == pop.sale_id).first()
+        sale_stmt = select(Sale).where(Sale.id == pop.sale_id)
+        sale = db.exec(sale_stmt).first() if hasattr(db, "exec") else db.query(Sale).filter(Sale.id == pop.sale_id).first()
         if sale:
             sale.payment_status = "PAYMENT_REJECTED"
 
@@ -195,6 +209,11 @@ def reject_pop(
     return pop
 
 def list_pop_queue(db: Session, status_filter: Optional[str] = None) -> List[POPVerification]:
+    statement = select(POPVerification)
+    if status_filter:
+        statement = statement.where(POPVerification.status == status_filter)
+    if hasattr(db, "exec"):
+        return db.exec(statement).all()
     query = db.query(POPVerification)
     if status_filter:
         query = query.filter(POPVerification.status == status_filter)
