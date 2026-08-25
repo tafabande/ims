@@ -25,6 +25,8 @@ htmlcov/
 .env.local
 *.sqlite
 *.db
+backend/uploads/*
+!backend/uploads/.gitkeep
 
 # IDE & OS
 .vscode/
