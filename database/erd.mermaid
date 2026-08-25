@@ -1,0 +1,109 @@
+erDiagram
+    USERS {
+        int id PK
+        string email
+        string hashed_password
+        string full_name
+        string role
+        string department
+        boolean active
+        timestamp created_at
+    }
+
+    CATEGORIES {
+        int id PK
+        string name
+        string code
+        string description
+    }
+
+    SUPPLIERS {
+        int id PK
+        string name
+        string contact_person
+        string email
+        string phone
+        string address
+    }
+
+    CUSTOMERS {
+        int id PK
+        string name
+        string contact_person
+        string email
+        string phone
+    }
+
+    PRODUCTS {
+        int id PK
+        string sku UK
+        string name
+        string description
+        int category_id FK
+        int supplier_id FK
+        float purchase_price
+        float selling_price
+        int stock_quantity
+        int reorder_level
+        string unit
+        string barcode
+        boolean active
+    }
+
+    INVENTORY_TRANSACTIONS {
+        int id PK
+        int product_id FK
+        string type
+        int quantity
+        string reference
+        string user_name
+        string notes
+        timestamp created_at
+    }
+
+    PURCHASES {
+        int id PK
+        string po_number UK
+        int supplier_id FK
+        string status
+        float total_amount
+        timestamp created_at
+        timestamp received_at
+    }
+
+    PURCHASE_ITEMS {
+        int id PK
+        int purchase_id FK
+        int product_id FK
+        int quantity
+        float unit_price
+    }
+
+    SALES {
+        int id PK
+        string invoice_number UK
+        int customer_id FK
+        float total_amount
+        string payment_status
+        string payment_method
+        timestamp created_at
+        string created_by
+    }
+
+    SALE_ITEMS {
+        int id PK
+        int sale_id FK
+        int product_id FK
+        int quantity
+        float unit_price
+    }
+
+    CATEGORIES ||--o{ PRODUCTS : "contains"
+    SUPPLIERS ||--o{ PRODUCTS : "supplies"
+    SUPPLIERS ||--o{ PURCHASES : "fulfills"
+    CUSTOMERS ||--o{ SALES : "places"
+    PRODUCTS ||--o{ INVENTORY_TRANSACTIONS : "logs"
+    PURCHASES ||--o{ PURCHASE_ITEMS : "includes"
+    PRODUCTS ||--o{ PURCHASE_ITEMS : "ordered_in"
+    SALES ||--o{ SALE_ITEMS : "contains"
+    PRODUCTS ||--o{ SALE_ITEMS : "sold_in"
