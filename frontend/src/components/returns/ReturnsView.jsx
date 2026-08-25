@@ -2,21 +2,7 @@ import React, { useState } from 'react';
 import { RotateCcw, AlertOctagon, CheckCircle2, DollarSign, PackageCheck, FileText } from 'lucide-react';
 
 export default function ReturnsView({ onShowToast }) {
-  const [returns, setReturns] = useState([
-    {
-      id: 1,
-      return_code: 'RET-2026-00041',
-      invoice_number: 'INV-2026-00103',
-      customer_name: 'Apex Retail Stores',
-      total_refund_amount: 100.0,
-      reason_category: 'DEFECTIVE',
-      is_damaged: true,
-      restock_approved: false,
-      status: 'COMPLETED',
-      created_at: '2026-08-25 14:15:00',
-      items: [{ id: 10, product_name: 'Logitech MX Master 3S', quantity: 2, price: 50.0, restockable: false }]
-    }
-  ]);
+  const [returns, setReturns] = useState([]);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({

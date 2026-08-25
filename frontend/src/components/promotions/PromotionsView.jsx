@@ -2,21 +2,7 @@ import React, { useState } from 'react';
 import { Tag, ShieldCheck, Plus, Calendar, Percent, CheckCircle2 } from 'lucide-react';
 
 export default function PromotionsView({ onShowToast, currentRole }) {
-  const [promotions, setPromotions] = useState([
-    {
-      id: 14,
-      promo_code: 'PROMO-2026-014',
-      name: 'Beverages & Accessories Sale',
-      discount_type: 'PERCENTAGE',
-      value: 10,
-      target_category: 'Peripherals & Accessories',
-      start_date: '2026-09-01',
-      end_date: '2026-09-30',
-      status: 'ACTIVE',
-      created_by: 'Charlie Staff',
-      approved_by: 'Bob Manager'
-    }
-  ]);
+  const [promotions, setPromotions] = useState([]);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({

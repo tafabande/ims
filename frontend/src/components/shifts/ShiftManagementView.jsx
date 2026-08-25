@@ -2,35 +2,10 @@ import React, { useState } from 'react';
 import { Clock, DollarSign, AlertTriangle, CheckCircle, Lock, Play, Calculator } from 'lucide-react';
 
 export default function ShiftManagementView({ onShowToast }) {
-  const [activeShift, setActiveShift] = useState({
-    id: 101,
-    shift_code: 'SHIFT-2026-00421',
-    employee_name: 'Charlie Staff (EMP-0003)',
-    store_name: 'Harare Flagship Store (STR-HRE-001)',
-    register_name: 'Till 01 (POS-HRE-001)',
-    start_time: '2026-08-25 08:30:00',
-    opening_cash: 200.0,
-    sales_total: 1420.0,
-    refunds_total: 50.0,
-    expected_cash: 1570.0,
-    status: 'OPEN'
-  });
+  const [activeShift, setActiveShift] = useState(null);
 
-  const [actualCashInput, setActualCashInput] = useState('1565.00');
-  const [closedShifts, setClosedShifts] = useState([
-    {
-      id: 99,
-      shift_code: 'SHIFT-2026-00418',
-      employee_name: 'Bob Manager',
-      start_time: '2026-08-24 08:00:00',
-      end_time: '2026-08-24 17:00:00',
-      opening_cash: 200.0,
-      expected_cash: 1200.0,
-      actual_cash: 1200.0,
-      variance: 0.0,
-      status: 'RECONCILED'
-    }
-  ]);
+  const [actualCashInput, setActualCashInput] = useState('');
+  const [closedShifts, setClosedShifts] = useState([]);
 
   const handleCloseShift = (e) => {
     e.preventDefault();

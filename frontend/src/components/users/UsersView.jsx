@@ -17,44 +17,9 @@ import {
 
 export default function UsersView({ users: initialUsers, currentRole, onShowToast }) {
   const [activeTab, setActiveTab] = useState('rbac'); // 'rbac' or 'raci'
-  const [operatorUsers, setOperatorUsers] = useState(initialUsers || [
-    { id: 1, name: "Alice Admin", email: "admin@ims.local", role: "ADMIN", department: "Executive", active: true },
-    { id: 2, name: "Bob Manager", email: "manager@ims.local", role: "MANAGER", department: "Warehouse A", active: true },
-    { id: 3, name: "Charlie Staff", email: "staff@ims.local", role: "STAFF", department: "POS Terminal", active: true }
-  ]);
+  const [operatorUsers, setOperatorUsers] = useState(initialUsers || []);
 
-  const [sessions, setSessions] = useState([
-    {
-      session_id: "SESS-9001",
-      user: "Alice Admin",
-      role: "ADMIN",
-      device: "Chrome on Windows 11 (Desktop)",
-      ip: "192.168.1.105",
-      created: "2026-08-25 08:00",
-      expires: "2026-09-01 08:00 (7d)",
-      active: true
-    },
-    {
-      session_id: "SESS-9002",
-      user: "Bob Manager",
-      role: "MANAGER",
-      device: "Safari on macOS (MacBook Pro)",
-      ip: "192.168.1.112",
-      created: "2026-08-25 09:15",
-      expires: "2026-09-01 09:15 (7d)",
-      active: true
-    },
-    {
-      session_id: "SESS-9003",
-      user: "Charlie Staff",
-      role: "STAFF",
-      device: "Edge on Windows 10 (POS Terminal)",
-      ip: "192.168.1.120",
-      created: "2026-08-25 09:10",
-      expires: "2026-09-01 09:10 (7d)",
-      active: true
-    }
-  ]);
+  const [sessions, setSessions] = useState([]);
 
   const handleRevokeSession = (sessionId) => {
     setSessions(prev => prev.map(s => s.session_id === sessionId ? { ...s, active: false } : s));

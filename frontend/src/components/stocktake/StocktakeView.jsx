@@ -2,22 +2,7 @@ import React, { useState } from 'react';
 import { ClipboardList, CheckCircle2, AlertTriangle, Play, FileSpreadsheet } from 'lucide-react';
 
 export default function StocktakeView({ onShowToast }) {
-  const [stocktakes, setStocktakes] = useState([
-    {
-      id: 17,
-      stocktake_code: 'STK-2026-00017',
-      store_name: 'Harare Flagship Store (STR-HRE-001)',
-      status: 'APPROVED',
-      reason: 'EXPIRY',
-      conducted_by: 'Charlie Staff',
-      approved_by: 'Bob Manager',
-      created_at: '2026-08-25 11:30:00',
-      items: [
-        { id: 1, sku: 'LAP-001', name: 'Lenovo ThinkPad X1', system: 18, physical: 18, variance: 0, reason: 'MATCH' },
-        { id: 2, sku: 'ACC-001', name: 'Logitech MX Master 3S', system: 42, physical: 39, variance: -3, reason: 'EXPIRY' }
-      ]
-    }
-  ]);
+  const [stocktakes, setStocktakes] = useState([]);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({

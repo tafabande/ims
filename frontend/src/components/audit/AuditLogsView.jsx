@@ -22,74 +22,7 @@ export default function AuditLogsView({ transactions, onShowToast }) {
   const [selectedStatus, setSelectedStatus] = useState('ALL');
   const [viewMode, setViewMode] = useState('timeline'); // 'timeline' or 'table'
 
-  const auditEvents = [
-    { 
-      id: 'LOG-8801', 
-      user: 'Alice Admin', 
-      role: 'ADMIN',
-      action: 'USER_LOGIN', 
-      ip: '192.168.1.105', 
-      status: 'SUCCESS', 
-      timestamp: '2026-08-25T08:00:12Z', 
-      details: 'Admin authentication via MFA hardware key token.',
-      before_after: 'Session created: SESS-9001 (Expires: 7 days)'
-    },
-    { 
-      id: 'LOG-8802', 
-      user: 'Bob Manager', 
-      role: 'MANAGER',
-      action: 'CREATE_PURCHASE_ORDER', 
-      ip: '192.168.1.112', 
-      status: 'SUCCESS', 
-      timestamp: '2026-08-25T09:15:33Z', 
-      details: 'Issued purchase order PO-2026-002 to OmniHardware Technologies.',
-      before_after: 'PO Total Value: $3,250.00 • Status: PENDING'
-    },
-    { 
-      id: 'LOG-8803', 
-      user: 'Charlie Staff', 
-      role: 'STAFF',
-      action: 'PROCESS_SALE', 
-      ip: '192.168.1.120', 
-      status: 'SUCCESS', 
-      timestamp: '2026-08-25T09:10:00Z', 
-      details: 'Processed tax invoice INV-2026-103 with automatic stock deduction.',
-      before_after: 'Cart Total: $149.99 • Items: 2'
-    },
-    { 
-      id: 'LOG-8804', 
-      user: 'Charlie Staff', 
-      role: 'STAFF',
-      action: 'STOCK_VALIDATION', 
-      ip: '192.168.1.120', 
-      status: 'WARN', 
-      timestamp: '2026-08-25T09:09:50Z', 
-      details: 'Attempted to sell Qty 5 Ubiquiti Router, but available stock was 2. Transaction rejected by validation engine.',
-      before_after: 'Stock bounds check failed (Requested 5 > Available 2)'
-    },
-    { 
-      id: 'LOG-8805', 
-      user: 'Alice Admin', 
-      role: 'ADMIN',
-      action: 'SECURITY_AUDIT', 
-      ip: '192.168.1.105', 
-      status: 'SUCCESS', 
-      timestamp: '2026-08-25T11:30:00Z', 
-      details: 'Verified database integrity, row lock consistency, and index checksums.',
-      before_after: 'PostgreSQL FOR UPDATE locks verified clean (0 deadlocks)'
-    },
-    {
-      id: 'LOG-8806',
-      user: 'Alice Admin',
-      role: 'ADMIN',
-      action: 'DISABLE_USER',
-      ip: '192.168.1.105',
-      status: 'SUCCESS',
-      timestamp: '2026-08-25T12:04:15Z',
-      details: 'Soft-disabled operator account EMP-000042 (Dave Driver). Historical ledger preserved.',
-      before_after: 'User State: ACTIVE -> DISABLED'
-    }
-  ];
+  const auditEvents = [];
 
   const filteredLogs = auditEvents.filter(evt => {
     const matchesSearch = 

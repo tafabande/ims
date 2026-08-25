@@ -2,18 +2,7 @@ import React, { useState } from 'react';
 import { ArrowRightLeft, Building2, CheckCircle2, ArrowRight, Package } from 'lucide-react';
 
 export default function TransfersView({ onShowToast }) {
-  const [transfers, setTransfers] = useState([
-    {
-      id: 1,
-      transfer_code: 'TRF-2026-00012',
-      source_store: 'Harare Flagship Store (STR-HRE-001)',
-      destination_store: 'Bulawayo Branch (STR-BYO-001)',
-      status: 'COMPLETED',
-      notes: 'Weekly stock rebalance',
-      created_at: '2026-08-25 10:00:00',
-      items: [{ id: 1, product_name: 'Dell XPS 15 9530', quantity: 3 }]
-    }
-  ]);
+  const [transfers, setTransfers] = useState([]);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({

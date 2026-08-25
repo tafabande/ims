@@ -2,32 +2,7 @@ import React, { useState } from 'react';
 import { Store, Warehouse, Plus, Building2, MapPin, Phone, Mail, CheckCircle2, Clock } from 'lucide-react';
 
 export default function StoresView({ onShowToast, currentRole }) {
-  const [stores, setStores] = useState([
-    {
-      id: 1,
-      store_code: 'STR-HRE-001',
-      name: 'Harare Flagship Store',
-      address: '100 Sam Nujoma Street, Harare',
-      phone: '+263 77 123 4567',
-      email: 'hre@ims.local',
-      status: 'ACTIVE',
-      operating_hours: '08:00 - 18:00',
-      warehouses: [{ id: 1, warehouse_code: 'WH-HRE-001', name: 'Main Central Storage' }],
-      registers: [{ id: 1, register_code: 'POS-HRE-001', name: 'Till 01', status: 'CLOSED' }]
-    },
-    {
-      id: 2,
-      store_code: 'STR-BYO-001',
-      name: 'Bulawayo Branch',
-      address: '45 Leopold Takawira Ave, Bulawayo',
-      phone: '+263 77 987 6543',
-      email: 'byo@ims.local',
-      status: 'ACTIVE',
-      operating_hours: '08:00 - 17:30',
-      warehouses: [{ id: 2, warehouse_code: 'WH-BYO-001', name: 'Branch Warehouse' }],
-      registers: [{ id: 2, register_code: 'POS-BYO-001', name: 'Till 01 - Express', status: 'CLOSED' }]
-    }
-  ]);
+  const [stores, setStores] = useState([]);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({

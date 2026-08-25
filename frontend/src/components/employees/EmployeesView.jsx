@@ -2,77 +2,7 @@ import React, { useState } from 'react';
 import { Users, Search, Plus, Building2, UserCheck, UserX, Activity, Shield, Phone, Mail, Edit3, Lock } from 'lucide-react';
 
 export default function EmployeesView({ onShowToast, currentRole }) {
-  const [employees, setEmployees] = useState([
-    {
-      id: 1,
-      employee_code: 'EMP-2026-00042',
-      first_name: 'John',
-      last_name: 'Banda',
-      email: 'john.banda@ims.local',
-      phone: '+263 77 111 2233',
-      position: 'CASHIER',
-      department: 'Sales & POS',
-      store_name: 'Harare Flagship Store (STR-HRE-001)',
-      manager_name: 'Bob Manager',
-      status: 'ACTIVE',
-      user_id: 3,
-      user_code: 'USR-0003',
-      role: 'STAFF',
-      activity: {
-        total_sales_count: 23,
-        total_sales_amount: 482.50,
-        total_returns_count: 1,
-        total_adjustments_count: 0,
-        last_activity: '2026-08-25 17:31:00'
-      }
-    },
-    {
-      id: 2,
-      employee_code: 'EMP-2026-00041',
-      first_name: 'Peter',
-      last_name: 'Smith',
-      email: 'peter.smith@ims.local',
-      phone: '+263 77 444 5566',
-      position: 'WAREHOUSE_ASSISTANT',
-      department: 'Logistics',
-      store_name: 'Harare Flagship Store (STR-HRE-001)',
-      manager_name: 'Bob Manager',
-      status: 'ACTIVE',
-      user_id: null,
-      user_code: null,
-      role: 'NO_ACCOUNT',
-      activity: {
-        total_sales_count: 0,
-        total_sales_amount: 0.0,
-        total_returns_count: 0,
-        total_adjustments_count: 14,
-        last_activity: '2026-08-25 15:10:00'
-      }
-    },
-    {
-      id: 3,
-      employee_code: 'EMP-2026-00044',
-      first_name: 'Mary',
-      last_name: 'Jones',
-      email: 'mary.jones@ims.local',
-      phone: '+263 77 888 9900',
-      position: 'STORE_MANAGER',
-      department: 'Executive',
-      store_name: 'Bulawayo Branch (STR-BYO-001)',
-      manager_name: 'Alice Admin',
-      status: 'ACTIVE',
-      user_id: 2,
-      user_code: 'USR-0002',
-      role: 'MANAGER',
-      activity: {
-        total_sales_count: 5,
-        total_sales_amount: 2100.00,
-        total_returns_count: 2,
-        total_adjustments_count: 3,
-        last_activity: '2026-08-25 16:05:00'
-      }
-    }
-  ]);
+  const [employees, setEmployees] = useState([]);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
