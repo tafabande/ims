@@ -4,36 +4,62 @@ import { RotateCcw, AlertOctagon, CheckCircle2, DollarSign, PackageCheck, FileTe
 export default function ReturnsView({ onShowToast }) {
   const [returns, setReturns] = useState([]);
 
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [formData, setFormData] = useState({
-    invoice_number: 'INV-2026-00103',
-    customer_name: 'Apex Retail Stores',
-    product_name: 'Lenovo ThinkPad X1 Carbon',
+  const initialFormState = {
+    invoice_number: '',
+    customer_name: '',
+    product_name: '',
     quantity: 1,
-    refund_price: 1450.0,
+    refund_price: '',
     reason_category: 'DEFECTIVE',
-    restockable: true
-  });
+    restockable: true,
+    notes: ''
+  };
 
-  const handleProcessReturn = (e) => {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [formData, setFormData] = useState(initialFormState);
+
+  const handleOpenModal = () => {
+    setFormData(initialFormState);
+    setIsModalOpen(true);
+  };
+
+  const handleCreateReturn = (e, isSubmitForApproval = false) => {
     e.preventDefault();
+    if (!formData.invoice_number || !formData.product_name || !formData.refund_price) {
+      onShowToast?.('warning', 'Missing Fields', 'Please fill in invoice number, product name, and unit price.');
+      return;
+    }
+
+    const price = parseFloat(formData.refund_price) || 0;
+    const qty = parseInt(formData.quantity) || 1;
+    const status = isSubmitForApproval ? 'PENDING_APPROVAL' : 'COMPLETED';
+    const now = new Date();
+    const formattedDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+
     const newReturn = {
       id: Date.now(),
-      return_code: `RET-2026-${Math.floor(10000 + Math.random() * 90000)}`,
+      return_code: `RET-${now.getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`,
       invoice_number: formData.invoice_number,
-      customer_name: formData.customer_name,
-      total_refund_amount: formData.quantity * formData.refund_price,
+      customer_name: formData.customer_name || 'Walk-in Customer',
+      total_refund_amount: qty * price,
       reason_category: formData.reason_category,
       is_damaged: !formData.restockable,
       restock_approved: formData.restockable,
-      status: 'COMPLETED',
-      created_at: new Date().toISOString().replace('T', ' ').substring(0, 19),
-      items: [{ id: Date.now() + 1, product_name: formData.product_name, quantity: formData.quantity, price: formData.refund_price, restockable: formData.restockable }]
+      notes: formData.notes,
+      status: status,
+      created_at: formattedDate,
+      items: [{ id: Date.now() + 1, product_name: formData.product_name, quantity: qty, price: price, restockable: formData.restockable }]
     };
 
     setReturns([newReturn, ...returns]);
     setIsModalOpen(false);
-    onShowToast?.('success', 'Return Processed', `Return order ${newReturn.return_code} processed. Refund: $${newReturn.total_refund_amount.toFixed(2)}.`);
+    setFormData(initialFormState);
+    
+    if (isSubmitForApproval) {
+      onShowToast?.('warning', 'Refund Submitted for Approval', `Return request ${newReturn.return_code} ($${newReturn.total_refund_amount.toFixed(2)}) sent to Manager Attention Center.`);
+    } else {
+      onShowToast?.('success', 'Return Processed', `Return order ${newReturn.return_code} processed. Refund: $${newReturn.total_refund_amount.toFixed(2)}.`);
+    }
   };
 
   return (
@@ -45,11 +71,11 @@ export default function ReturnsView({ onShowToast }) {
             Returns & Refunds Management
           </h2>
           <p style={{ fontSize: '0.875rem', color: 'var(--color-ink-muted)' }}>
-            Process customer returns, restockable items, damaged write-offs, and refund receipts.
+            Process customer returns, submit refund requests for manager approval, restock items, and write-offs.
           </p>
         </div>
         <button
-          onClick={() => setIsModalOpen(true)}
+          onClick={handleOpenModal}
           style={{
             display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px', borderRadius: 'var(--radius-sm)',
             background: 'var(--color-accent)', color: '#fff', fontWeight: 700, border: 'none', cursor: 'pointer'
@@ -67,7 +93,7 @@ export default function ReturnsView({ onShowToast }) {
               <th style={{ padding: '10px' }}>RETURN CODE</th>
               <th style={{ padding: '10px' }}>ORIGINAL SALE</th>
               <th style={{ padding: '10px' }}>CUSTOMER</th>
-              <th style={{ padding: '10px' }}>REASON</th>
+              <th style={{ padding: '10px' }}>REASON & NOTES</th>
               <th style={{ padding: '10px' }}>RESTOCKABLE</th>
               <th style={{ padding: '10px' }}>TOTAL REFUND</th>
               <th style={{ padding: '10px' }}>STATUS</th>
@@ -80,9 +106,10 @@ export default function ReturnsView({ onShowToast }) {
                 <td style={{ padding: '10px', fontFamily: 'var(--font-mono)', color: 'var(--color-accent)' }}>{r.invoice_number}</td>
                 <td style={{ padding: '10px' }}>{r.customer_name}</td>
                 <td style={{ padding: '10px' }}>
-                  <span style={{ fontSize: '0.75rem', padding: '2px 8px', borderRadius: '4px', background: 'var(--color-paper-2)', fontWeight: 600 }}>
+                  <span style={{ fontSize: '0.75rem', padding: '2px 8px', borderRadius: '4px', background: 'var(--color-paper-2)', fontWeight: 600, display: 'inline-block', marginBottom: '4px' }}>
                     {r.reason_category}
                   </span>
+                  {r.notes && <div style={{ fontSize: '0.75rem', color: 'var(--color-ink-muted)' }}>{r.notes}</div>}
                 </td>
                 <td style={{ padding: '10px' }}>
                   {r.restock_approved ? (
@@ -98,8 +125,9 @@ export default function ReturnsView({ onShowToast }) {
                 <td style={{ padding: '10px', fontWeight: 800, color: 'var(--color-ink)' }}>${r.total_refund_amount.toFixed(2)}</td>
                 <td style={{ padding: '10px' }}>
                   <span style={{
-                    fontSize: '0.7rem', fontFamily: 'var(--font-mono)', padding: '2px 8px', borderRadius: '12px',
-                    background: 'rgba(34, 197, 94, 0.15)', color: 'var(--color-signal-green)', fontWeight: 700
+                    fontSize: '0.7rem', fontFamily: 'var(--font-mono)', padding: '2px 8px', borderRadius: '12px', fontWeight: 700,
+                    background: r.status === 'PENDING_APPROVAL' ? 'rgba(245, 158, 11, 0.15)' : r.status === 'COMPLETED' || r.status === 'APPROVED' ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                    color: r.status === 'PENDING_APPROVAL' ? '#f59e0b' : r.status === 'COMPLETED' || r.status === 'APPROVED' ? 'var(--color-signal-green)' : '#ef4444'
                   }}>
                     {r.status}
                   </span>
@@ -118,10 +146,10 @@ export default function ReturnsView({ onShowToast }) {
         }}>
           <div style={{
             background: 'var(--color-paper)', border: '1px solid var(--color-rule)', borderRadius: 'var(--radius-md)',
-            padding: '24px', width: '480px', display: 'flex', flexDirection: 'column', gap: '16px'
+            padding: '24px', width: '520px', display: 'flex', flexDirection: 'column', gap: '16px'
           }}>
-            <h3 style={{ fontSize: '1.2rem', fontWeight: 800 }}>Issue Return Order</h3>
-            <form onSubmit={handleProcessReturn} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <h3 style={{ fontSize: '1.2rem', fontWeight: 800 }}>Issue / Request Customer Return</h3>
+            <form style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div>
                 <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-ink-muted)' }}>ORIGINAL INVOICE NUMBER</label>
                 <input
@@ -129,6 +157,16 @@ export default function ReturnsView({ onShowToast }) {
                   required
                   value={formData.invoice_number}
                   onChange={e => setFormData({ ...formData, invoice_number: e.target.value })}
+                  style={{ width: '100%', padding: '8px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-rule)', background: 'var(--color-paper-2)', color: 'var(--color-ink)' }}
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-ink-muted)' }}>CUSTOMER NAME</label>
+                <input
+                  type="text"
+                  required
+                  value={formData.customer_name}
+                  onChange={e => setFormData({ ...formData, customer_name: e.target.value })}
                   style={{ width: '100%', padding: '8px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-rule)', background: 'var(--color-paper-2)', color: 'var(--color-ink)' }}
                 />
               </div>
@@ -150,7 +188,7 @@ export default function ReturnsView({ onShowToast }) {
                     min="1"
                     required
                     value={formData.quantity}
-                    onChange={e => setFormData({ ...formData, quantity: parseInt(e.target.value) })}
+                    onChange={e => setFormData({ ...formData, quantity: parseInt(e.target.value) || 1 })}
                     style={{ width: '100%', padding: '8px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-rule)', background: 'var(--color-paper-2)', color: 'var(--color-ink)' }}
                   />
                 </div>
@@ -161,7 +199,7 @@ export default function ReturnsView({ onShowToast }) {
                     step="0.01"
                     required
                     value={formData.refund_price}
-                    onChange={e => setFormData({ ...formData, refund_price: parseFloat(e.target.value) })}
+                    onChange={e => setFormData({ ...formData, refund_price: parseFloat(e.target.value) || 0 })}
                     style={{ width: '100%', padding: '8px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-rule)', background: 'var(--color-paper-2)', color: 'var(--color-ink)' }}
                   />
                 </div>
@@ -179,6 +217,16 @@ export default function ReturnsView({ onShowToast }) {
                   <option value="CUSTOMER_CHANGE">Customer Changed Mind</option>
                 </select>
               </div>
+              <div>
+                <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-ink-muted)' }}>REFUND REASON DETAILS / NOTES (OPTIONAL)</label>
+                <textarea
+                  rows={2}
+                  value={formData.notes}
+                  onChange={e => setFormData({ ...formData, notes: e.target.value })}
+                  placeholder="Provide additional details regarding the return or refund justification..."
+                  style={{ width: '100%', padding: '8px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-rule)', background: 'var(--color-paper-2)', color: 'var(--color-ink)', fontSize: '0.85rem' }}
+                />
+              </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <input
                   type="checkbox"
@@ -188,19 +236,27 @@ export default function ReturnsView({ onShowToast }) {
                 />
                 <label htmlFor="restockable" style={{ fontSize: '0.8125rem', fontWeight: 600 }}>Restock back into active inventory ledger</label>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '10px' }}>
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  style={{ padding: '8px 16px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-rule)', background: 'transparent', color: 'var(--color-ink)', cursor: 'pointer' }}
+                  style={{ padding: '8px 14px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-rule)', background: 'transparent', color: 'var(--color-ink)', cursor: 'pointer', fontSize: '0.85rem' }}
                 >
                   Cancel
                 </button>
                 <button
-                  type="submit"
-                  style={{ padding: '8px 16px', borderRadius: 'var(--radius-sm)', border: 'none', background: 'var(--color-accent)', color: '#fff', fontWeight: 700, cursor: 'pointer' }}
+                  type="button"
+                  onClick={(e) => handleCreateReturn(e, true)}
+                  style={{ padding: '8px 14px', borderRadius: 'var(--radius-sm)', border: '1px solid #f59e0b', background: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b', fontWeight: 700, cursor: 'pointer', fontSize: '0.85rem' }}
                 >
-                  Process Refund
+                  Send for Manager Approval
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => handleCreateReturn(e, false)}
+                  style={{ padding: '8px 14px', borderRadius: 'var(--radius-sm)', border: 'none', background: 'var(--color-accent)', color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: '0.85rem' }}
+                >
+                  Process & Issue Refund
                 </button>
               </div>
             </form>

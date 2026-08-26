@@ -125,3 +125,25 @@ def execute_symmetrical_approval_decision(
         "executed_at": datetime.now(timezone.utc).isoformat(),
         "message": f"Approval decision '{decision}' executed successfully with audit log entry."
     }
+
+from app.services.scheduler_service import scheduler_service
+
+@router.get("/scheduler/jobs")
+def get_scheduled_cron_jobs(
+    auth_ctx: dict = Depends(require_permission("system:config"))
+):
+    """
+    Returns configured backend background cron & scheduled jobs.
+    """
+    return scheduler_service.list_jobs()
+
+@router.post("/scheduler/trigger/{job_id}")
+def trigger_scheduled_cron_job(
+    job_id: str,
+    auth_ctx: dict = Depends(require_permission("system:config"))
+):
+    """
+    Manually triggers a backend scheduled cron job for event generation.
+    """
+    return scheduler_service.trigger_job(job_id)
+

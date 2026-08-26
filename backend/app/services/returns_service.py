@@ -1,4 +1,6 @@
 from sqlalchemy.orm import Session
+from sqlalchemy import func
+from typing import Optional
 from fastapi import HTTPException, status
 from app.models import Sale, SaleItem, ReturnOrder, ReturnItem, Product
 from app.services.inventory_service import process_stock_adjustment
@@ -17,7 +19,7 @@ def process_return_order(db: Session, return_data, user_name: str = "System Oper
             detail="Separation of Duties Violation: Requester cannot approve their own refund order."
         )
 
-    return_code = f"RTN-2026-{uuid.uuid4().hex[:6].upper()}"
+    return_code = f"RET-2026-{uuid.uuid4().hex[:6].upper()}"
     total_refund = 0.0
 
     # Validate each return line item against original sale invoice items

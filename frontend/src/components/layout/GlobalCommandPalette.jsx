@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, X, Package, ShoppingCart, Boxes, BarChart3, Sun, Moon, ShieldCheck, ArrowRight } from 'lucide-react';
+import { Search, X, Package, ShoppingCart, Boxes, BarChart3, Sun, Moon, ShieldCheck, ArrowRight, Sliders } from 'lucide-react';
 
 export default function GlobalCommandPalette({ 
   isOpen, 
@@ -35,9 +35,10 @@ export default function GlobalCommandPalette({
 
   const navigationCommands = [
     { label: 'Go to Dashboard Overview', tab: 'dashboard', icon: BarChart3, shortcut: 'Alt+D' },
+    { label: 'Go to POS Checkout Register', tab: 'pos', icon: ShoppingCart, shortcut: 'Alt+S' },
+    { label: 'Go to Sales Policy & Rates', tab: 'sales', icon: Sliders },
     { label: 'Go to Products Catalog', tab: 'products', icon: Package, shortcut: 'Alt+P' },
     { label: 'Go to Stock & Audit Ledger', tab: 'inventory', icon: Boxes, shortcut: 'Alt+I' },
-    { label: 'Go to Sales & POS Terminal', tab: 'sales', icon: ShoppingCart, shortcut: 'Alt+S' },
   ];
 
   return (

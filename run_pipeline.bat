@@ -19,8 +19,8 @@ echo    [2] LAN Development (FastAPI 0.0.0.0:8000 + Vite 5173)
 echo    [3] Run Automated Verification Suite (Pytest + Vite Build + Config)
 echo    [4] Deploy Docker Production Stack (NGINX + FastAPI + Postgres + Redis)
 echo    [5] Run Database Schema Migrations (Alembic)
-echo    [6] Database Backup & Disaster Recovery
-echo    [7] Service Health & Readiness Diagnostics
+echo    [6] Database Backup ^& Disaster Recovery
+echo    [7] Service Health ^& Readiness Diagnostics
 echo    [8] Exit
 echo.
 set /p CHOICE="Enter your choice [1-8]: "
@@ -129,7 +129,21 @@ echo [PREFLIGHT] Running Production Deployment Preflight Checks...
 echo =========================================================================
 cd /d "%~dp0"
 if not exist ".env" if not exist ".env.production" (
-    echo [WARNING] .env or .env.production file not found. Ensure secrets are configured.
+    echo [INFO] Creating default .env from .env.example...
+    if exist ".env.example" copy .env.example .env >nul
+)
+
+echo [PREFLIGHT] Checking Docker daemon status...
+docker info >nul 2>&1
+if %ERRORLEVEL% NEQ 0 (
+    color 0C
+    echo [ERROR] Docker daemon is not running!
+    echo Please start Docker Desktop on your machine and wait for the Docker service to start, then try again.
+    echo.
+    echo Tip: If you prefer running locally without Docker, select [1] for Local Development from the main menu.
+    pause
+    color 0A
+    goto MENU
 )
 
 echo [DEPLOY] Starting Docker Production Stack (NGINX + FastAPI + Postgres + Redis)...
@@ -163,7 +177,7 @@ goto MENU
 :DB_BACKUP
 CLS
 echo =========================================================================
-echo [BACKUP] Executing Automated Database & Ledger Snapshot...
+echo [BACKUP] Executing Automated Database ^& Ledger Snapshot...
 echo =========================================================================
 cd /d "%~dp0backend"
 python -c "import os, datetime; print(f'Backup created: backup_ims_{datetime.datetime.now().strftime(\"%Y%m%d_%H%M%S\")}.db')"
@@ -174,7 +188,7 @@ goto MENU
 :HEALTH_CHECK
 CLS
 echo =========================================================================
-echo [DIAGNOSTIC] Querying Operational Health & SLA Telemetry Probes...
+echo [DIAGNOSTIC] Querying Operational Health ^& SLA Telemetry Probes...
 echo =========================================================================
 cd /d "%~dp0backend"
 python -c "import urllib.request, json; print(json.dumps(json.loads(urllib.request.urlopen('http://127.0.0.1:8000/release/readiness').read().decode()), indent=2))" 2>nul

@@ -6,13 +6,14 @@ from sqlalchemy import text
 from datetime import datetime, timezone
 from app.database import get_db, Base, engine
 import app.models # Register all SQLAlchemy models in Base.metadata
-from app.routes import products, inventory, sales, purchases, auth, audit, uploads, users, employees, stores, shifts, returns, transfers, stocktakes, promotions, reservations, setup_wizards, approvals, reconciliation, pricing, procurement, settings, payments, sessions, integrity, import_export, integrations, imports, planning, notifications, registries
+from app.routes import products, inventory, sales, purchases, auth, audit, uploads, users, employees, stores, shifts, returns, transfers, stocktakes, promotions, reservations, setup_wizards, approvals, reconciliation, pricing, procurement, settings, payments, sessions, integrity, import_export, integrations, imports, planning, notifications, registries, cases, work_sessions
 
 from app.middleware.rate_limiter import DistributedRateLimiterMiddleware
 from app.middleware.security import SecurityHeadersMiddleware
 from app.middleware.idempotency import IdempotencyMiddleware
 from app.middleware.request_correlation import RequestCorrelationMiddleware
 from app.services.cache_service import get_cache_stats
+from seed import seed_db
 
 # Create DB tables automatically
 try:
@@ -20,12 +21,18 @@ try:
 except Exception as e:
     print(f"Schema notice: {e}")
 
-
 app = FastAPI(
     title="IMS Microservices & Gateway API",
     description="Production Microservices API for IMS with Domain Model Architecture, Employee Separation, Hierarchical Categories, RequestID Correlation, Structured JSON Logging & Audit Logging.",
     version="4.0.0"
 )
+
+@app.on_event("startup")
+def auto_seed_database_on_startup():
+    try:
+        seed_db()
+    except Exception as e:
+        print(f"Startup database seeding notice: {e}")
 
 # 0. Request Correlation & Observability Middleware (X-Request-ID)
 app.add_middleware(RequestCorrelationMiddleware)
@@ -55,6 +62,7 @@ app.add_middleware(
 )
 
 # Register Microservice Route Handlers
+app.include_router(work_sessions.router)
 app.include_router(auth.router)
 app.include_router(users.router)
 app.include_router(employees.router)
@@ -70,6 +78,7 @@ app.include_router(returns.router)
 app.include_router(transfers.router)
 app.include_router(planning.router)
 app.include_router(notifications.router)
+app.include_router(cases.router)
 app.include_router(registries.router)
 
 

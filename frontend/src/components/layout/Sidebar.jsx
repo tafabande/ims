@@ -18,7 +18,8 @@ import {
   Tag,
   LogOut,
   FileSpreadsheet,
-  TrendingUp
+  TrendingUp,
+  Sliders
 } from 'lucide-react';
 import { can } from '../../utils/permissions';
 
@@ -49,16 +50,17 @@ export default function Sidebar({ activeTab, setActiveTab, currentRole = 'MANAGE
       title: 'OPERATIONS',
       items: [
         { id: 'inventory', label: 'Stock & Audit Ledger', shortcut: 'Alt+I', icon: Boxes, perm: 'inventory.view' },
-        { id: 'integrity', label: 'Integrity & Anomaly Engine', icon: ShieldAlert, perm: 'attention.decide' },
-        { id: 'sales', label: 'Sales & POS Terminal', shortcut: 'Alt+S', icon: ShoppingCart, perm: 'sales.view' },
+        { id: 'integrity', label: 'Integrity & Anomaly Engine', icon: ShieldAlert, perm: 'integrity.view' },
+        { id: 'pos', label: 'POS Checkout Register', shortcut: 'Alt+S', icon: ShoppingCart, perm: 'sales.create' },
+        { id: 'sales', label: 'Sales Policy & Rates', icon: Sliders, perm: 'sales.policy' },
         { id: 'purchases', label: 'Purchase Orders', shortcut: 'Alt+B', icon: ShoppingBag, perm: 'purchases.view' }
       ]
     },
     {
       title: 'CATALOG & DIRECTORY',
       items: [
-        { id: 'products', label: 'Products Catalog', shortcut: 'Alt+P', icon: Package, perm: 'inventory.view' },
-        { id: 'employees', label: 'Employees Directory', icon: Users, perm: 'attention.decide' },
+        { id: 'products', label: 'Products Catalog', shortcut: 'Alt+P', icon: Package, perm: 'products.view' },
+        { id: 'employees', label: 'Employees Directory', icon: Users, perm: 'employees.view' },
         { id: 'suppliers', label: 'Suppliers Directory', icon: Truck, perm: 'purchases.view' },
         { id: 'customers', label: 'Customer Records', icon: Users, perm: 'sales.view' }
       ]

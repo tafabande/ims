@@ -4,830 +4,532 @@ import {
   AlertTriangle, 
   Info, 
   CheckCircle2, 
-  Settings, 
   Clock, 
   User, 
   ArrowRight, 
   FileText, 
   ShieldAlert, 
-  TrendingDown, 
+  X, 
+  Check, 
+  RotateCcw, 
+  Sliders, 
+  DollarSign, 
+  Package, 
+  Layers, 
+  Filter, 
+  MessageSquare, 
+  Lock, 
+  Download, 
+  ShieldCheck, 
+  Send, 
+  Plus,
   HelpCircle,
-  X,
-  Check,
-  RotateCcw,
-  Sliders,
-  DollarSign,
-  Package,
-  Layers,
-  Filter,
-  CheckSquare,
-  MessageSquare,
-  Lock,
-  Download,
-  ShieldCheck,
-  Send,
-  Radio,
-  Users,
-  Megaphone,
-  Plus
+  AlertOctagon,
+  XCircle,
+  FileCheck,
+  TrendingUp
 } from 'lucide-react';
 import { can } from '../../utils/permissions';
 
 export default function AttentionCenterView({ onShowToast, currentRole = 'MANAGER', onNavigate }) {
-  const [activeFilter, setActiveFilter] = useState('ALL'); // 'ALL' | 'MESSAGES' | 'ALERTS' | 'APPROVALS' | 'ANNOUNCEMENTS' | 'HISTORY_BOARD'
-  const [selectedAlertForExplanation, setSelectedAlertForExplanation] = useState(null);
-  
-  // Custom Modals State
-  const [showComposer, setShowComposer] = useState(false);
-  const [composerScope, setComposerScope] = useState('INDIVIDUAL'); // 'INDIVIDUAL' | 'TEAM' | 'BROADCAST'
-  const [composerRecipient, setComposerRecipient] = useState('EMP-00014 (Sales Staff)');
-  const [composerTeam, setComposerTeam] = useState('Warehouse Team');
-  const [composerSubject, setComposerSubject] = useState('');
-  const [composerBody, setComposerBody] = useState('');
-  const [composerPriority, setComposerPriority] = useState('NORMAL');
-  const [composerRelatedRecord, setComposerRelatedRecord] = useState('PO-2026-00431');
-  const [composerRequireAck, setComposerRequireAck] = useState(true);
+  // Case Filtering & Search State
+  const [activeFilter, setActiveFilter] = useState('ALL'); // 'ALL' | 'REFUND_REQUEST' | 'RECEIVING_DISCREPANCY' | 'FLOAT_VARIANCE' | 'STOCK_ADJUSTMENT' | 'SYSTEM_ERROR' | 'PRICE_OVERRIDE'
+  const [statusTab, setStatusTab] = useState('PENDING'); // 'PENDING' | 'INVESTIGATING' | 'RESOLVED'
+  const [searchTerm, setSearchTerm] = useState('');
 
-  // Decision Modal
-  const [decisionModalEntity, setDecisionModalEntity] = useState(null);
-  const [decisionNote, setDecisionNote] = useState('');
-  
-  // Staff Note Modal
-  const [staffNoteModalEntity, setStaffNoteModalEntity] = useState(null);
-  const [staffObservationNote, setStaffObservationNote] = useState('');
+  // Selected Case Modal State
+  const [selectedCase, setSelectedCase] = useState(null);
+  const [decisionType, setDecisionType] = useState('APPROVED'); // 'APPROVED' | 'DENIED' | 'CONTESTED' | 'RETURNED' | 'ESCALATED'
+  const [decisionComment, setDecisionComment] = useState('');
 
-  // Sensitive Export Modal
-  const [exportConsentModal, setExportConsentModal] = useState(null);
-  const [exportReason, setExportReason] = useState('');
-
-  const isManager = can(currentRole, 'attention.decide');
-  const canBroadcast = can(currentRole, 'broadcast.send');
-
-  // Operational Communication & System Event Stream
-  const [items, setItems] = useState([
+  // Unified Operational Cases Master Dataset
+  const [cases, setCases] = useState([
     {
       id: 1,
-      code: 'APPROVAL-REF-00042',
-      type: 'APPROVAL', // APPROVAL | ALERT | MESSAGE | ANNOUNCEMENT
-      scope: 'SYSTEM_EVENT',
-      importance: 'ACTION_REQUIRED',
-      title: 'Refund Approval Required: #REF-00042',
-      summary: 'Customer ABC Traders requested $340.00 refund on receipt SAL-00182.',
-      sender: 'SYSTEM_ENGINE (Triggered by EMP-00014)',
-      timestamp: '2026-08-26T01:45:00Z',
-      lifecycle: 'ACTION_REQUIRED',
-      relatedRecord: 'REF-00042',
-      details: {
-        customer: 'ABC Traders',
-        amount: 340.00,
-        receipt_id: 'SAL-00182',
-        reason: 'Duplicate Transaction'
+      case_number: 'REF-2026-0042',
+      case_type: 'REFUND_REQUEST',
+      status: 'PENDING_REVIEW', // PENDING_REVIEW, UNDER_INVESTIGATION, APPROVED, DENIED, CONTESTED, RETURNED
+      priority: 'HIGH',
+      subject: 'Customer Refund Request: SAL-00182 ($340.00)',
+      description: 'Customer ABC Traders requested $340.00 refund on receipt SAL-00182 due to damaged packaging discovered upon unboxing.',
+      created_by: 'Tendai M. (EMP-00014)',
+      assigned_to_role: 'MANAGER',
+      entity_type: 'REFUND',
+      entity_id: 'INV-004281',
+      amount: 340.00,
+      evidence: {
+        customer_name: 'ABC Traders',
+        item_name: 'Dell XPS 15 Workstation Laptop',
+        original_sale_amount: 340.00,
+        refund_reason: 'Damaged item upon delivery',
+        attached_files: ['Receipt_SAL00182.pdf', 'Photo_BoxDamage.jpg']
       },
-      whyExplanation: {
-        trigger: 'Refund Amount Exceeds Staff Authorization Threshold ($100.00)',
-        formula: 'Requested Refund ($340.00) > Staff Limit ($100.00) → Manager Approval Required',
-        auditRef: 'AUD-REF-2026-0042'
-      },
-      staffNotes: [],
-      historyTrail: [{ time: '01:45 UTC', event: 'Approval request generated by POS' }]
+      created_at: '2026-08-26T04:12:00Z',
+      events: [
+        { id: 101, event_type: 'CREATED', performed_by: 'Tendai M. (EMP-00014)', old_status: null, new_status: 'DRAFT', comment: 'Draft refund request created at POS terminal', created_at: '2026-08-26T04:12:00Z' },
+        { id: 102, event_type: 'SUBMITTED', performed_by: 'Tendai M. (EMP-00014)', old_status: 'DRAFT', new_status: 'PENDING_REVIEW', comment: 'Submitted for Store Manager approval', created_at: '2026-08-26T04:13:00Z' }
+      ]
     },
     {
       id: 2,
-      code: 'ALERT-CAT6',
-      type: 'ALERT',
-      scope: 'SYSTEM_EVENT',
-      importance: 'IMPORTANT',
-      title: 'Critical Inventory Alert: CAT6 Cable Roll 300m',
-      summary: 'CAT6 Cable has fallen below safety reorder level (Current: 3, Minimum: 10).',
-      sender: 'SYSTEM_ENGINE',
-      timestamp: '2026-08-26T01:30:00Z',
-      lifecycle: 'IMPORTANT',
-      relatedRecord: 'SKU-CAT6-300M',
-      details: { currentStock: 3, minBuffer: 10, unitPrice: 45.00 },
-      whyExplanation: {
-        trigger: 'Reorder Buffer Breach',
-        formula: 'Available Stock (3) < Safety Threshold (10) → Reorder PO Recommended',
-        auditRef: 'AUD-BUF-9402'
+      case_number: 'DISC-2026-0087',
+      case_type: 'RECEIVING_DISCREPANCY',
+      status: 'PENDING_REVIEW',
+      priority: 'HIGH',
+      subject: 'Goods Receiving Discrepancy: PO-00431 (-2u Missing)',
+      description: 'XYZ Electronics delivery for PO-00431: 100 ordered, 96 accepted, 2 rejected (damaged), 2 unaccounted for.',
+      created_by: 'Farai W. (EMP-00031)',
+      assigned_to_role: 'MANAGER',
+      entity_type: 'PURCHASE_ORDER',
+      entity_id: 'PO-00431',
+      amount: 230.00,
+      evidence: {
+        po_number: 'PO-00431',
+        supplier_name: 'XYZ Electronics',
+        ordered_qty: 100,
+        accepted_qty: 96,
+        rejected_qty: 2,
+        missing_qty: 2,
+        attached_files: ['DeliveryNote_GRN882.pdf']
       },
-      staffNotes: [],
-      historyTrail: [{ time: '01:30 UTC', event: 'Reorder alert triggered by Stock Monitor' }]
+      created_at: '2026-08-26T03:45:00Z',
+      events: [
+        { id: 103, event_type: 'SUBMITTED', performed_by: 'Farai W. (EMP-00031)', old_status: null, new_status: 'PENDING_REVIEW', comment: 'Receiving variance calculated during warehouse count', created_at: '2026-08-26T03:45:00Z' }
+      ]
     },
     {
       id: 3,
-      code: 'MSG-PO-00431',
-      type: 'MESSAGE',
-      scope: 'INDIVIDUAL',
-      importance: 'IMPORTANT',
-      title: 'Direct Message: PO-00431 Receiving Discrepancy',
-      summary: 'Please verify the quantity received against GRN #882 for PO-00431.',
-      sender: 'Sarah Jenkins (Warehouse Manager)',
-      recipient: 'EMP-00022 (Receiving Operator)',
-      timestamp: '2026-08-26T01:10:00Z',
-      lifecycle: 'IMPORTANT',
-      relatedRecord: 'PO-2026-00431',
-      staffNotes: [{ author: 'EMP-00022', time: '01:15 UTC', note: 'Supplier driver confirmed 4 units backordered on delivery slip.' }],
-      historyTrail: [{ time: '01:10 UTC', event: 'Direct operational message sent with PO-00431 reference' }]
+      case_number: 'FV-2026-0021',
+      case_type: 'FLOAT_VARIANCE',
+      status: 'PENDING_REVIEW',
+      priority: 'NORMAL',
+      subject: 'End-of-Shift Cash Float Variance: -$13.00',
+      description: 'Till 01 Shift Close: Expected cash $200.00, Actual counted $187.00. Variance -$13.00.',
+      created_by: 'Tendai M. (EMP-00014)',
+      assigned_to_role: 'MANAGER',
+      entity_type: 'CASH_SESSION',
+      entity_id: 'SES-00021',
+      amount: 13.00,
+      evidence: {
+        till_id: 'TILL-01',
+        expected_cash: 200.00,
+        actual_cash: 187.00,
+        variance: -13.00,
+        staff_note: 'Incorrect opening change float provided at morning shift start.'
+      },
+      created_at: '2026-08-26T02:30:00Z',
+      events: [
+        { id: 104, event_type: 'SUBMITTED', performed_by: 'Tendai M. (EMP-00014)', old_status: null, new_status: 'PENDING_REVIEW', comment: 'Shift variance submitted at till reconciliation', created_at: '2026-08-26T02:30:00Z' }
+      ]
     },
     {
       id: 4,
-      code: 'ANNOUNCEMENT-2026-001',
-      type: 'ANNOUNCEMENT',
-      scope: 'BROADCAST',
-      importance: 'IMPORTANT',
-      title: 'System Maintenance & Nightly Stock Freeze',
-      summary: 'Inventory system maintenance will occur tonight from 22:00–23:00. POS transactions must be synced before 22:00.',
-      sender: 'Taa (App Admin)',
-      audience: 'All Warehouse & Sales Staff',
-      timestamp: '2026-08-26T00:30:00Z',
-      lifecycle: 'INFORMATIONAL',
-      requireAck: true,
-      acknowledgements: {
-        totalRequired: 8,
-        confirmedCount: 6,
-        confirmedUsers: ['John M.', 'Sarah J.', 'Michael T.', 'Peter K.', 'James L.', 'David R.'],
-        pendingUsers: ['Brian S.', 'Thomas W.']
+      case_number: 'INC-2026-0017',
+      case_type: 'SYSTEM_ERROR',
+      status: 'UNDER_INVESTIGATION',
+      priority: 'HIGH',
+      subject: 'POS Transaction Stock Deduction Failure: INV-00921',
+      description: 'Customer payment succeeded on EFTPOS card reader, but stock deduction failed due to lock timeout.',
+      created_by: 'Charlie Staff (EMP-00014)',
+      assigned_to_role: 'SYSADMIN',
+      entity_type: 'SYSTEM_INCIDENT',
+      entity_id: 'INV-00921',
+      amount: 0.00,
+      evidence: {
+        transaction_id: 'TXN-902184',
+        error_code: 'DB_TIMEOUT_LOCK',
+        affected_sku: 'SKU-000482'
       },
-      historyTrail: [{ time: '00:30 UTC', event: 'Org-wide broadcast issued by Administrator' }]
+      created_at: '2026-08-26T01:10:00Z',
+      events: [
+        { id: 105, event_type: 'SUBMITTED', performed_by: 'Charlie Staff', old_status: null, new_status: 'PENDING_REVIEW', comment: 'Incident reported from front-desk POS', created_at: '2026-08-26T01:10:00Z' },
+        { id: 106, event_type: 'ESCALATED', performed_by: 'Bob Manager', old_status: 'PENDING_REVIEW', new_status: 'UNDER_INVESTIGATION', comment: 'Escalated to IT Sysadmin for database ledger audit', created_at: '2026-08-26T01:30:00Z' }
+      ]
+    },
+    {
+      id: 5,
+      case_number: 'REF-2026-0039',
+      case_type: 'REFUND_REQUEST',
+      status: 'APPROVED',
+      priority: 'NORMAL',
+      subject: 'Customer Refund Approved: SAL-00140 ($120.00)',
+      description: 'Refund for unopened Ethernet switch return within 7-day policy window.',
+      created_by: 'Charlie Staff (EMP-00014)',
+      assigned_to_role: 'MANAGER',
+      entity_type: 'REFUND',
+      entity_id: 'INV-003912',
+      amount: 120.00,
+      evidence: {
+        customer_name: 'Metro Network Solutions',
+        item_name: '8-Port Gigabit Switch',
+        original_sale_amount: 120.00
+      },
+      created_at: '2026-08-25T16:00:00Z',
+      events: [
+        { id: 107, event_type: 'SUBMITTED', performed_by: 'Charlie Staff', old_status: null, new_status: 'PENDING_REVIEW', comment: 'Customer return presented with original receipt', created_at: '2026-08-25T16:00:00Z' },
+        { id: 108, event_type: 'APPROVED', performed_by: 'Bob Manager', old_status: 'PENDING_REVIEW', new_status: 'APPROVED', comment: 'Approved per standard 7-day return policy. Receipt verified.', created_at: '2026-08-25T16:15:00Z' }
+      ]
     }
   ]);
 
-  // Handle Send New Message / Broadcast
-  const handleSendMessage = () => {
-    if (!composerSubject.trim() || !composerBody.trim()) {
-      if (onShowToast) onShowToast('warning', 'Incomplete Message', 'Subject and Message body are required.');
-      return;
-    }
+  // Segregation of Duties (SoD) Capability Check
+  const canViewAttention = can(currentRole, 'attention.view');
 
-    const newItem = {
-      id: Date.now(),
-      code: `MSG-${Date.now().toString().slice(-4)}`,
-      type: composerScope === 'BROADCAST' ? 'ANNOUNCEMENT' : 'MESSAGE',
-      scope: composerScope,
-      importance: composerPriority === 'URGENT' ? 'ACTION_REQUIRED' : 'IMPORTANT',
-      title: composerSubject,
-      summary: composerBody,
-      sender: `${currentRole} User (Taa)`,
-      recipient: composerScope === 'INDIVIDUAL' ? composerRecipient : composerScope === 'TEAM' ? composerTeam : 'All Staff',
-      timestamp: new Date().toISOString(),
-      lifecycle: 'IMPORTANT',
-      relatedRecord: composerRelatedRecord || 'N/A',
-      requireAck: composerRequireAck,
-      acknowledgements: composerRequireAck ? {
-        totalRequired: 8,
-        confirmedCount: 1,
-        confirmedUsers: [`${currentRole} User`],
-        pendingUsers: ['Sarah J.', 'Michael T.', 'Peter K.', 'Brian S.', 'Thomas W.', 'David R.', 'James L.']
-      } : null,
-      staffNotes: [],
-      historyTrail: [{ time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), event: `Message sent by ${currentRole}` }]
-    };
+  if (!canViewAttention) {
+    return (
+      <div style={{ padding: '40px 24px', maxWidth: '800px', margin: '0 auto', textAlign: 'center' }}>
+        <div style={{
+          background: 'var(--color-paper-surface)',
+          border: '1px solid var(--color-rule)',
+          borderRadius: 'var(--radius-md)',
+          padding: '40px 30px',
+          boxShadow: 'var(--shadow-sm)'
+        }}>
+          <div style={{
+            width: '56px', height: '56px', borderRadius: '50%',
+            background: 'rgba(239, 68, 68, 0.15)', color: 'var(--color-signal-red)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px auto'
+          }}>
+            <Lock size={28} />
+          </div>
+          <h2 style={{ fontSize: '1.4rem', fontWeight: 800, margin: '0 0 8px 0', color: 'var(--color-ink)' }}>
+            Segregation of Duties (SoD) Restricted Access
+          </h2>
+          <p style={{ fontSize: '14px', color: 'var(--color-ink-muted)', lineHeight: '1.6', margin: '0 0 20px 0' }}>
+            The <strong>Operational Attention & Case Decision Center</strong> is strictly reserved for <strong>Managerial Personnel (MANAGER)</strong>.
+          </p>
+          <div style={{
+            padding: '14px 18px', background: 'var(--color-paper-2)', border: '1px solid var(--color-rule)', borderRadius: 'var(--radius-xs)',
+            fontSize: '12px', fontFamily: 'monospace', color: 'var(--color-ink)', textAlign: 'left'
+          }}>
+            <strong>SoD Compliance Rule:</strong> System Administrators manage infrastructure and users. Operational business decisions (refund approvals, write-offs, discrepancies) are strictly performed by authorized Store Managers.
+          </div>
+        </div>
+      </div>
+    );
+  }
 
-    setItems(prev => [newItem, ...prev]);
-    if (onShowToast) onShowToast('success', 'Message Transmitted', `Operational ${composerScope.toLowerCase()} message sent successfully.`);
-    setShowComposer(false);
-    setComposerSubject('');
-    setComposerBody('');
-  };
+  // Handle Manager Decision Submission
+  const handleExecuteDecision = () => {
+    if (!selectedCase) return;
 
-  // Handle Acknowledgement
-  const handleAcknowledge = (item) => {
-    setItems(prev => prev.map(i => {
-      if (i.id === item.id && i.acknowledgements) {
+    const nowStr = new Date().toISOString();
+    const finalComment = decisionComment.trim() ? decisionComment.trim() : '';
+
+    setCases(prev => prev.map(c => {
+      if (c.id === selectedCase.id) {
+        const oldStatus = c.status;
+        const newStatus = decisionType === 'APPROVED' ? 'APPROVED' : decisionType;
+        
         return {
-          ...i,
-          acknowledgements: {
-            ...i.acknowledgements,
-            confirmedCount: i.acknowledgements.confirmedCount + 1,
-            confirmedUsers: [...i.acknowledgements.confirmedUsers, `${currentRole} User`]
-          }
-        };
-      }
-      return i;
-    }));
-    if (onShowToast) onShowToast('info', 'Acknowledgement Confirmed', `You acknowledged operational instruction #${item.code}.`);
-  };
-
-  // Handle Manager Decision
-  const handleExecuteManagerDecision = () => {
-    if (!decisionModalEntity || !decisionNote.trim()) {
-      if (onShowToast) onShowToast('warning', 'Manager Note Required', 'Must attach mandatory decision note.');
-      return;
-    }
-
-    const { item, decision } = decisionModalEntity;
-    setItems(prev => prev.map(i => {
-      if (i.id === item.id) {
-        return {
-          ...i,
-          importance: 'RESOLVED',
-          lifecycle: 'RESOLVED',
-          title: `Resolved (${decision}): ${i.title}`,
-          details: { ...i.details, managerDecision: decision, managerNote: decisionNote },
-          historyTrail: [
-            ...i.historyTrail,
-            { time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), event: `Manager Decision (${decision}) executed. Note: ${decisionNote}` }
+          ...c,
+          status: newStatus,
+          updated_at: nowStr,
+          events: [
+            ...c.events,
+            {
+              id: Date.now(),
+              event_type: decisionType,
+              performed_by: `${currentRole.toUpperCase()} Reviewer`,
+              old_status: oldStatus,
+              new_status: newStatus,
+              comment: finalComment,
+              created_at: nowStr
+            }
           ]
         };
       }
-      return i;
+      return c;
     }));
 
-    if (onShowToast) onShowToast('success', `Decision Executed (${decision})`, `Item #${item.code} resolved and logged.`);
-    setDecisionModalEntity(null);
-    setDecisionNote('');
+    onShowToast?.('success', `Case Decision Executed (${decisionType})`, `Case ${selectedCase.case_number} updated. Logged in immutable timeline.`);
+    setSelectedCase(null);
+    setDecisionComment('');
   };
 
-  // Handle Staff Note Attachment
-  const handleAddStaffNote = () => {
-    if (!staffNoteModalEntity || !staffObservationNote.trim()) return;
-    setItems(prev => prev.map(i => {
-      if (i.id === staffNoteModalEntity.id) {
-        return {
-          ...i,
-          staffNotes: [
-            ...i.staffNotes,
-            { author: `${currentRole} User`, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), note: staffObservationNote }
-          ]
-        };
-      }
-      return i;
-    }));
-    if (onShowToast) onShowToast('info', 'Observation Note Attached', `Note added to #${staffNoteModalEntity.code}.`);
-    setStaffNoteModalEntity(null);
-    setStaffObservationNote('');
-  };
+  // Filter Cases
+  const filteredCases = cases.filter(c => {
+    // Status tab filter
+    if (statusTab === 'PENDING' && c.status !== 'PENDING_REVIEW') return false;
+    if (statusTab === 'INVESTIGATING' && c.status !== 'UNDER_INVESTIGATION' && c.status !== 'CONTESTED') return false;
+    if (statusTab === 'RESOLVED' && c.status !== 'APPROVED' && c.status !== 'DENIED' && c.status !== 'RETURNED') return false;
 
-  // Filter Items
-  const filteredItems = items.filter(i => {
-    if (activeFilter === 'MESSAGES') return i.type === 'MESSAGE';
-    if (activeFilter === 'ALERTS') return i.type === 'ALERT';
-    if (activeFilter === 'APPROVALS') return i.type === 'APPROVAL';
-    if (activeFilter === 'ANNOUNCEMENTS') return i.type === 'ANNOUNCEMENT';
-    if (activeFilter === 'HISTORY_BOARD') return true;
+    // Type filter
+    if (activeFilter !== 'ALL' && c.case_type !== activeFilter) return false;
+
+    // Search term
+    if (searchTerm.trim()) {
+      const q = searchTerm.toLowerCase();
+      return (
+        c.case_number.toLowerCase().includes(q) ||
+        c.subject.toLowerCase().includes(q) ||
+        c.created_by.toLowerCase().includes(q)
+      );
+    }
     return true;
   });
 
+  const pendingCount = cases.filter(c => c.status === 'PENDING_REVIEW').length;
+  const investigatingCount = cases.filter(c => c.status === 'UNDER_INVESTIGATION' || c.status === 'CONTESTED').length;
+  const resolvedCount = cases.filter(c => c.status === 'APPROVED' || c.status === 'DENIED' || c.status === 'RETURNED').length;
+
   return (
-    <div style={{ padding: '24px', maxWidth: '1400px', margin: '0 auto' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       
-      {/* Page Header */}
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: '24px',
-        paddingBottom: '16px',
-        borderBottom: '1px solid var(--color-rule)'
-      }}>
+      {/* Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{
-              width: '38px',
-              height: '38px',
-              borderRadius: 'var(--radius-sm)',
-              background: 'var(--color-accent)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#fff'
-            }}>
-              <ShieldAlert size={22} />
-            </div>
-            <div>
-              <h1 style={{ fontSize: '22px', fontWeight: '800', margin: 0, letterSpacing: '-0.02em' }}>
-                Operational Attention & Communication Center
-              </h1>
-              <p style={{ fontSize: '13px', color: 'var(--color-text-secondary)', margin: '2px 0 0 0' }}>
-                Unified Operational Stream • Direct Messages • Team Groups • Broadcasts • System Event Alerts
-              </p>
-            </div>
-          </div>
+          <h2 style={{ fontSize: '1.5rem', fontWeight: 800, margin: 0, color: 'var(--color-ink)', letterSpacing: '-0.02em' }}>
+            Unified Operational Attention & Escalation Center
+          </h2>
+          <p style={{ fontSize: '0.875rem', color: 'var(--color-ink-muted)', margin: '4px 0 0 0' }}>
+            Single command center for managing operational cases: refunds, receiving discrepancies, float variances, stock write-offs, and incidents.
+          </p>
         </div>
 
         <div style={{ display: 'flex', gap: '10px' }}>
-          <button
-            onClick={() => setShowComposer(true)}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '8px',
-              background: 'var(--color-accent)',
-              color: '#fff',
-              border: 'none',
-              borderRadius: 'var(--radius-xs)',
-              padding: '9px 16px',
-              fontSize: '13px',
-              fontWeight: '700',
-              cursor: 'pointer'
-            }}
+          <button 
+            className={`btn ${statusTab === 'PENDING' ? 'btn-primary' : 'btn-secondary'}`}
+            onClick={() => setStatusTab('PENDING')}
           >
-            <Plus size={16} /> New Message / Broadcast
+            Needs Decision ({pendingCount})
           </button>
-
-          <button
-            onClick={() => setExportConsentModal({ datasetName: 'Customer & Financial Stock Ledger' })}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '8px',
-              background: 'var(--color-canvas)',
-              border: '1px solid var(--color-rule)',
-              borderRadius: 'var(--radius-xs)',
-              padding: '9px 16px',
-              fontSize: '13px',
-              fontWeight: '600',
-              cursor: 'pointer',
-              color: 'var(--color-text)'
-            }}
+          <button 
+            className={`btn ${statusTab === 'INVESTIGATING' ? 'btn-primary' : 'btn-secondary'}`}
+            onClick={() => setStatusTab('INVESTIGATING')}
           >
-            <Download size={16} /> Export Sensitive Ledger
+            Under Investigation ({investigatingCount})
+          </button>
+          <button 
+            className={`btn ${statusTab === 'RESOLVED' ? 'btn-primary' : 'btn-secondary'}`}
+            onClick={() => setStatusTab('RESOLVED')}
+          >
+            Resolved Cases ({resolvedCount})
           </button>
         </div>
       </div>
 
-      {/* FILTER CHIPS (ALL, MESSAGES, ALERTS, APPROVALS, ANNOUNCEMENTS, HISTORY BOARD) */}
-      <div style={{
-        display: 'flex',
-        gap: '8px',
-        borderBottom: '1px solid var(--color-rule)',
-        marginBottom: '24px',
-        overflowX: 'auto'
-      }}>
+      {/* Case Type Filters Bar */}
+      <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px', borderBottom: '1px solid var(--color-rule)' }}>
         {[
-          { id: 'ALL', label: 'ALL EVENTS', icon: Layers },
-          { id: 'APPROVALS', label: 'APPROVALS', icon: CheckSquare },
-          { id: 'ALERTS', label: 'ALERTS', icon: AlertTriangle },
-          { id: 'MESSAGES', label: 'DIRECT & TEAM MESSAGES', icon: MessageSquare },
-          { id: 'ANNOUNCEMENTS', label: 'BROADCASTS', icon: Megaphone },
-          { id: 'HISTORY_BOARD', label: 'CONVERSATION & TICKET BOARD', icon: Clock }
-        ].map(tab => {
-          const Icon = tab.icon;
-          const isActive = activeFilter === tab.id;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => setActiveFilter(tab.id)}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '12px 18px',
-                border: 'none',
-                borderBottom: isActive ? '2px solid var(--color-accent)' : '2px solid transparent',
-                background: 'transparent',
-                color: isActive ? 'var(--color-accent)' : 'var(--color-text-secondary)',
-                fontWeight: isActive ? '700' : '500',
-                fontSize: '13px',
-                cursor: 'pointer',
-                whiteSpace: 'nowrap'
-              }}
-            >
-              <Icon size={16} color={isActive ? 'var(--color-accent)' : 'currentColor'} />
-              <span>{tab.label}</span>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* OPERATIONAL STREAM */}
-      <div style={{ display: 'grid', gap: '16px' }}>
-        {filteredItems.map(item => (
-          <div
-            key={item.id}
+          { id: 'ALL', label: 'All Case Types' },
+          { id: 'REFUND_REQUEST', label: 'Refund Requests' },
+          { id: 'RECEIVING_DISCREPANCY', label: 'Receiving Discrepancies' },
+          { id: 'FLOAT_VARIANCE', label: 'Float Variances' },
+          { id: 'STOCK_ADJUSTMENT', label: 'Stock Write-offs' },
+          { id: 'SYSTEM_ERROR', label: 'System Errors' }
+        ].map(filter => (
+          <button
+            key={filter.id}
+            onClick={() => setActiveFilter(filter.id)}
             style={{
-              background: 'var(--color-paper)',
-              border: '1px solid var(--color-rule)',
-              borderRadius: 'var(--radius-sm)',
-              padding: '20px',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
+              padding: '6px 12px',
+              borderRadius: 'var(--radius-xs)',
+              fontSize: '12px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              border: 'none',
+              background: activeFilter === filter.id ? 'var(--color-accent)' : 'var(--color-paper-2)',
+              color: activeFilter === filter.id ? '#fff' : 'var(--color-ink)'
             }}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <span style={{ fontSize: '10px', fontFamily: 'monospace', fontWeight: '800', padding: '2px 8px', borderRadius: '4px', background: 'var(--color-canvas)', border: '1px solid var(--color-rule)', color: 'var(--color-accent)' }}>
-                    {item.type} • {item.code}
-                  </span>
-                  <h3 style={{ fontSize: '16px', fontWeight: '700', margin: 0 }}>
-                    {item.title}
-                  </h3>
-                </div>
-
-                <p style={{ fontSize: '13.5px', margin: '8px 0 0 0', color: 'var(--color-text)' }}>
-                  {item.summary}
-                </p>
-
-                <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '6px', display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
-                  <span>Sender: <strong>{item.sender}</strong></span>
-                  {item.recipient && <span>Recipient: <strong>{item.recipient}</strong></span>}
-                  {item.relatedRecord && <span>Linked Object: <strong style={{ fontFamily: 'monospace', color: 'var(--color-accent)' }}>{item.relatedRecord}</strong></span>}
-                  <span>{new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                </div>
-
-                {/* Acknowledgement Progress Bar (For Broadcasts / Team Messages) */}
-                {item.requireAck && item.acknowledgements && (
-                  <div style={{ marginTop: '12px', padding: '12px', background: 'var(--color-canvas)', border: '1px solid var(--color-rule)', borderRadius: 'var(--radius-xs)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', fontWeight: '700', marginBottom: '6px' }}>
-                      <span>Acknowledgement Progress: {item.acknowledgements.confirmedCount} / {item.acknowledgements.totalRequired} Confirmed</span>
-                      <span style={{ color: 'var(--color-accent)' }}>
-                        {Math.round((item.acknowledgements.confirmedCount / item.acknowledgements.totalRequired) * 100)}%
-                      </span>
-                    </div>
-                    <div style={{ width: '100%', height: '6px', background: 'var(--color-paper)', borderRadius: '3px', overflow: 'hidden', marginBottom: '8px' }}>
-                      <div style={{ width: `${(item.acknowledgements.confirmedCount / item.acknowledgements.totalRequired) * 100}%`, height: '100%', background: 'var(--color-accent)' }} />
-                    </div>
-
-                    <div style={{ fontSize: '11px', display: 'flex', gap: '12px', flexWrap: 'wrap', color: 'var(--color-text-secondary)' }}>
-                      <span>✓ Confirmed: {item.acknowledgements.confirmedUsers.join(', ')}</span>
-                      {item.acknowledgements.pendingUsers.length > 0 && (
-                        <span>○ Pending: {item.acknowledgements.pendingUsers.join(', ')}</span>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Staff Observation Notes */}
-                {item.staffNotes && item.staffNotes.length > 0 && (
-                  <div style={{ marginTop: '12px', padding: '10px', background: 'var(--color-canvas)', border: '1px solid var(--color-rule)', borderRadius: 'var(--radius-xs)' }}>
-                    <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--color-accent)', marginBottom: '4px' }}>STAFF OBSERVATIONS:</div>
-                    {item.staffNotes.map((sn, idx) => (
-                      <div key={idx} style={{ fontSize: '12px', color: 'var(--color-text)' }}>
-                        <strong>{sn.author} ({sn.time}):</strong> "{sn.note}"
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Action Buttons */}
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-                {item.whyExplanation && (
-                  <button
-                    onClick={() => setSelectedAlertForExplanation(item)}
-                    style={{ padding: '7px 12px', background: 'var(--color-canvas)', border: '1px solid var(--color-rule)', borderRadius: 'var(--radius-xs)', fontSize: '12px', cursor: 'pointer' }}
-                  >
-                    Why Am I Seeing This?
-                  </button>
-                )}
-
-                {item.requireAck && (
-                  <button
-                    onClick={() => handleAcknowledge(item)}
-                    style={{ padding: '7px 14px', background: 'var(--color-accent)', color: '#fff', border: 'none', borderRadius: 'var(--radius-xs)', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
-                  >
-                    ✓ Acknowledge Receipt
-                  </button>
-                )}
-
-                <button
-                  onClick={() => setStaffNoteModalEntity(item)}
-                  style={{ padding: '7px 12px', background: 'var(--color-canvas)', border: '1px solid var(--color-rule)', borderRadius: 'var(--radius-xs)', fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
-                >
-                  <MessageSquare size={14} /> Attach Note
-                </button>
-
-                {item.type === 'APPROVAL' && (
-                  isManager ? (
-                    <>
-                      <button
-                        onClick={() => setDecisionModalEntity({ item, decision: 'APPROVE' })}
-                        style={{ padding: '7px 14px', background: 'var(--color-accent)', color: '#fff', border: 'none', borderRadius: 'var(--radius-xs)', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
-                      >
-                        Approve
-                      </button>
-                      <button
-                        onClick={() => setDecisionModalEntity({ item, decision: 'REJECT' })}
-                        style={{ padding: '7px 14px', background: 'rgba(239, 68, 68, 0.12)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: 'var(--radius-xs)', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
-                      >
-                        Reject
-                      </button>
-                      <button
-                        onClick={() => setDecisionModalEntity({ item, decision: 'REQUEST_CHANGES' })}
-                        style={{ padding: '7px 14px', background: 'var(--color-canvas)', color: 'var(--color-text)', border: '1px solid var(--color-rule)', borderRadius: 'var(--radius-xs)', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
-                      >
-                        Request Changes
-                      </button>
-                    </>
-                  ) : (
-                    <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)', fontStyle: 'italic', padding: '6px' }}>
-                      (View Only Mode — Manager Decision Required)
-                    </span>
-                  )
-                )}
-
-                {item.type === 'ALERT' && (
-                  <button
-                    onClick={() => { if (onNavigate) onNavigate('purchases'); }}
-                    style={{ padding: '7px 14px', background: 'var(--color-accent)', color: '#fff', border: 'none', borderRadius: 'var(--radius-xs)', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
-                  >
-                    Create Purchase Order
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
+            {filter.label}
+          </button>
         ))}
       </div>
 
-      {/* COMPOSER MODAL (1:1, TEAM, BROADCAST WITH BUSINESS OBJECT LINKING) */}
-      {showComposer && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: '20px' }}>
-          <div style={{ background: 'var(--color-paper)', border: '1px solid var(--color-rule)', borderRadius: 'var(--radius-sm)', width: '560px', maxWidth: '100%', padding: '24px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid var(--color-rule)', paddingBottom: '12px' }}>
-              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '800' }}>
-                New Operational Message / Broadcast
-              </h3>
-              <button onClick={() => setShowComposer(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
-                <X size={20} />
-              </button>
+      {/* Case List Grid */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        {filteredCases.length === 0 ? (
+          <div style={{ background: 'var(--color-paper-surface)', border: '1px solid var(--color-rule)', borderRadius: 'var(--radius-md)', padding: '40px', textAlign: 'center', color: 'var(--color-ink-muted)', fontSize: '14px' }}>
+            No operational cases found under this filter.
+          </div>
+        ) : (
+          filteredCases.map(item => (
+            <div
+              key={item.id}
+              style={{
+                background: 'var(--color-paper-surface)',
+                border: '1px solid var(--color-rule)',
+                borderRadius: 'var(--radius-md)',
+                padding: '16px 20px',
+                display: 'flex',
+                alignItems: 'center',
+                justify: 'space-between',
+                gap: '16px',
+                flexWrap: 'wrap'
+              }}
+            >
+              <div style={{ flex: 1, minWidth: '280px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
+                  <span style={{ fontFamily: 'monospace', fontWeight: 800, color: 'var(--color-accent)', fontSize: '13px' }}>
+                    {item.case_number}
+                  </span>
+                  <span style={{
+                    fontSize: '10px', fontWeight: 800, padding: '2px 8px', borderRadius: '10px',
+                    background: item.priority === 'HIGH' || item.priority === 'CRITICAL' ? 'rgba(239, 68, 68, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+                    color: item.priority === 'HIGH' || item.priority === 'CRITICAL' ? '#ef4444' : '#f59e0b',
+                    fontFamily: 'monospace'
+                  }}>
+                    {item.case_type.replace('_', ' ')}
+                  </span>
+                  {item.amount > 0 && (
+                    <span style={{ fontSize: '12px', fontWeight: 800, fontFamily: 'monospace', color: 'var(--color-signal-green)' }}>
+                      ${item.amount.toFixed(2)}
+                    </span>
+                  )}
+                </div>
+
+                <h4 style={{ fontSize: '15px', fontWeight: 700, margin: '0 0 4px 0', color: 'var(--color-ink)' }}>
+                  {item.subject}
+                </h4>
+                <p style={{ fontSize: '13px', color: 'var(--color-ink-muted)', margin: 0, lineHeight: 1.4 }}>
+                  {item.description}
+                </p>
+
+                <div style={{ fontSize: '11px', color: 'var(--color-ink-muted)', marginTop: '8px', display: 'flex', gap: '14px' }}>
+                  <span>Requested by: <strong>{item.created_by}</strong></span>
+                  <span>Target: <strong>{item.entity_id || 'N/A'}</strong></span>
+                  <span>Submitted: <strong>{new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</strong></span>
+                </div>
+              </div>
+
+              <div>
+                <button
+                  className="btn btn-primary"
+                  onClick={() => {
+                    setSelectedCase(item);
+                    setDecisionType('APPROVED');
+                    setDecisionComment('');
+                  }}
+                  style={{ padding: '8px 16px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}
+                >
+                  Review →
+                </button>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* WORKBENCH MODAL: CASE DETAILS & DECISION ENGINE */}
+      {selectedCase && (
+        <div className="modal-overlay" onClick={() => setSelectedCase(null)} style={{ zIndex: 300 }}>
+          <div 
+            className="modal-content" 
+            onClick={e => e.stopPropagation()} 
+            style={{ maxWidth: '780px', padding: '24px', maxHeight: '90vh', overflowY: 'auto' }}
+          >
+            {/* Modal Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid var(--color-rule)', paddingBottom: '16px', marginBottom: '16px' }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '12px', fontFamily: 'monospace', color: 'var(--color-accent)', fontWeight: 800 }}>{selectedCase.case_number}</span>
+                  <span style={{ fontSize: '11px', fontWeight: 800, padding: '2px 8px', borderRadius: '10px', background: 'var(--color-paper-2)', color: 'var(--color-ink)' }}>{selectedCase.case_type}</span>
+                </div>
+                <h3 style={{ fontSize: '1.2rem', fontWeight: 800, margin: '4px 0 0 0', color: 'var(--color-ink)' }}>{selectedCase.subject}</h3>
+              </div>
+              <button onClick={() => setSelectedCase(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-ink-muted)' }}><X size={20} /></button>
             </div>
 
-            {/* Scope Selection */}
-            <div style={{ marginBottom: '16px' }}>
-              <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', marginBottom: '6px' }}>COMMUNICATION SCOPE</label>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
-                {[
-                  { id: 'INDIVIDUAL', label: 'Individual (1:1)' },
-                  { id: 'TEAM', label: 'Team / Group' },
-                  { id: 'BROADCAST', label: 'Broadcast (Org-wide)' }
-                ].map(s => (
-                  <button
-                    key={s.id}
-                    onClick={() => {
-                      if (s.id === 'BROADCAST' && !canBroadcast) {
-                        if (onShowToast) onShowToast('warning', 'Permission Restricted', 'Broadcast permission is restricted to Managers and Admins.');
-                        return;
-                      }
-                      setComposerScope(s.id);
-                    }}
-                    style={{
-                      padding: '8px',
-                      background: composerScope === s.id ? 'var(--color-accent)' : 'var(--color-canvas)',
-                      color: composerScope === s.id ? '#fff' : 'var(--color-text)',
-                      border: '1px solid var(--color-rule)',
-                      borderRadius: 'var(--radius-xs)',
-                      fontSize: '12px',
-                      fontWeight: '700',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    {s.label}
-                  </button>
+            {/* Original Request Details (Immutable Context) */}
+            <div style={{ background: 'var(--color-paper-2)', padding: '16px', borderRadius: 'var(--radius-sm)', marginBottom: '16px', border: '1px solid var(--color-rule)' }}>
+              <div style={{ fontSize: '12px', fontWeight: 800, color: 'var(--color-ink-muted)', marginBottom: '8px', textTransform: 'uppercase' }}>Original Case Context</div>
+              <p style={{ fontSize: '13px', color: 'var(--color-ink)', margin: '0 0 12px 0' }}>{selectedCase.description}</p>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '10px', fontSize: '12px' }}>
+                <div><strong>Requested By:</strong> {selectedCase.created_by}</div>
+                <div><strong>Reference Entity:</strong> {selectedCase.entity_type} ({selectedCase.entity_id})</div>
+                <div><strong>Financial Amount:</strong> ${selectedCase.amount ? selectedCase.amount.toFixed(2) : '0.00'}</div>
+                <div><strong>Current Status:</strong> <span style={{ fontWeight: 800, color: 'var(--color-accent)' }}>{selectedCase.status}</span></div>
+              </div>
+
+              {/* Evidence Metadata */}
+              {selectedCase.evidence && (
+                <div style={{ marginTop: '12px', paddingTop: '10px', borderTop: '1px dashed var(--color-rule)', fontSize: '12px' }}>
+                  <div style={{ fontWeight: '700', marginBottom: '4px' }}>ATTACHED EVIDENCE & VERIFICATION:</div>
+                  <pre style={{ margin: 0, fontFamily: 'monospace', fontSize: '11px', background: 'var(--color-paper)', padding: '8px', borderRadius: '4px', color: 'var(--color-ink)' }}>
+                    {JSON.stringify(selectedCase.evidence, null, 2)}
+                  </pre>
+                </div>
+              )}
+            </div>
+
+            {/* Immutable Timeline Audit Events Trail */}
+            <div style={{ marginBottom: '20px' }}>
+              <h4 style={{ fontSize: '13px', fontWeight: 800, margin: '0 0 10px 0', color: 'var(--color-ink)' }}>Immutable Case Event Audit Timeline</h4>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {selectedCase.events.map(ev => (
+                  <div key={ev.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', background: 'var(--color-paper-surface)', padding: '10px 12px', borderRadius: 'var(--radius-xs)', border: '1px solid var(--color-rule)' }}>
+                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--color-accent)', marginTop: '4px' }} />
+                    <div style={{ flex: 1, fontSize: '12px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <strong>{ev.event_type} by {ev.performed_by}</strong>
+                        <span style={{ fontFamily: 'monospace', color: 'var(--color-ink-muted)', fontSize: '11px' }}>{new Date(ev.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                      </div>
+                      <div style={{ color: 'var(--color-ink-muted)', marginTop: '2px' }}>{ev.comment}</div>
+                    </div>
+                  </div>
                 ))}
               </div>
             </div>
 
-            {/* Recipient Selection */}
-            {composerScope === 'INDIVIDUAL' && (
-              <div style={{ marginBottom: '14px' }}>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', marginBottom: '4px' }}>RECIPIENT EMPLOYEE</label>
-                <select
-                  value={composerRecipient}
-                  onChange={e => setComposerRecipient(e.target.value)}
-                  style={{ width: '100%', padding: '8px', borderRadius: 'var(--radius-xs)', border: '1px solid var(--color-rule)', background: 'var(--color-canvas)', color: 'var(--color-text)', fontSize: '13px' }}
-                >
-                  <option value="EMP-00014 (Sales Staff)">John M. (EMP-00014 - Sales Staff)</option>
-                  <option value="EMP-00022 (Receiving Operator)">Sarah J. (EMP-00022 - Warehouse)</option>
-                  <option value="EMP-00031 (Warehouse Lead)">Peter K. (EMP-00031 - Warehouse Lead)</option>
-                </select>
+            {/* Manager Decision Controls (Executing Action) */}
+            {can(currentRole, 'attention.decide') ? (
+              <div style={{ borderTop: '1px solid var(--color-rule)', paddingTop: '16px' }}>
+                <h4 style={{ fontSize: '14px', fontWeight: 800, margin: '0 0 12px 0', color: 'var(--color-ink)' }}>Manager Decision Execution</h4>
+                
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '8px', marginBottom: '14px' }}>
+                  {[
+                    { id: 'APPROVED', label: 'Approve', color: '#10b981' },
+                    { id: 'DENIED', label: 'Deny', color: '#ef4444' },
+                    { id: 'CONTESTED', label: 'Contest', color: '#f59e0b' },
+                    { id: 'RETURNED', label: 'Return for clarification', color: '#3b82f6' },
+                    { id: 'ESCALATED', label: 'Escalate Further', color: '#8b5cf6' }
+                  ].map(opt => (
+                    <button
+                      key={opt.id}
+                      onClick={() => setDecisionType(opt.id)}
+                      style={{
+                        padding: '8px',
+                        borderRadius: 'var(--radius-xs)',
+                        fontSize: '12px',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        border: decisionType === opt.id ? `2px solid ${opt.color}` : '1px solid var(--color-rule)',
+                        background: decisionType === opt.id ? opt.color : 'var(--color-paper-2)',
+                        color: decisionType === opt.id ? '#fff' : 'var(--color-ink)'
+                      }}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+
+                <div style={{ marginBottom: '14px' }}>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px', color: 'var(--color-ink)' }}>REVIEWER DECISION NOTE / COMMENT (OPTIONAL)</label>
+                  <textarea
+                    rows={3}
+                    value={decisionComment}
+                    onChange={e => setDecisionComment(e.target.value)}
+                    placeholder="Enter decision rationale, verification notes, or instructions (optional)..."
+                    style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-xs)', border: '1px solid var(--color-rule)', background: 'var(--color-canvas)', color: 'var(--color-ink)', fontSize: '13px' }}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                  <button className="btn btn-secondary" onClick={() => setSelectedCase(null)}>Cancel</button>
+                  <button className="btn btn-primary" onClick={handleExecuteDecision}>
+                    Submit Decision ({decisionType})
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div style={{ borderTop: '1px solid var(--color-rule)', paddingTop: '16px', fontSize: '13px', color: 'var(--color-ink-muted)' }}>
+                <em>Read-Only View: Operational decision rights reserved for Store Operations Managers.</em>
               </div>
             )}
 
-            {composerScope === 'TEAM' && (
-              <div style={{ marginBottom: '14px' }}>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', marginBottom: '4px' }}>TARGET OPERATIONAL GROUP</label>
-                <select
-                  value={composerTeam}
-                  onChange={e => setComposerTeam(e.target.value)}
-                  style={{ width: '100%', padding: '8px', borderRadius: 'var(--radius-xs)', border: '1px solid var(--color-rule)', background: 'var(--color-canvas)', color: 'var(--color-text)', fontSize: '13px' }}
-                >
-                  <option value="Warehouse Team">Warehouse Team</option>
-                  <option value="Sales Department">Sales Department</option>
-                  <option value="Purchasing Team">Purchasing Team</option>
-                  <option value="All Managers">All Branch Managers</option>
-                </select>
-              </div>
-            )}
-
-            {/* Subject & Related Business Object Link */}
-            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '10px', marginBottom: '14px' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', marginBottom: '4px' }}>SUBJECT</label>
-                <input
-                  type="text"
-                  value={composerSubject}
-                  onChange={e => setComposerSubject(e.target.value)}
-                  placeholder="e.g. PO-00431 Receiving Discrepancy"
-                  style={{ width: '100%', padding: '8px', borderRadius: 'var(--radius-xs)', border: '1px solid var(--color-rule)', background: 'var(--color-canvas)', color: 'var(--color-text)', fontSize: '13px' }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', marginBottom: '4px' }}>LINKED RECORD</label>
-                <input
-                  type="text"
-                  value={composerRelatedRecord}
-                  onChange={e => setComposerRelatedRecord(e.target.value)}
-                  placeholder="PO-00431"
-                  style={{ width: '100%', padding: '8px', borderRadius: 'var(--radius-xs)', border: '1px solid var(--color-rule)', background: 'var(--color-canvas)', color: 'var(--color-text)', fontSize: '13px', fontFamily: 'monospace' }}
-                />
-              </div>
-            </div>
-
-            {/* Message Body */}
-            <div style={{ marginBottom: '16px' }}>
-              <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', marginBottom: '4px' }}>TRANSACTIONAL INSTRUCTION</label>
-              <textarea
-                value={composerBody}
-                onChange={e => setComposerBody(e.target.value)}
-                placeholder="Enter clear operational instruction..."
-                rows={4}
-                style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-xs)', border: '1px solid var(--color-rule)', background: 'var(--color-canvas)', color: 'var(--color-text)', fontSize: '13px' }}
-              />
-            </div>
-
-            {/* Options: Priority & Acknowledgement Checkbox */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', cursor: 'pointer' }}>
-                <input
-                  type="checkbox"
-                  checked={composerRequireAck}
-                  onChange={e => setComposerRequireAck(e.target.checked)}
-                />
-                <strong>Require Formal Acknowledgement</strong>
-              </label>
-
-              <select
-                value={composerPriority}
-                onChange={e => setComposerPriority(e.target.value)}
-                style={{ padding: '6px 12px', borderRadius: 'var(--radius-xs)', border: '1px solid var(--color-rule)', background: 'var(--color-canvas)', color: 'var(--color-text)', fontSize: '12px', fontWeight: '700' }}
-              >
-                <option value="NORMAL">Normal Priority</option>
-                <option value="IMPORTANT">Important</option>
-                <option value="URGENT">Urgent Action</option>
-              </select>
-            </div>
-
-            {/* Modal Actions */}
-            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-              <button onClick={() => setShowComposer(false)} style={{ padding: '9px 16px', background: 'var(--color-canvas)', border: '1px solid var(--color-rule)', borderRadius: 'var(--radius-xs)', cursor: 'pointer' }}>Cancel</button>
-              <button onClick={handleSendMessage} style={{ padding: '9px 18px', background: 'var(--color-accent)', color: '#fff', border: 'none', borderRadius: 'var(--radius-xs)', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Send size={14} /> Send Transmission
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* DECISION MODAL WITH MANDATORY NOTE */}
-      {decisionModalEntity && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: '20px' }}>
-          <div style={{ background: 'var(--color-paper)', border: '1px solid var(--color-rule)', borderRadius: 'var(--radius-sm)', width: '500px', maxWidth: '100%', padding: '24px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '800' }}>
-                Manager Decision: {decisionModalEntity.decision}
-              </h3>
-              <button onClick={() => setDecisionModalEntity(null)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
-                <X size={20} />
-              </button>
-            </div>
-
-            <div style={{ fontSize: '13px', marginBottom: '14px' }}>
-              Target Item: <strong>{decisionModalEntity.item.code}</strong> — {decisionModalEntity.item.title}
-            </div>
-
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', marginBottom: '6px' }}>
-                Mandatory Manager Decision Note / Audit Justification:
-              </label>
-              <textarea
-                value={decisionNote}
-                onChange={e => setDecisionNote(e.target.value)}
-                placeholder="Enter mandatory justification note for audit ledger..."
-                rows={4}
-                style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-xs)', border: '1px solid var(--color-rule)', background: 'var(--color-canvas)', color: 'var(--color-text)', fontSize: '13px' }}
-              />
-            </div>
-
-            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-              <button onClick={() => setDecisionModalEntity(null)} style={{ padding: '9px 16px', background: 'var(--color-canvas)', border: '1px solid var(--color-rule)', borderRadius: 'var(--radius-xs)', cursor: 'pointer' }}>Cancel</button>
-              <button onClick={handleExecuteManagerDecision} style={{ padding: '9px 18px', background: 'var(--color-accent)', color: '#fff', border: 'none', borderRadius: 'var(--radius-xs)', fontWeight: '700', cursor: 'pointer' }}>
-                Confirm & Log Decision
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* STAFF OBSERVATION NOTE MODAL */}
-      {staffNoteModalEntity && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: '20px' }}>
-          <div style={{ background: 'var(--color-paper)', border: '1px solid var(--color-rule)', borderRadius: 'var(--radius-sm)', width: '480px', maxWidth: '100%', padding: '24px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '800' }}>
-                Attach Staff Observation Note
-              </h3>
-              <button onClick={() => setStaffNoteModalEntity(null)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
-                <X size={20} />
-              </button>
-            </div>
-
-            <div style={{ fontSize: '13px', marginBottom: '14px' }}>
-              Target Item: <strong>{staffNoteModalEntity.code}</strong>
-            </div>
-
-            <div style={{ marginBottom: '20px' }}>
-              <textarea
-                value={staffObservationNote}
-                onChange={e => setStaffObservationNote(e.target.value)}
-                placeholder="e.g. Supplier driver confirmed 4 units backordered on delivery slip."
-                rows={3}
-                style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-xs)', border: '1px solid var(--color-rule)', background: 'var(--color-canvas)', color: 'var(--color-text)', fontSize: '13px' }}
-              />
-            </div>
-
-            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-              <button onClick={() => setStaffNoteModalEntity(null)} style={{ padding: '9px 16px', background: 'var(--color-canvas)', border: '1px solid var(--color-rule)', borderRadius: 'var(--radius-xs)', cursor: 'pointer' }}>Cancel</button>
-              <button onClick={handleAddStaffNote} style={{ padding: '9px 18px', background: 'var(--color-accent)', color: '#fff', border: 'none', borderRadius: 'var(--radius-xs)', fontWeight: '700', cursor: 'pointer' }}>Attach Note</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* SENSITIVE DATA EXPORT CONSENT MODAL */}
-      {exportConsentModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: '20px' }}>
-          <div style={{ background: 'var(--color-paper)', border: '1px solid var(--color-rule)', borderRadius: 'var(--radius-sm)', width: '520px', maxWidth: '100%', padding: '24px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <Lock size={22} style={{ color: 'var(--color-accent)' }} />
-                <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '800' }}>
-                  Sensitive Data Export Consent Required
-                </h3>
-              </div>
-              <button onClick={() => setExportConsentModal(null)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
-                <X size={20} />
-              </button>
-            </div>
-
-            <div style={{ background: 'var(--color-canvas)', border: '1px solid var(--color-rule)', borderRadius: 'var(--radius-xs)', padding: '12px', fontSize: '12.5px', marginBottom: '16px' }}>
-              ⚠️ You are attempting to export sensitive dataset: <strong>{exportConsentModal.datasetName}</strong>. Every export is permanently logged into the security compliance audit trail.
-            </div>
-
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', marginBottom: '6px' }}>
-                Export Reason / Business Justification:
-              </label>
-              <textarea
-                value={exportReason}
-                onChange={e => setExportReason(e.target.value)}
-                placeholder="e.g. Monthly external financial audit compliance export for Q3."
-                rows={3}
-                style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-xs)', border: '1px solid var(--color-rule)', background: 'var(--color-canvas)', color: 'var(--color-text)', fontSize: '13px' }}
-              />
-            </div>
-
-            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-              <button onClick={() => setExportConsentModal(null)} style={{ padding: '9px 16px', background: 'var(--color-canvas)', border: '1px solid var(--color-rule)', borderRadius: 'var(--radius-xs)', cursor: 'pointer' }}>Cancel</button>
-              <button onClick={handleConfirmExport} style={{ padding: '9px 18px', background: 'var(--color-accent)', color: '#fff', border: 'none', borderRadius: 'var(--radius-xs)', fontWeight: '700', cursor: 'pointer' }}>
-                Authorize Export & Log
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* WHY EXPLANATION MODAL */}
-      {selectedAlertForExplanation && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: '20px' }}>
-          <div style={{ background: 'var(--color-paper)', border: '1px solid var(--color-rule)', borderRadius: 'var(--radius-sm)', width: '580px', maxWidth: '100%', padding: '24px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid var(--color-rule)', paddingBottom: '12px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <HelpCircle size={22} color="var(--color-accent)" />
-                <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '800' }}>
-                  Why Am I Seeing This?
-                </h3>
-              </div>
-              <button onClick={() => setSelectedAlertForExplanation(null)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
-                <X size={20} />
-              </button>
-            </div>
-
-            <div style={{ fontSize: '13px', lineHeight: 1.6 }}>
-              <div><strong>Trigger Rule:</strong> {selectedAlertForExplanation.whyExplanation.trigger}</div>
-              <div style={{ marginTop: '8px', fontFamily: 'monospace', background: 'var(--color-canvas)', padding: '10px', border: '1px solid var(--color-rule)', borderRadius: 'var(--radius-xs)' }}>
-                {selectedAlertForExplanation.whyExplanation.formula}
-              </div>
-              <div style={{ marginTop: '12px', fontSize: '12px', color: 'var(--color-text-secondary)' }}>
-                Audit Reference: {selectedAlertForExplanation.whyExplanation.auditRef}
-              </div>
-            </div>
-
-            <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end' }}>
-              <button onClick={() => setSelectedAlertForExplanation(null)} style={{ padding: '9px 18px', background: 'var(--color-accent)', color: '#fff', border: 'none', borderRadius: 'var(--radius-xs)', fontWeight: '600', cursor: 'pointer' }}>
-                Close Explanation
-              </button>
-            </div>
           </div>
         </div>
       )}

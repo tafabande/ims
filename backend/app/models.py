@@ -204,6 +204,8 @@ class InventoryTransaction(Base):
     reason_category = Column(String(100), default="CORRECTION")
     reference = Column(String(100), nullable=True)
     user_name = Column(String(255), nullable=True)
+    work_session_id = Column(Integer, ForeignKey("work_sessions.id", use_alter=True, name="fk_tx_work_session"), nullable=True)
+    work_session_code = Column(String(50), nullable=True)
     notes = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
@@ -217,6 +219,8 @@ class Purchase(Base):
     supplier_id = Column(Integer, ForeignKey("suppliers.id"), nullable=False)
     status = Column(String(50), default="PENDING") # PENDING, RECEIVED, CANCELLED
     total_amount = Column(Float, default=0.0)
+    work_session_id = Column(Integer, ForeignKey("work_sessions.id", use_alter=True, name="fk_po_work_session"), nullable=True)
+    work_session_code = Column(String(50), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     received_at = Column(DateTime, nullable=True)
 
@@ -244,6 +248,8 @@ class Sale(Base):
     total_amount = Column(Float, nullable=False)
     payment_status = Column(String(50), default="PAID")
     payment_method = Column(String(50), default="Cash")
+    work_session_id = Column(Integer, ForeignKey("work_sessions.id", use_alter=True, name="fk_sale_work_session"), nullable=True)
+    work_session_code = Column(String(50), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     created_by = Column(String(255), nullable=True)
 
@@ -1008,3 +1014,139 @@ class OrganisationClassificationHistory(Base):
 
     organisation = relationship("Organisation", back_populates="classification_history")
     changed_by = relationship("User")
+
+
+# -----------------------------------------------------------------------------
+# UNIFIED OPERATIONAL CASE & ESCALATION WORKFLOW ENGINE (SoD Architecture)
+# -----------------------------------------------------------------------------
+
+class OperationalCase(Base):
+    """
+    Unified Operational Case model.
+    Represents any staff action requiring managerial review, decision, or escalation:
+    REFUND_REQUEST, RECEIVING_DISCREPANCY, FLOAT_VARIANCE, STOCK_ADJUSTMENT,
+    SYSTEM_ERROR, PRICE_OVERRIDE, DAMAGE_REPORT, SUPPLIER_DISPUTE.
+    """
+    __tablename__ = "cases"
+
+    id = Column(Integer, primary_key=True, index=True)
+    case_number = Column(String(50), unique=True, index=True, nullable=False) # e.g. REF-2026-0042, CAS-2026-0087
+    case_type = Column(String(50), nullable=False) # REFUND_REQUEST, RECEIVING_DISCREPANCY, FLOAT_VARIANCE, STOCK_ADJUSTMENT, SYSTEM_ERROR, PRICE_OVERRIDE
+    status = Column(String(50), nullable=False, default="PENDING_REVIEW") # DRAFT, SUBMITTED, PENDING_REVIEW, APPROVED, DENIED, CONTESTED, RETURNED, EXECUTED, ESCALATED
+    priority = Column(String(20), nullable=False, default="NORMAL") # LOW, NORMAL, HIGH, CRITICAL
+    
+    subject = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)
+    
+    created_by = Column(String(100), nullable=False) # e.g. Tendai M. (EMP-00014)
+    assigned_to_role = Column(String(50), nullable=False, default="MANAGER") # MANAGER, STORE_MANAGER, WAREHOUSE_MANAGER
+    assigned_to_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    
+    entity_type = Column(String(50), nullable=True) # REFUND, PURCHASE_ORDER, CASH_SESSION, PRODUCT, STOCK_MOVEMENT
+    entity_id = Column(String(100), nullable=True) # e.g. INV-004281, PO-00431, SES-00021
+    amount = Column(Float, nullable=True, default=0.0) # Financial impact if applicable
+    
+    evidence_metadata = Column(Text, nullable=True) # JSON representation of attached receipts, logs, photos
+    work_session_id = Column(Integer, ForeignKey("work_sessions.id", use_alter=True, name="fk_case_work_session"), nullable=True)
+    work_session_code = Column(String(50), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    resolved_at = Column(DateTime, nullable=True)
+
+    events = relationship("CaseEvent", back_populates="case", cascade="all, delete-orphan")
+    attachments = relationship("CaseAttachment", back_populates="case", cascade="all, delete-orphan")
+
+
+class CaseEvent(Base):
+    """
+    Immutable Case Audit Event Trail.
+    Logs every state transition and comment. Never overwrites original request.
+    """
+    __tablename__ = "case_events"
+
+    id = Column(Integer, primary_key=True, index=True)
+    case_id = Column(Integer, ForeignKey("cases.id"), nullable=False)
+    event_type = Column(String(50), nullable=False) # CREATED, SUBMITTED, REVIEWED, APPROVED, DENIED, CONTESTED, RETURNED, EXECUTED, ESCALATED
+    performed_by = Column(String(100), nullable=False) # Name and role of actor
+    old_status = Column(String(50), nullable=True)
+    new_status = Column(String(50), nullable=False)
+    comment = Column(Text, nullable=True) # Decision rationale or note
+    metadata_json = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    case = relationship("OperationalCase", back_populates="events")
+
+
+class CaseAttachment(Base):
+    """
+    Evidence & Attachments linked to an Operational Case.
+    """
+    __tablename__ = "case_attachments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    case_id = Column(Integer, ForeignKey("cases.id"), nullable=False)
+    file_name = Column(String(255), nullable=False)
+    file_url = Column(String(500), nullable=False)
+    uploaded_by = Column(String(100), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    case = relationship("OperationalCase", back_populates="attachments")
+
+
+# -----------------------------------------------------------------------------
+# THREE-LAYER OPERATIONAL WORK SESSION ARCHITECTURE (Chaa Specification)
+# -----------------------------------------------------------------------------
+
+class WorkSession(Base):
+    """
+    Operational Work Session model.
+    Represents the active operational context and job being performed by a user:
+    - Layer A: User Authentication Session
+    - Layer B: Work Session (Session Type, Location, Terminal, Float, State)
+    - Layer C: Operational Transactions & Events
+
+    States: SCHEDULED, OPEN, ACTIVE, PAUSED, CLOSING, CLOSED, SUSPENDED, ABANDONED, FORCED_CLOSED
+    """
+    __tablename__ = "work_sessions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    session_code = Column(String(50), unique=True, index=True, nullable=False) # e.g. WS-2026-0826-0041
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    role = Column(String(50), nullable=False) # APP_ADMIN, MANAGER, STAFF, WAREHOUSE, AUDITOR
+    location_name = Column(String(100), nullable=False, default="Harare Store #01")
+    device_id = Column(String(50), nullable=False, default="POS-01")
+    session_type = Column(String(50), nullable=False, default="SALES") # SALES, GOODS_RECEIVING, STOCK_COUNT, STOCK_TRANSFER, DISPATCH, RETURN_PROCESSING, REFUND_PROCESSING, STOCK_ADJUSTMENT, WAREHOUSE_PICKING, WAREHOUSE_PACKING, AUDIT
+    status = Column(String(50), nullable=False, default="ACTIVE") # SCHEDULED, OPEN, ACTIVE, PAUSED, CLOSING, CLOSED, SUSPENDED, ABANDONED, FORCED_CLOSED
+    opening_float = Column(Float, nullable=False, default=0.0)
+    closing_float = Column(Float, nullable=False, default=0.0)
+    expected_closing = Column(Float, nullable=False, default=0.0)
+    variance = Column(Float, nullable=False, default=0.0)
+    total_sales_amount = Column(Float, nullable=False, default=0.0)
+    total_refunds_amount = Column(Float, nullable=False, default=0.0)
+    started_at = Column(DateTime, default=datetime.utcnow)
+    paused_at = Column(DateTime, nullable=True)
+    closed_at = Column(DateTime, nullable=True)
+    notes = Column(Text, nullable=True)
+
+    user = relationship("User")
+    events = relationship("SessionEvent", back_populates="work_session", cascade="all, delete-orphan")
+
+
+class SessionEvent(Base):
+    """
+    Immutable Operational Session Event Trail.
+    Logs every action during a work session (e.g. ITEM_SCANNED, SALE_CREATED, REFUND_APPROVED, SESSION_PAUSED).
+    """
+    __tablename__ = "session_events"
+
+    id = Column(Integer, primary_key=True, index=True)
+    session_id = Column(Integer, ForeignKey("work_sessions.id"), nullable=False)
+    event_type = Column(String(50), nullable=False) # SESSION_STARTED, ITEM_SCANNED, SALE_CREATED, REFUND_REQUESTED, REFUND_APPROVED, STOCK_ADJUSTED, TRANSFER_STARTED, TRANSFER_DISPATCHED, TRANSFER_RECEIVED, EXCEPTION_RAISED, ESCALATION_CREATED, SESSION_PAUSED, SESSION_RESUMED, SESSION_CLOSED
+    entity_type = Column(String(50), nullable=True) # Sale, Refund, Transfer, Product
+    entity_id = Column(String(100), nullable=True)
+    metadata_json = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    work_session = relationship("WorkSession", back_populates="events")
+
+

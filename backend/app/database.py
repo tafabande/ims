@@ -39,11 +39,20 @@ with engine.connect() as conn:
         "ALTER TABLE import_batches ADD COLUMN file_size INTEGER DEFAULT 0;",
         "ALTER TABLE import_batches ADD COLUMN column_mapping_json TEXT;",
         "ALTER TABLE import_batches ADD COLUMN storage_path VARCHAR(255);",
-        "ALTER TABLE import_batches ADD COLUMN approval_id INTEGER;"
+        "ALTER TABLE import_batches ADD COLUMN approval_id INTEGER;",
+        "ALTER TABLE purchases ADD COLUMN work_session_id INTEGER;",
+        "ALTER TABLE purchases ADD COLUMN work_session_code VARCHAR(50);",
+        "ALTER TABLE sales ADD COLUMN work_session_id INTEGER;",
+        "ALTER TABLE sales ADD COLUMN work_session_code VARCHAR(50);",
+        "ALTER TABLE inventory_transactions ADD COLUMN work_session_id INTEGER;",
+        "ALTER TABLE inventory_transactions ADD COLUMN work_session_code VARCHAR(50);",
+        "ALTER TABLE cases ADD COLUMN work_session_id INTEGER;",
+        "ALTER TABLE cases ADD COLUMN work_session_code VARCHAR(50);"
     ]:
         try:
             conn.execute(text(stmt))
             conn.commit()
         except Exception:
             pass
+
 

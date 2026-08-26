@@ -7,6 +7,7 @@ import {
   Download,
   PackageCheck
 } from 'lucide-react';
+import { can } from '../../utils/permissions';
 
 export default function PurchasesView({ 
   purchases, 
@@ -111,7 +112,7 @@ export default function PurchasesView({
           <button className="btn btn-secondary" onClick={exportCSV}>
             <Download size={15} /> Export Orders CSV
           </button>
-          {currentRole !== 'STAFF' && (
+          {can(currentRole, 'purchases.create') && (
             <button className="btn btn-primary" onClick={() => setIsModalOpen(true)}>
               <Plus size={18} /> Create Purchase Order
             </button>
@@ -142,7 +143,7 @@ export default function PurchasesView({
                   </div>
                 </div>
 
-                {po.status === 'PENDING' && (
+                {po.status === 'PENDING' && can(currentRole, 'purchases.receive') && (
                   <button 
                     className="btn btn-success"
                     onClick={() => confirmReceivePo(po)}

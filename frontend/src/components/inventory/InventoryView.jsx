@@ -14,6 +14,7 @@ import {
   ShieldCheck,
   Calculator
 } from 'lucide-react';
+import { can } from '../../utils/permissions';
 
 export default function InventoryView({ products = [], transactions = [], onAdjustStock, onExportCSV, onShowToast, currentRole }) {
   const [activeTab, setActiveTab] = useState('levels');
@@ -71,7 +72,7 @@ export default function InventoryView({ products = [], transactions = [], onAdju
           <button className="btn btn-secondary" onClick={() => onExportCSV(transactions, 'inventory_ledger.csv')}>
             <Download size={15} /> Export Ledger CSV
           </button>
-          {(currentRole === 'MANAGER' || currentRole === 'STAFF') && (
+          {can(currentRole, 'inventory.adjust') && (
             <button className="btn btn-primary" onClick={() => setIsAdjustModalOpen(true)}>
               <Plus size={15} /> Record Stock Adjustment
             </button>

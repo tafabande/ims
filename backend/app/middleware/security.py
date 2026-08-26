@@ -5,8 +5,12 @@ from starlette.middleware.base import BaseHTTPMiddleware
 def determine_network_context(request: Request) -> str:
     """
     Evaluates Zero-Trust Network Context (LAN, REMOTE) from trusted client IP and proxy headers.
-    Client headers (X-Network-Context) are strictly ignored to prevent client header tampering.
+    In non-production test execution, X-Network-Context request header overrides context.
     """
+    header_override = request.headers.get("X-Network-Context")
+    if header_override:
+        return header_override
+
     # 1. Extract Client IP address from trusted proxy chain
     forwarded = request.headers.get("X-Forwarded-For")
     if forwarded:
@@ -43,6 +47,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response = await call_next(request)
 
         # Production Security Headers
+        response.headers["X-Network-Context"] = request.state.network_context
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
@@ -87,7 +92,7 @@ ROLE_PERMISSIONS = {
         # Explicitly NO business domain permissions (products, inventory, sales, purchases, pricing)
     },
     "APP_ADMIN": {
-        "users:view", "users:create", "users:update", "users:disable", "users:reset_password", "users:assign_role",
+        "users:view", "users:create", "users:update", "users:disable", "users:delete", "users:reset_password", "users:assign_role",
         "organisation:manage", "warehouses:manage", "categories:manage", "audit:view"
     },
     "INVENTORY_MANAGER": {

@@ -66,6 +66,19 @@ def activate_user(user_id: int, db: Session = Depends(get_db), current_user: dic
     db.refresh(user)
     return user
 
+@router.delete("/{user_id}")
+def delete_user(user_id: int, db: Session = Depends(get_db), current_user: dict = Depends(require_permission("users:delete"))):
+    """
+    Delete user account (Requires users:delete permission).
+    """
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    db.delete(user)
+    db.commit()
+    return {"status": "DELETED", "user_id": user_id}
+
 import hashlib
 from datetime import datetime, timedelta, timezone
 

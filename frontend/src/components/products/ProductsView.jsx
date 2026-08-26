@@ -11,6 +11,7 @@ import {
   Download
 } from 'lucide-react';
 import ThermalLabelModal from './ThermalLabelModal';
+import { can } from '../../utils/permissions';
 
 export default function ProductsView({ 
   products = [], 
@@ -149,7 +150,7 @@ export default function ProductsView({
             <Download size={15} /> Export Catalog CSV
           </button>
 
-          {currentRole !== 'STAFF' && (
+          {can(currentRole, 'products.create') && (
             <button className="btn btn-primary" onClick={handleOpenAdd}>
               <Plus size={18} /> Add New Product
             </button>
@@ -266,12 +267,12 @@ export default function ProductsView({
                       </td>
                       <td>
                         <div style={{ display: 'flex', gap: '6px' }}>
-                          {currentRole !== 'STAFF' && (
+                          {can(currentRole, 'products.edit') && (
                             <button className="btn btn-sm btn-secondary" onClick={() => handleOpenEdit(product)} title="Edit Product">
                               <Edit3 size={14} />
                             </button>
                           )}
-                          {currentRole === 'ADMIN' && (
+                          {can(currentRole, 'products.delete') && (
                             <button className="btn btn-sm btn-danger" onClick={() => {
                               onDeleteProduct(product.id);
                               if (onShowToast) onShowToast('danger', 'Product Deleted', `Removed ${product.name} from database.`);

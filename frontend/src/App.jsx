@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import Navbar from './components/layout/Navbar';
 import Sidebar from './components/layout/Sidebar';
+import WorkSessionBar from './components/layout/WorkSessionBar';
+import SessionCloseModal from './components/shifts/SessionCloseModal';
 import GlobalCommandPalette from './components/layout/GlobalCommandPalette';
 import ToastNotification from './components/common/ToastNotification';
 import LoginView from './components/auth/LoginView';
@@ -13,6 +15,8 @@ import DashboardView from './components/dashboard/DashboardView';
 const ProductsView = lazy(() => import('./components/products/ProductsView'));
 const InventoryView = lazy(() => import('./components/inventory/InventoryView'));
 const SalesView = lazy(() => import('./components/sales/SalesView'));
+const POSTerminalView = lazy(() => import('./components/pos/POSTerminalView'));
+const SalesGovernanceView = lazy(() => import('./components/sales/SalesGovernanceView'));
 const PurchasesView = lazy(() => import('./components/purchases/PurchasesView'));
 const SuppliersView = lazy(() => import('./components/suppliers/SuppliersView'));
 const CustomersView = lazy(() => import('./components/customers/CustomersView'));
@@ -63,6 +67,85 @@ export default function App() {
   const [purchases, setPurchases] = useState(INITIAL_PURCHASES);
   const [sales, setSales] = useState(INITIAL_SALES);
   const [users, setUsers] = useState(INITIAL_USERS);
+
+  // Layer B: Operational Work Session State
+  const [activeSession, setActiveSession] = useState({
+    id: 1,
+    session_code: 'WS-2026-0826-0041',
+    session_type: 'SALES',
+    status: 'ACTIVE',
+    location_name: 'Harare Store #01',
+    device_id: 'POS-01',
+    opening_float: 200.00,
+    total_sales_amount: 1420.00,
+    total_refunds_amount: 80.00,
+    expected_closing: 1540.00
+  });
+  const [isSessionCloseModalOpen, setIsSessionCloseModalOpen] = useState(false);
+
+  const handleStartSession = (sessionData) => {
+    setActiveSession({
+      id: Date.now(),
+      session_code: `WS-${Date.now().toString().slice(-6)}`,
+      session_type: sessionData.session_type,
+      status: 'ACTIVE',
+      location_name: sessionData.location_name,
+      device_id: sessionData.device_id,
+      opening_float: sessionData.opening_float,
+      total_sales_amount: 0.00,
+      total_refunds_amount: 0.00,
+      expected_closing: sessionData.opening_float
+    });
+  };
+
+  const handlePauseSession = () => {
+    if (activeSession) {
+      setActiveSession({ ...activeSession, status: 'PAUSED' });
+      handleShowToast('warning', 'Session Paused', 'Operational session PAUSED. Workflows locked.');
+    }
+  };
+
+  const handleResumeSession = () => {
+    if (activeSession) {
+      setActiveSession({ ...activeSession, status: 'ACTIVE' });
+      handleShowToast('info', 'Session Resumed', 'Operational session is now ACTIVE.');
+    }
+  };
+
+  const handleCloseSession = ({ actual_counted_cash, notes }) => {
+    if (!activeSession) return;
+    const expected = (activeSession.opening_float || 0) + (activeSession.total_sales_amount || 0) - (activeSession.total_refunds_amount || 0);
+    const variance = actual_counted_cash - expected;
+    
+    setActiveSession(null);
+    setIsSessionCloseModalOpen(false);
+
+    if (variance === 0) {
+      handleShowToast('success', 'Session Reconciled & Closed', `Closing cash matched $${expected.toFixed(2)} exactly.`);
+    } else {
+      handleShowToast('error', 'Session Closed with Variance', `Cash ${variance < 0 ? 'shortage' : 'overage'} of $${Math.abs(variance).toFixed(2)} logged.`);
+    }
+  };
+
+  // Central Sales Control Policy & Dynamic Exchange Rate State
+  const [salesPolicy, setSalesPolicy] = useState({
+    maxCashierDiscountPct: 5.0,
+    highValueApprovalThreshold: 1000.00,
+    standardTaxRatePct: 10.0,
+    zigExchangeRate: 13.50, // 1 USD = 13.50 ZiG
+    allowNegativeStockSale: false
+  });
+
+  const [gateways, setGateways] = useState([
+    { id: 'cash', name: 'Cash (USD / ZiG)', type: 'CASH', surchargePct: 0.0, enabled: true, usage: 'BOTH' },
+    { id: 'ecocash', name: 'EcoCash Mobile Money', type: 'MOBILE_WALLET', surchargePct: 2.5, enabled: true, usage: 'BOTH' },
+    { id: 'telecash', name: 'Telecash Mobile', type: 'MOBILE_WALLET', surchargePct: 2.0, enabled: true, usage: 'CUSTOMER' },
+    { id: 'onemoney', name: 'OneMoney NetOne', type: 'MOBILE_WALLET', surchargePct: 2.0, enabled: true, usage: 'CUSTOMER' },
+    { id: 'innbucks', name: 'InnBucks Retail Voucher', type: 'RETAIL_WALLET', surchargePct: 1.0, enabled: true, usage: 'BOTH' },
+    { id: 'card_local', name: 'Debit / Credit Card (Local EFTPOS)', type: 'CARD', surchargePct: 1.5, enabled: true, usage: 'BOTH' },
+    { id: 'zipit', name: 'Inter-Bank ZIPIT Transfer', type: 'BANK_INTERBANK', surchargePct: 1.0, enabled: true, usage: 'BOTH' },
+    { id: 'rtgs', name: 'RTGS Electronic Bank Transfer', type: 'BANK_DOMESTIC', surchargePct: 0.5, enabled: true, usage: 'BOTH' }
+  ]);
 
   // Apply Theme Data Attribute
   useEffect(() => {
@@ -258,6 +341,17 @@ export default function App() {
         onLogout={handleLogout}
       />
 
+      {/* Layer B: Operational Work Context Bar */}
+      <WorkSessionBar
+        currentRole={currentRole}
+        activeSession={activeSession}
+        onStartSession={handleStartSession}
+        onPauseSession={handlePauseSession}
+        onResumeSession={handleResumeSession}
+        onOpenCloseModal={() => setIsSessionCloseModalOpen(true)}
+        onShowToast={handleShowToast}
+      />
+
       <div style={{ display: 'flex', flex: 1 }}>
         {/* Navigation Sidebar */}
         <Sidebar
@@ -280,8 +374,11 @@ export default function App() {
                 products={products}
                 transactions={transactions}
                 sales={sales}
+                purchases={purchases}
+                users={users}
                 currentRole={currentRole}
                 onNavigate={setActiveTab}
+                salesPolicy={salesPolicy}
               />
             )}
 
@@ -304,6 +401,7 @@ export default function App() {
               <ShiftManagementView
                 currentRole={currentRole}
                 onShowToast={handleShowToast}
+                salesPolicy={salesPolicy}
               />
             )}
 
@@ -388,12 +486,31 @@ export default function App() {
               />
             )}
 
-            {activeTab === 'sales' && (
-              <SalesView
+            {activeTab === 'pos' && (
+              <POSTerminalView
                 products={products}
                 sales={sales}
                 customers={customers}
-                onAddSale={handleProcessSale}
+                onProcessSale={handleProcessSale}
+                currentRole={currentRole}
+                onShowToast={handleShowToast}
+                salesPolicy={salesPolicy}
+                gateways={gateways}
+              />
+            )}
+
+            {activeTab === 'sales' && (
+              <SalesGovernanceView
+                products={products}
+                sales={sales}
+                customers={customers}
+                onProcessSale={handleProcessSale}
+                currentRole={currentRole}
+                onShowToast={handleShowToast}
+                salesPolicy={salesPolicy}
+                setSalesPolicy={setSalesPolicy}
+                gateways={gateways}
+                setGateways={setGateways}
               />
             )}
 
@@ -418,6 +535,7 @@ export default function App() {
               <CustomersView
                 customers={customers}
                 onAddCustomer={handleAddCustomer}
+                onShowToast={handleShowToast}
               />
             )}
 
@@ -462,6 +580,15 @@ export default function App() {
           handleShowToast('info', 'Role Switched', `Active access role changed to ${newRole}.`);
         }}
       />
+
+      {/* Session Close & Cash Float Reconciliation Modal */}
+      {isSessionCloseModalOpen && (
+        <SessionCloseModal
+          activeSession={activeSession}
+          onCloseSession={handleCloseSession}
+          onCloseModal={() => setIsSessionCloseModalOpen(false)}
+        />
+      )}
 
       {/* Global Toast Notification Overlay */}
       <ToastNotification toasts={toasts} onDismiss={handleDismissToast} />

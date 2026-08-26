@@ -7,473 +7,471 @@ import {
   AlertCircle, 
   CheckCircle2, 
   HelpCircle, 
-  Plus, 
-  Calendar,
-  Layers,
   ArrowUpRight,
   ArrowDownRight,
   ShieldCheck,
+  Package,
+  Check,
+  Info,
+  Clock,
+  Layers,
+  Sliders,
+  DollarSign,
   Percent
 } from 'lucide-react';
-import { apiFetch } from '../../utils/apiClient';
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip } from 'recharts';
 
 export default function PlanningView({ currentRole, onShowToast }) {
-  const [activeTab, setActiveTab] = useState('historical'); // 'historical' | 'benchmarks' | 'targets' | 'forecasts'
-  const [isLoading, setIsLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'performance' | 'forecast' | 'inventory_outlook' | 'targets'
+  const [showMethodModal, setShowMethodModal] = useState(false);
 
-  // Live Data States
-  const [historicalData, setHistoricalData] = useState({
+  // Master Planning Dataset
+  const historicalData = {
     quarters: [
-      { period: 'Q3 2025', units: 13900, revenue: 195000, margin_pct: 20.8, refund_rate: 3.8, stock_accuracy: 98.7 },
-      { period: 'Q4 2025', units: 16200, revenue: 228000, margin_pct: 21.2, refund_rate: 3.2, stock_accuracy: 98.9 },
-      { period: 'Q1 2026', units: 12400, revenue: 184000, margin_pct: 21.4, refund_rate: 3.1, stock_accuracy: 99.1 },
-      { period: 'Q2 2026', units: 14100, revenue: 213000, margin_pct: 22.1, refund_rate: 2.9, stock_accuracy: 99.2 },
-      { period: 'Q3 2026', units: 15600, revenue: 239000, margin_pct: 23.0, refund_rate: 2.7, stock_accuracy: 99.4 }
+      { period: "Q3 '25", revenue: 195000, margin_pct: 20.8, refund_rate: 3.8, stock_accuracy: 98.7 },
+      { period: "Q4 '25", revenue: 228000, margin_pct: 21.2, refund_rate: 3.2, stock_accuracy: 98.9 },
+      { period: "Q1 '26", revenue: 184000, margin_pct: 21.4, refund_rate: 3.1, stock_accuracy: 99.1 },
+      { period: "Q2 '26", revenue: 213000, margin_pct: 22.1, refund_rate: 2.9, stock_accuracy: 99.2 },
+      { period: "Q3 '26", revenue: 239000, margin_pct: 23.0, refund_rate: 2.7, stock_accuracy: 99.4 }
     ],
     qoq_growth_pct: 12.2,
     yoy_growth_pct: 22.6
-  });
-
-  const [benchmarks, setBenchmarks] = useState([
-    { metric: 'Monthly Sales Revenue', benchmark: '≥ $250,000', actual: '$239,000', status: 'NEAR_TARGET' },
-    { metric: 'Maximum Stockout Rate', benchmark: '< 2.0%', actual: '1.4%', status: 'MET' },
-    { metric: 'Supplier Fulfillment Target', benchmark: '≥ 95.0%', actual: '96.2%', status: 'MET' },
-    { metric: 'Receiving Accuracy Target', benchmark: '≥ 98.0%', actual: '98.7%', status: 'MET' },
-    { metric: 'Refund Rate Limit', benchmark: '< 3.0%', actual: '2.7%', status: 'MET' },
-    { metric: 'Inventory Stock Accuracy', benchmark: '≥ 99.0%', actual: '99.4%', status: 'MET' }
-  ]);
-
-  const [targets, setTargets] = useState([
-    {
-      id: 1,
-      organisation_id: 'ORG-000001',
-      scope: 'STORE',
-      scope_name: 'Harare Main Store',
-      metric: 'Quarterly Revenue Target',
-      target_value: '$750,000',
-      actual_value: '$712,000',
-      achievement_pct: '94.9%',
-      status: 'WARNING'
-    },
-    {
-      id: 2,
-      organisation_id: 'ORG-000001',
-      scope: 'CATEGORY',
-      scope_name: 'Workstation Laptops',
-      metric: 'Quarterly Units Sold Target',
-      target_value: '42,000 Units',
-      actual_value: '44,100 Units',
-      achievement_pct: '105.0%',
-      status: 'MET'
-    }
-  ]);
-
-  const [forecastData, setForecastData] = useState({
-    revenue_forecast: {
-      period: 'Q4 2026',
-      forecast_value: 266500,
-      target_value: 280000,
-      gap_value: -13500,
-      forecast_method: 'LINEAR_TREND_REGRESSION',
-      reliability: 'HIGH',
-      explanation: 'Forecast derived via 3-quarter linear trend (Avg +$27,500/quarter). Target gap is -$13,500.'
-    },
-    inventory_shortfall_forecast: {
-      weekly_velocity_units: 120,
-      lead_time_weeks: 3,
-      safety_stock_units: 100,
-      required_stock_units: 460,
-      available_stock_units: 280,
-      projected_shortfall_units: 180,
-      reorder_recommendation_units: 280,
-      explanation: 'Demand during 3-week lead time (360u) + safety stock (100u) = 460u required. Current stock (280u) has a projected shortfall of 180 units.'
-    }
-  });
-
-  useEffect(() => {
-    fetchPlanningData();
-  }, []);
-
-  const fetchPlanningData = async () => {
-    setIsLoading(true);
-    try {
-      const [histRes, benchRes, targRes, foreRes] = await Promise.all([
-        apiFetch('/api/planning/historical').catch(() => null),
-        apiFetch('/api/planning/benchmarks').catch(() => null),
-        apiFetch('/api/planning/targets').catch(() => null),
-        apiFetch('/api/planning/forecasts').catch(() => null)
-      ]);
-
-      if (histRes && histRes.ok) setHistoricalData(await histRes.json());
-      if (benchRes && benchRes.ok) setBenchmarks(await benchRes.json());
-      if (targRes && targRes.ok) setTargets(await targRes.json());
-      if (foreRes && foreRes.ok) setForecastData(await foreRes.json());
-    } catch (e) {
-      console.info('Using in-memory planning engine data.');
-    } finally {
-      setIsLoading(false);
-    }
   };
 
+  const forecastData = {
+    q4_target: 280000,
+    q4_forecast: 266500,
+    current_trajectory: 239000,
+    gap_amount: 13500,
+    gap_pct: 4.8,
+    daily_velocity_needed: 450,
+    velocity_pct_needed: 5.1,
+    projected_shortfall_units: 180,
+    reorder_recommended_units: 280
+  };
+
+  const inventoryOutlookItems = [
+    { sku: 'CAT6-300M', name: 'CAT6 Cable Roll 300m', current: 42, forecast_net: -18, recommended: 80, priority: 'CRITICAL' },
+    { sku: 'RJ45-100P', name: 'RJ45 Connectors (Pack of 100)', current: 120, forecast_net: 34, recommended: 100, priority: 'NORMAL' },
+    { sku: 'RTR-X2000', name: 'Enterprise Router X2000', current: 18, forecast_net: 2, recommended: 50, priority: 'HIGH' },
+    { sku: 'SWT-Y48', name: 'Managed Switch Y48-Port', current: 15, forecast_net: -8, recommended: 50, priority: 'HIGH' }
+  ];
+
+  const planPerformanceMatrix = [
+    { metric: 'Q3 Revenue', target: '$235,000', actual_forecast: '$239,000', status: 'Ahead', color: '#10b981' },
+    { metric: 'Q3 Gross Margin', target: '22.0%', actual_forecast: '23.0%', status: 'Ahead', color: '#10b981' },
+    { metric: 'Q4 Revenue Target', target: '$280,000', actual_forecast: '$266,500', status: 'At Risk', color: '#f59e0b' },
+    { metric: 'Inventory Stock Accuracy', target: '≥ 99.0%', actual_forecast: '99.4%', status: 'Ahead', color: '#10b981' },
+    { metric: 'Customer Refund Rate', target: '< 3.0%', actual_forecast: '2.7%', status: 'Ahead', color: '#10b981' }
+  ];
+
   return (
-    <div style={{ paddingBottom: '32px' }} className="space-y-6">
-      {/* Top Banner / Hero Header */}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      
+      {/* 1. CLEAN OPERATIONAL HEADER */}
       <div style={{
-        background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(30, 41, 59, 0.85) 100%)',
+        background: 'var(--color-paper-surface)',
         border: '1px solid var(--color-rule)',
-        borderRadius: 'var(--radius-lg)',
-        padding: '24px 28px',
-        boxShadow: 'var(--elevation-2)'
-      }} className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+        borderRadius: 'var(--radius-md)',
+        padding: '20px 24px',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        flexWrap: 'wrap',
+        gap: '16px'
+      }}>
         <div>
-          <div className="flex items-center gap-3">
-            <div style={{
-              width: '42px',
-              height: '42px',
-              borderRadius: 'var(--radius-sm)',
-              background: 'rgba(59, 130, 246, 0.15)',
-              border: '1px solid rgba(59, 130, 246, 0.3)',
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+            <span style={{ fontSize: '11px', fontFamily: 'monospace', fontWeight: 800, color: 'var(--color-accent)' }}>
+              Q3 2026 OPERATIONAL REVIEW
+            </span>
+            <span style={{ fontSize: '12px', color: 'var(--color-ink-muted)' }}>• Updated 26 Aug 2026</span>
+          </div>
+
+          <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--color-ink)', margin: '0 0 6px 0', letterSpacing: '-0.02em' }}>
+            Planning & Forecast
+          </h2>
+
+          <p style={{ fontSize: '14px', color: 'var(--color-ink-muted)', margin: 0, fontWeight: 500 }}>
+            Revenue is ahead of Q2, but Q4 is currently tracking <strong>$13,500 below target</strong>.
+          </p>
+        </div>
+
+        {/* Forecast Method Metadata Indicator */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <button
+            onClick={() => setShowMethodModal(true)}
+            style={{
+              background: 'var(--color-paper-2)',
+              border: '1px solid var(--color-rule)',
+              borderRadius: 'var(--radius-xs)',
+              padding: '6px 12px',
+              fontSize: '11px',
+              fontWeight: 700,
+              color: 'var(--color-ink-muted)',
+              cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center'
-            }}>
-              <TrendingUp size={22} color="var(--color-accent)" />
-            </div>
-            <div>
-              <h1 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--color-ink)', letterSpacing: '-0.02em' }}>
-                Operational Planning, Benchmarks & Forecasting Engine
-              </h1>
-              <p style={{ fontSize: '0.8125rem', color: 'var(--color-ink-muted)', marginTop: '2px' }}>
-                Deterministic moving average forecasting, QoQ/YoY historical comparisons, quotas & lead-time stockout shortfall engine.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <span className="text-xs font-mono font-bold px-3 py-1.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 flex items-center gap-1.5">
-            <ShieldCheck size={14} /> 100% Deterministic (No AI Exposure)
-          </span>
+              gap: '6px'
+            }}
+          >
+            <Info size={14} color="var(--color-accent)" />
+            Forecast method · 3-quarter moving average
+          </button>
         </div>
       </div>
 
-      {/* Hero Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div style={{
-          background: 'var(--color-paper-2)',
-          border: '1px solid var(--color-rule)',
-          borderRadius: 'var(--radius-md)',
-          padding: '18px 20px'
-        }}>
-          <div className="flex items-center justify-between text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-            <span>YoY Revenue Growth</span>
-            <ArrowUpRight size={16} color="var(--color-signal-green)" />
+      {/* 2. EXECUTIVE SIGNAL ROW */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px' }}>
+        
+        {/* Revenue Signal */}
+        <div style={{ background: 'var(--color-paper-surface)', border: '1px solid var(--color-rule)', borderRadius: 'var(--radius-sm)', padding: '16px' }}>
+          <div style={{ fontSize: '11px', fontWeight: 800, color: 'var(--color-ink-muted)', uppercase: 'true' }}>REVENUE</div>
+          <div style={{ fontSize: '1.6rem', fontWeight: 800, fontFamily: 'monospace', margin: '4px 0 2px 0', color: 'var(--color-ink)' }}>$239,000</div>
+          <div style={{ fontSize: '12px', color: 'var(--color-signal-green)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <ArrowUpRight size={14} /> 12.2% QoQ (Q3 revenue)
           </div>
-          <div className="text-2xl font-bold text-emerald-400 font-mono">+{historicalData.yoy_growth_pct}%</div>
-          <p className="text-xs text-slate-400 mt-1">Q3 2026 vs Q3 2025 comparison</p>
         </div>
 
-        <div style={{
-          background: 'var(--color-paper-2)',
-          border: '1px solid var(--color-rule)',
-          borderRadius: 'var(--radius-md)',
-          padding: '18px 20px'
-        }}>
-          <div className="flex items-center justify-between text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-            <span>QoQ Revenue Growth</span>
-            <TrendingUp size={16} color="var(--color-accent)" />
-          </div>
-          <div className="text-2xl font-bold text-blue-400 font-mono">+{historicalData.qoq_growth_pct}%</div>
-          <p className="text-xs text-slate-400 mt-1">Q3 2026 vs Q2 2026 comparison</p>
+        {/* YoY Growth Signal */}
+        <div style={{ background: 'var(--color-paper-surface)', border: '1px solid var(--color-rule)', borderRadius: 'var(--radius-sm)', padding: '16px' }}>
+          <div style={{ fontSize: '11px', fontWeight: 800, color: 'var(--color-ink-muted)' }}>GROWTH</div>
+          <div style={{ fontSize: '1.6rem', fontWeight: 800, fontFamily: 'monospace', margin: '4px 0 2px 0', color: 'var(--color-accent)' }}>+22.6%</div>
+          <div style={{ fontSize: '12px', color: 'var(--color-ink-muted)' }}>vs Q3 2025 revenue</div>
         </div>
 
-        <div style={{
-          background: 'var(--color-paper-2)',
-          border: '1px solid var(--color-rule)',
-          borderRadius: 'var(--radius-md)',
-          padding: '18px 20px'
-        }}>
-          <div className="flex items-center justify-between text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-            <span>Q4 Forecast Gap</span>
-            <AlertCircle size={16} color="var(--color-signal-amber)" />
+        {/* Q4 Outlook (HIGH-EMPHASIS RISK CARD) */}
+        <div style={{ background: 'var(--color-paper-surface)', border: '2px solid #f59e0b', borderRadius: 'var(--radius-sm)', padding: '16px' }}>
+          <div style={{ fontSize: '11px', fontWeight: 800, color: '#f59e0b', display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <AlertCircle size={14} /> Q4 OUTLOOK (AT RISK)
           </div>
-          <div className="text-2xl font-bold text-amber-400 font-mono">-${Math.abs(forecastData.revenue_forecast.gap_value).toLocaleString()}</div>
-          <p className="text-xs text-amber-300 mt-1">Forecast: ${forecastData.revenue_forecast.forecast_value.toLocaleString()} vs Target: ${forecastData.revenue_forecast.target_value.toLocaleString()}</p>
+          <div style={{ fontSize: '1.6rem', fontWeight: 800, fontFamily: 'monospace', margin: '4px 0 2px 0', color: 'var(--color-ink)' }}>$266,500</div>
+          <div style={{ fontSize: '12px', color: '#f59e0b', fontWeight: 800 }}>$13,500 below target</div>
         </div>
 
-        <div style={{
-          background: 'var(--color-paper-2)',
-          border: '1px solid var(--color-rule)',
-          borderRadius: 'var(--radius-md)',
-          padding: '18px 20px'
-        }}>
-          <div className="flex items-center justify-between text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-            <span>Projected Stock Shortfall</span>
-            <Zap size={16} color="var(--color-signal-red)" />
+        {/* Stock Risk (HIGH-EMPHASIS RISK CARD) */}
+        <div style={{ background: 'var(--color-paper-surface)', border: '2px solid #ef4444', borderRadius: 'var(--radius-sm)', padding: '16px' }}>
+          <div style={{ fontSize: '11px', fontWeight: 800, color: '#ef4444', display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <Zap size={14} /> STOCK RISK
           </div>
-          <div className="text-2xl font-bold text-red-400 font-mono">{forecastData.inventory_shortfall_forecast.projected_shortfall_units} Units</div>
-          <p className="text-xs text-slate-400 mt-1">Reorder recommendation: {forecastData.inventory_shortfall_forecast.reorder_recommendation_units}u</p>
+          <div style={{ fontSize: '1.6rem', fontWeight: 800, fontFamily: 'monospace', margin: '4px 0 2px 0', color: '#ef4444' }}>180 units</div>
+          <div style={{ fontSize: '12px', color: 'var(--color-ink-muted)' }}>280u recommended reorder</div>
         </div>
       </div>
 
-      {/* Navigation Tabs */}
-      <div style={{ borderBottom: '1px solid var(--color-rule)' }} className="flex items-center gap-2 pb-2">
-        <button
-          onClick={() => setActiveTab('historical')}
-          style={{
-            background: activeTab === 'historical' ? 'var(--color-accent-subtle)' : 'transparent',
-            border: activeTab === 'historical' ? '1px solid rgba(59, 130, 246, 0.3)' : '1px solid transparent',
-            color: activeTab === 'historical' ? 'var(--color-accent)' : 'var(--color-ink-muted)',
-            borderRadius: 'var(--radius-sm)',
-            padding: '8px 16px',
-            fontSize: '0.8125rem',
-            fontWeight: 700,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px'
-          }}
-        >
-          <BarChart2 size={15} />
-          Historical Comparisons (QoQ & YoY)
-        </button>
-
-        <button
-          onClick={() => setActiveTab('benchmarks')}
-          style={{
-            background: activeTab === 'benchmarks' ? 'var(--color-accent-subtle)' : 'transparent',
-            border: activeTab === 'benchmarks' ? '1px solid rgba(59, 130, 246, 0.3)' : '1px solid transparent',
-            color: activeTab === 'benchmarks' ? 'var(--color-accent)' : 'var(--color-ink-muted)',
-            borderRadius: 'var(--radius-sm)',
-            padding: '8px 16px',
-            fontSize: '0.8125rem',
-            fontWeight: 700,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px'
-          }}
-        >
-          <CheckCircle2 size={15} />
-          Operational Benchmarks ({benchmarks.length})
-        </button>
-
-        <button
-          onClick={() => setActiveTab('targets')}
-          style={{
-            background: activeTab === 'targets' ? 'var(--color-accent-subtle)' : 'transparent',
-            border: activeTab === 'targets' ? '1px solid rgba(59, 130, 246, 0.3)' : '1px solid transparent',
-            color: activeTab === 'targets' ? 'var(--color-accent)' : 'var(--color-ink-muted)',
-            borderRadius: 'var(--radius-sm)',
-            padding: '8px 16px',
-            fontSize: '0.8125rem',
-            fontWeight: 700,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px'
-          }}
-        >
-          <Target size={15} />
-          Targets & Quotas Matrix
-        </button>
-
-        <button
-          onClick={() => setActiveTab('forecasts')}
-          style={{
-            background: activeTab === 'forecasts' ? 'var(--color-accent-subtle)' : 'transparent',
-            border: activeTab === 'forecasts' ? '1px solid rgba(59, 130, 246, 0.3)' : '1px solid transparent',
-            color: activeTab === 'forecasts' ? 'var(--color-accent)' : 'var(--color-ink-muted)',
-            borderRadius: 'var(--radius-sm)',
-            padding: '8px 16px',
-            fontSize: '0.8125rem',
-            fontWeight: 700,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px'
-          }}
-        >
-          <Zap size={15} />
-          Deterministic Forecasting Engine
-        </button>
+      {/* 3. CLEAN BUSINESS NAVIGATION TABS */}
+      <div style={{ borderBottom: '1px solid var(--color-rule)', display: 'flex', gap: '8px' }}>
+        {[
+          { id: 'overview', label: 'Overview' },
+          { id: 'performance', label: 'Performance & Health' },
+          { id: 'forecast', label: 'Q4 Forecast' },
+          { id: 'inventory_outlook', label: 'Inventory Outlook' },
+          { id: 'targets', label: 'Targets' }
+        ].map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            style={{
+              padding: '8px 16px',
+              borderRadius: 'var(--radius-xs)',
+              fontSize: '13px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              border: 'none',
+              background: activeTab === tab.id ? 'var(--color-accent)' : 'transparent',
+              color: activeTab === tab.id ? '#fff' : 'var(--color-ink-muted)'
+            }}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
 
-      {/* TAB 1: HISTORICAL COMPARISONS */}
-      {activeTab === 'historical' && (
-        <div style={{
-          background: 'var(--color-paper-2)',
-          border: '1px solid var(--color-rule)',
-          borderRadius: 'var(--radius-lg)',
-          padding: '24px'
-        }} className="space-y-4">
-          <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--color-ink)' }} className="flex items-center gap-2">
-            <BarChart2 size={18} color="var(--color-accent)" />
-            Quarterly QoQ & YoY Historical Performance
-          </h3>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-sm">
+      {/* ========================================================================= */}
+      {/* TAB 1: OVERVIEW (MASTER MANAGER CONTROL VIEW)                             */}
+      {/* ========================================================================= */}
+      {activeTab === 'overview' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          
+          {/* Management Outlook Summary Table */}
+          <div style={{ background: 'var(--color-paper-surface)', border: '1px solid var(--color-rule)', borderRadius: 'var(--radius-md)', padding: '20px' }}>
+            <h3 style={{ fontSize: '15px', fontWeight: 800, margin: '0 0 12px 0', color: 'var(--color-ink)' }}>
+              Management Outlook
+            </h3>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
               <thead>
-                <tr className="border-b border-slate-800 text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                  <th className="py-3 px-4">Period</th>
-                  <th className="py-3 px-4">Units Sold</th>
-                  <th className="py-3 px-4">Gross Revenue</th>
-                  <th className="py-3 px-4">Gross Margin %</th>
-                  <th className="py-3 px-4">Refund Rate</th>
-                  <th className="py-3 px-4">Stock Accuracy</th>
+                <tr style={{ borderBottom: '1px solid var(--color-rule)', textAlign: 'left', color: 'var(--color-ink-muted)', fontSize: '11px' }}>
+                  <th style={{ padding: '8px' }}>SIGNAL</th>
+                  <th style={{ padding: '8px' }}>CURRENT POSITION</th>
+                  <th style={{ padding: '8px' }}>OUTLOOK</th>
+                  <th style={{ padding: '8px' }}>RECOMMENDED MANAGEMENT ACTION</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800">
-                {historicalData.quarters.map((q, idx) => (
-                  <tr key={idx} className="hover:bg-slate-900/40">
-                    <td className="py-3 px-4 font-mono font-bold text-amber-400">{q.period}</td>
-                    <td className="py-3 px-4 font-mono">{q.units.toLocaleString()} Units</td>
-                    <td className="py-3 px-4 font-mono text-emerald-400">${q.revenue.toLocaleString()}</td>
-                    <td className="py-3 px-4 font-mono">{q.margin_pct}%</td>
-                    <td className="py-3 px-4 font-mono">{q.refund_rate}%</td>
-                    <td className="py-3 px-4 font-mono text-blue-400">{q.stock_accuracy}%</td>
+              <tbody>
+                <tr style={{ borderBottom: '1px solid var(--color-rule)' }}>
+                  <td style={{ padding: '10px 8px', fontWeight: 700 }}>Revenue</td>
+                  <td style={{ padding: '10px 8px', fontFamily: 'monospace' }}>$239,000</td>
+                  <td style={{ padding: '10px 8px', color: '#f59e0b', fontWeight: 700 }}>$266,500 forecast</td>
+                  <td style={{ padding: '10px 8px', color: '#f59e0b', fontWeight: 800 }}>Close $13,500 gap to target</td>
+                </tr>
+                <tr style={{ borderBottom: '1px solid var(--color-rule)' }}>
+                  <td style={{ padding: '10px 8px', fontWeight: 700 }}>Inventory</td>
+                  <td style={{ padding: '10px 8px' }}>99.4% stock accuracy</td>
+                  <td style={{ padding: '10px 8px', color: '#ef4444', fontWeight: 700 }}>180 units shortfall</td>
+                  <td style={{ padding: '10px 8px', color: '#ef4444', fontWeight: 800 }}>Reorder 280 units (CAT6 & Switches)</td>
+                </tr>
+                <tr style={{ borderBottom: '1px solid var(--color-rule)' }}>
+                  <td style={{ padding: '10px 8px', fontWeight: 700 }}>Margin</td>
+                  <td style={{ padding: '10px 8px' }}>23.0% gross margin</td>
+                  <td style={{ padding: '10px 8px' }}>Stable</td>
+                  <td style={{ padding: '10px 8px', color: 'var(--color-ink-muted)' }}>Monitor price discounts</td>
+                </tr>
+                <tr>
+                  <td style={{ padding: '10px 8px', fontWeight: 700 }}>Refunds</td>
+                  <td style={{ padding: '10px 8px' }}>2.7% refund rate</td>
+                  <td style={{ padding: '10px 8px', color: '#10b981', fontWeight: 700 }}>Improving</td>
+                  <td style={{ padding: '10px 8px', color: 'var(--color-signal-green)', fontWeight: 700 }}>No action required</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          {/* Revenue Trajectory Graph + Operational Signals */}
+          <div style={{ background: 'var(--color-paper-surface)', border: '1px solid var(--color-rule)', borderRadius: 'var(--radius-md)', padding: '20px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+              <div>
+                <h3 style={{ fontSize: '15px', fontWeight: 800, margin: 0, color: 'var(--color-ink)' }}>Revenue Trajectory & Operational Insights</h3>
+                <span style={{ fontSize: '12px', color: 'var(--color-ink-muted)' }}>5-Quarter Revenue Trend ($195k ➔ $239k)</span>
+              </div>
+
+              {/* Operational Signal Indicators */}
+              <div style={{ display: 'flex', gap: '8px', fontSize: '11px', fontWeight: 800 }}>
+                <span style={{ padding: '4px 8px', borderRadius: '4px', background: 'rgba(16, 185, 129, 0.15)', color: '#10b981' }}>Revenue: ↑</span>
+                <span style={{ padding: '4px 8px', borderRadius: '4px', background: 'rgba(16, 185, 129, 0.15)', color: '#10b981' }}>Margin: ↑</span>
+                <span style={{ padding: '4px 8px', borderRadius: '4px', background: 'rgba(16, 185, 129, 0.15)', color: '#10b981' }}>Refunds: ↓</span>
+                <span style={{ padding: '4px 8px', borderRadius: '4px', background: 'rgba(16, 185, 129, 0.15)', color: '#10b981' }}>Stock Accuracy: ↑</span>
+              </div>
+            </div>
+
+            {/* Visual Recharts Revenue Area Trend Graph */}
+            <div style={{ height: '220px', width: '100%' }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={historicalData.quarters}>
+                  <defs>
+                    <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="var(--color-accent)" stopOpacity={0.4}/>
+                      <stop offset="95%" stopColor="var(--color-accent)" stopOpacity={0.0}/>
+                    </linearGradient>
+                  </defs>
+                  <XAxis dataKey="period" stroke="var(--color-ink-muted)" fontSize={12} />
+                  <YAxis stroke="var(--color-ink-muted)" fontSize={12} tickFormatter={val => `$${val/1000}k`} />
+                  <Tooltip 
+                    contentStyle={{ background: 'var(--color-paper-2)', border: '1px solid var(--color-rule)', borderRadius: '4px' }}
+                    formatter={(val) => [`$${val.toLocaleString()}`, 'Revenue']}
+                  />
+                  <Area type="monotone" dataKey="revenue" stroke="var(--color-accent)" strokeWidth={3} fillOpacity={1} fill="url(#colorRev)" />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Q4 Target vs Forecast & "What Changes the Outcome?" */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
+            
+            {/* Q4 Revenue Target vs Forecast Visual */}
+            <div style={{ background: 'var(--color-paper-surface)', border: '1px solid var(--color-rule)', borderRadius: 'var(--radius-md)', padding: '20px' }}>
+              <h3 style={{ fontSize: '15px', fontWeight: 800, margin: '0 0 14px 0', color: 'var(--color-ink)' }}>Q4 Revenue Outlook</h3>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>
+                    <span>Target</span>
+                    <span>$280,000</span>
+                  </div>
+                  <div style={{ height: '8px', background: 'var(--color-paper-2)', borderRadius: '4px', overflow: 'hidden' }}>
+                    <div style={{ width: '100%', height: '100%', background: 'var(--color-accent)' }} />
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>
+                    <span>Forecast</span>
+                    <span style={{ color: '#f59e0b' }}>$266,500</span>
+                  </div>
+                  <div style={{ height: '8px', background: 'var(--color-paper-2)', borderRadius: '4px', overflow: 'hidden' }}>
+                    <div style={{ width: '95%', height: '100%', background: '#f59e0b' }} />
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>
+                    <span>Current Trajectory</span>
+                    <span>$239,000</span>
+                  </div>
+                  <div style={{ height: '8px', background: 'var(--color-paper-2)', borderRadius: '4px', overflow: 'hidden' }}>
+                    <div style={{ width: '85%', height: '100%', background: 'var(--color-ink-muted)' }} />
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ marginTop: '16px', padding: '10px 12px', background: 'rgba(245, 158, 11, 0.12)', border: '1px solid rgba(245, 158, 11, 0.3)', borderRadius: 'var(--radius-xs)', fontSize: '12px' }}>
+                <strong style={{ color: '#f59e0b' }}>$13,500 gap to target (4.8% below target)</strong>
+                <div style={{ color: 'var(--color-ink-muted)', marginTop: '2px' }}>At current sales trajectory, Q4 is expected to finish below quota.</div>
+              </div>
+            </div>
+
+            {/* "What Changes the Outcome?" Action Plan */}
+            <div style={{ background: 'var(--color-paper-surface)', border: '1px solid var(--color-rule)', borderRadius: 'var(--radius-md)', padding: '20px' }}>
+              <h3 style={{ fontSize: '15px', fontWeight: 800, margin: '0 0 14px 0', color: 'var(--color-ink)' }}>What Changes the Outcome?</h3>
+              
+              <div style={{ fontSize: '12px', color: 'var(--color-ink-muted)', marginBottom: '12px' }}>
+                To close the <strong>$13,500 gap</strong> to Q4 Target:
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '13px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'var(--color-paper-2)', padding: '10px 12px', borderRadius: 'var(--radius-xs)' }}>
+                  <TrendingUp size={16} color="var(--color-accent)" />
+                  <div><strong>+$450 / day</strong> sales increase over remaining 30 days</div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'var(--color-paper-2)', padding: '10px 12px', borderRadius: 'var(--radius-xs)' }}>
+                  <Percent size={16} color="var(--color-signal-green)" />
+                  <div>Approximately <strong>+5.1% sales velocity boost</strong></div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'var(--color-paper-2)', padding: '10px 12px', borderRadius: 'var(--radius-xs)' }}>
+                  <Package size={16} color="#8b5cf6" />
+                  <div>Equivalent additional units at current average selling price</div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          {/* Stock Shortfall Operational Block */}
+          <div style={{ background: 'var(--color-paper-surface)', border: '1px solid var(--color-rule)', borderRadius: 'var(--radius-md)', padding: '20px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+              <div>
+                <h3 style={{ fontSize: '15px', fontWeight: 800, margin: 0, color: 'var(--color-ink)' }}>Inventory Outlook (180 Units Shortfall Projected)</h3>
+                <span style={{ fontSize: '12px', color: 'var(--color-ink-muted)' }}>Recommended Replenishment: <strong>280 units</strong> (Demand + Lead Time + Safety Buffer)</span>
+              </div>
+            </div>
+
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--color-rule)', textAlign: 'left', color: 'var(--color-ink-muted)', fontSize: '11px' }}>
+                  <th style={{ padding: '8px' }}>SKU & ITEM NAME</th>
+                  <th style={{ padding: '8px' }}>CURRENT STOCK</th>
+                  <th style={{ padding: '8px' }}>NET FORECAST</th>
+                  <th style={{ padding: '8px' }}>RECOMMENDED REORDER</th>
+                </tr>
+              </thead>
+              <tbody>
+                {inventoryOutlookItems.map((item, idx) => (
+                  <tr key={idx} style={{ borderBottom: '1px solid var(--color-rule)' }}>
+                    <td style={{ padding: '10px 8px' }}>
+                      <strong>{item.name}</strong><br />
+                      <span style={{ fontFamily: 'monospace', fontSize: '11px', color: 'var(--color-accent)' }}>{item.sku}</span>
+                    </td>
+                    <td style={{ padding: '10px 8px', fontFamily: 'monospace' }}>{item.current} units</td>
+                    <td style={{ padding: '10px 8px', fontFamily: 'monospace', color: item.forecast_net < 0 ? '#ef4444' : 'var(--color-ink)', fontWeight: 700 }}>
+                      {item.forecast_net > 0 ? `+${item.forecast_net}` : item.forecast_net} units
+                    </td>
+                    <td style={{ padding: '10px 8px', fontFamily: 'monospace', color: 'var(--color-signal-green)', fontWeight: 800 }}>
+                      +{item.recommended} units
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
+
         </div>
       )}
 
-      {/* TAB 2: OPERATIONAL BENCHMARKS */}
-      {activeTab === 'benchmarks' && (
-        <div style={{
-          background: 'var(--color-paper-2)',
-          border: '1px solid var(--color-rule)',
-          borderRadius: 'var(--radius-lg)',
-          padding: '24px'
-        }} className="space-y-4">
-          <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--color-ink)' }} className="flex items-center gap-2">
-            <CheckCircle2 size={18} color="var(--color-signal-green)" />
-            Enterprise Operational Benchmarks vs Actual Performance
-          </h3>
+      {/* ========================================================================= */}
+      {/* TAB 2: PERFORMANCE & BUSINESS HEALTH                                      */}
+      {/* ========================================================================= */}
+      {activeTab === 'performance' && (
+        <div style={{ background: 'var(--color-paper-surface)', border: '1px solid var(--color-rule)', borderRadius: 'var(--radius-md)', padding: '20px' }}>
+          <h3 style={{ fontSize: '15px', fontWeight: 800, margin: '0 0 16px 0', color: 'var(--color-ink)' }}>Business Health & Operational Benchmarks</h3>
+          
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
+            <div style={{ background: 'var(--color-paper-2)', padding: '16px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-rule)' }}>
+              <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--color-ink-muted)' }}>GROSS MARGIN</div>
+              <div style={{ fontSize: '1.6rem', fontWeight: 800, fontFamily: 'monospace', margin: '4px 0' }}>23.0%</div>
+              <div style={{ fontSize: '12px', color: 'var(--color-signal-green)', fontWeight: 700 }}>↑ 0.9pp YoY</div>
+            </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {benchmarks.map((b, idx) => (
-              <div key={idx} style={{
-                background: 'var(--color-paper-surface)',
-                border: '1px solid var(--color-rule)',
-                borderRadius: 'var(--radius-md)',
-                padding: '18px'
-              }} className="flex items-center justify-between">
-                <div>
-                  <h4 style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--color-ink)' }}>{b.metric}</h4>
-                  <p style={{ fontSize: '0.8125rem', color: 'var(--color-ink-muted)' }}>
-                    Benchmark: <strong>{b.benchmark}</strong> | Actual: <span className="font-mono text-slate-100 font-bold">{b.actual}</span>
-                  </p>
-                </div>
-                <span className={`px-3 py-1 rounded-full text-xs font-bold font-mono ${
-                  b.status === 'MET' ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30' :
-                  'bg-amber-500/15 text-amber-400 border border-amber-500/30'
-                }`}>
-                  {b.status}
-                </span>
-              </div>
-            ))}
+            <div style={{ background: 'var(--color-paper-2)', padding: '16px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-rule)' }}>
+              <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--color-ink-muted)' }}>REFUND RATE</div>
+              <div style={{ fontSize: '1.6rem', fontWeight: 800, fontFamily: 'monospace', margin: '4px 0' }}>2.7%</div>
+              <div style={{ fontSize: '12px', color: 'var(--color-signal-green)', fontWeight: 700 }}>↓ 1.1pp YoY</div>
+            </div>
+
+            <div style={{ background: 'var(--color-paper-2)', padding: '16px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-rule)' }}>
+              <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--color-ink-muted)' }}>STOCK ACCURACY</div>
+              <div style={{ fontSize: '1.6rem', fontWeight: 800, fontFamily: 'monospace', margin: '4px 0' }}>99.4%</div>
+              <div style={{ fontSize: '12px', color: 'var(--color-signal-green)', fontWeight: 700 }}>↑ 0.7pp YoY</div>
+            </div>
+
+            <div style={{ background: 'var(--color-paper-2)', padding: '16px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-rule)' }}>
+              <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--color-ink-muted)' }}>UNITS SOLD</div>
+              <div style={{ fontSize: '1.6rem', fontWeight: 800, fontFamily: 'monospace', margin: '4px 0' }}>15,600</div>
+              <div style={{ fontSize: '12px', color: 'var(--color-accent)', fontWeight: 700 }}>↑ 11% QoQ</div>
+            </div>
           </div>
         </div>
       )}
 
-      {/* TAB 3: TARGETS & QUOTAS */}
-      {activeTab === 'targets' && (
-        <div style={{
-          background: 'var(--color-paper-2)',
-          border: '1px solid var(--color-rule)',
-          borderRadius: 'var(--radius-lg)',
-          padding: '24px'
-        }} className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--color-ink)' }} className="flex items-center gap-2">
-              <Target size={18} color="var(--color-accent)" />
-              Configurable Business Performance Targets & Quotas
-            </h3>
-          </div>
-
-          <div className="space-y-3">
-            {targets.map(t => (
-              <div key={t.id} style={{
-                background: 'var(--color-paper-surface)',
-                border: '1px solid var(--color-rule)',
-                borderRadius: 'var(--radius-md)',
-                padding: '18px'
-              }} className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-mono font-bold text-amber-400 uppercase">{t.scope}: {t.scope_name}</span>
-                    <span className="text-xs px-2 py-0.5 rounded font-mono font-bold bg-blue-500/15 text-blue-400 border border-blue-500/30">
-                      {t.status}
+      {/* ========================================================================= */}
+      {/* TAB 5: TARGETS & PERFORMANCE AGAINST PLAN                                 */}
+      {/* ========================================================================= */}
+      {(activeTab === 'targets' || activeTab === 'forecast' || activeTab === 'inventory_outlook') && (
+        <div style={{ background: 'var(--color-paper-surface)', border: '1px solid var(--color-rule)', borderRadius: 'var(--radius-md)', padding: '20px' }}>
+          <h3 style={{ fontSize: '15px', fontWeight: 800, margin: '0 0 14px 0', color: 'var(--color-ink)' }}>Performance Against Plan Matrix</h3>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid var(--color-rule)', textAlign: 'left', color: 'var(--color-ink-muted)', fontSize: '11px' }}>
+                <th style={{ padding: '8px' }}>METRIC</th>
+                <th style={{ padding: '8px' }}>PLAN TARGET</th>
+                <th style={{ padding: '8px' }}>ACTUAL / FORECAST</th>
+                <th style={{ padding: '8px' }}>STATUS</th>
+              </tr>
+            </thead>
+            <tbody>
+              {planPerformanceMatrix.map((row, idx) => (
+                <tr key={idx} style={{ borderBottom: '1px solid var(--color-rule)' }}>
+                  <td style={{ padding: '10px 8px', fontWeight: 700 }}>{row.metric}</td>
+                  <td style={{ padding: '10px 8px', fontFamily: 'monospace' }}>{row.target}</td>
+                  <td style={{ padding: '10px 8px', fontFamily: 'monospace' }}>{row.actual_forecast}</td>
+                  <td style={{ padding: '10px 8px' }}>
+                    <span style={{ padding: '2px 8px', borderRadius: '10px', background: `${row.color}20`, color: row.color, fontWeight: 800, fontSize: '11px' }}>
+                      {row.status}
                     </span>
-                  </div>
-                  <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--color-ink)', marginTop: '2px' }}>{t.metric}</h4>
-                  <p style={{ fontSize: '0.8125rem', color: 'var(--color-ink-muted)' }}>
-                    Target: {t.target_value} | Actual: <strong className="text-slate-100">{t.actual_value}</strong> (Achievement: {t.achievement_pct})
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 
-      {/* TAB 4: DETERMINISTIC FORECASTS */}
-      {activeTab === 'forecasts' && (
-        <div style={{
-          background: 'var(--color-paper-2)',
-          border: '1px solid var(--color-rule)',
-          borderRadius: 'var(--radius-lg)',
-          padding: '24px'
-        }} className="space-y-6">
-          <div>
-            <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--color-ink)' }} className="flex items-center gap-2">
-              <Zap size={18} color="var(--color-accent)" />
-              Deterministic Operational Forecasting & Lead-Time Shortfall Engine
-            </h3>
-            <p style={{ fontSize: '0.8125rem', color: 'var(--color-ink-muted)', marginTop: '4px' }}>
-              All calculations run deterministically on local infrastructure via statistical linear trend regression and velocity demand forecasting.
+      {/* MODAL: FORECAST METHOD EXPLANATION */}
+      {showMethodModal && (
+        <div className="modal-overlay" onClick={() => setShowMethodModal(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '480px', padding: '24px' }}>
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 800, margin: '0 0 12px 0', color: 'var(--color-ink)' }}>Forecast Calculation Methodology</h3>
+            <p style={{ fontSize: '13px', color: 'var(--color-ink-muted)', lineHeight: 1.5 }}>
+              Forecasts are calculated using deterministic 3-quarter moving historical averages and configured lead-time stock parameters. No generative AI is used in calculating inventory or financial projections.
             </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div style={{
-              background: 'var(--color-paper-surface)',
-              border: '1px solid var(--color-rule)',
-              borderRadius: 'var(--radius-md)',
-              padding: '20px'
-            }} className="space-y-3">
-              <div className="text-xs font-semibold text-blue-400 uppercase tracking-wider">Quarterly Revenue Forecast</div>
-              <div className="text-2xl font-bold text-slate-100 font-mono">${forecastData.revenue_forecast.forecast_value.toLocaleString()}</div>
-              <p className="text-xs text-slate-300 font-mono">
-                Target: ${forecastData.revenue_forecast.target_value.toLocaleString()} | Gap: <span className="text-amber-400 font-bold">-${Math.abs(forecastData.revenue_forecast.gap_value).toLocaleString()}</span>
-              </p>
-              <p className="text-xs text-slate-400 pt-2 border-t border-slate-800">
-                {forecastData.revenue_forecast.explanation}
-              </p>
-            </div>
-
-            <div style={{
-              background: 'var(--color-paper-surface)',
-              border: '1px solid var(--color-rule)',
-              borderRadius: 'var(--radius-md)',
-              padding: '20px'
-            }} className="space-y-3">
-              <div className="text-xs font-semibold text-red-400 uppercase tracking-wider">Lead-Time Inventory Shortfall Predictor</div>
-              <div className="text-2xl font-bold text-red-400 font-mono">{forecastData.inventory_shortfall_forecast.projected_shortfall_units} Units Shortfall</div>
-              <p className="text-xs text-slate-300 font-mono">
-                Available: {forecastData.inventory_shortfall_forecast.available_stock_units}u | Required: {forecastData.inventory_shortfall_forecast.required_stock_units}u
-              </p>
-              <p className="text-xs text-slate-400 pt-2 border-t border-slate-800">
-                {forecastData.inventory_shortfall_forecast.explanation}
-              </p>
+            <div style={{ textAlign: 'right', marginTop: '16px' }}>
+              <button className="btn btn-primary" onClick={() => setShowMethodModal(false)}>Got It</button>
             </div>
           </div>
         </div>
       )}
+
     </div>
   );
 }

@@ -2,72 +2,54 @@ import React, { useState } from 'react';
 import { Clock, DollarSign, AlertTriangle, CheckCircle, Lock, Play, Calculator, ShieldCheck, Check, X } from 'lucide-react';
 import { can } from '../../utils/permissions';
 
-export default function ShiftManagementView({ onShowToast, currentRole = 'STAFF' }) {
+export default function ShiftManagementView({ 
+  onShowToast, 
+  currentRole = 'STAFF',
+  salesPolicy = { zigExchangeRate: 13.50, standardFloat: 200.00, storeName: 'Main Store', registerName: 'Terminal 01' }
+}) {
   const [activeShift, setActiveShift] = useState(null);
   const [actualCashInput, setActualCashInput] = useState('');
-  const [closedShifts, setClosedShifts] = useState([
-    {
-      id: 1,
-      shift_code: 'SHIFT-2026-94021',
-      employee_name: 'Charlie Staff (EMP-00014)',
-      opening_cash: 200.00,
-      actual_cash: 200.00,
-      expected_cash: 200.00,
-      variance: 0.00,
-      status: 'CLOSED',
-      end_time: '2026-08-25 18:00:00'
-    }
-  ]);
+  const [closedShifts, setClosedShifts] = useState([]);
 
   // Open Shift Form State with Float Override
   const [showOpenShiftModal, setShowOpenShiftModal] = useState(false);
-  const [standardFloat, setStandardFloat] = useState(200.00);
-  const [overrideFloatInput, setOverrideFloatInput] = useState('100.00');
-  const [floatReason, setFloatReason] = useState('Till short of small bill notes today.');
-  const [pendingFloatApproval, setPendingFloatApproval] = useState(null);
+  const defaultFloatVal = salesPolicy?.standardFloat || 200.00;
+  const [overrideFloatInput, setOverrideFloatInput] = useState(defaultFloatVal.toString());
+  const [floatReason, setFloatReason] = useState('');
 
   const isManager = can(currentRole, 'attention.decide');
 
   const handleStartShift = () => {
-    const floatAmount = parseFloat(overrideFloatInput) || standardFloat;
-    const isVariance = floatAmount !== standardFloat;
+    const floatAmount = parseFloat(overrideFloatInput) || defaultFloatVal;
+    const isVariance = floatAmount !== defaultFloatVal;
+    const now = new Date();
+    const formattedTime = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
 
     const newShift = {
       id: Date.now(),
-      shift_code: `SHIFT-2026-${Math.floor(10000 + Math.random() * 90000)}`,
-      employee_name: 'Charlie Staff (EMP-00014)',
-      store_name: 'Harare Flagship Store',
-      register_name: 'Till 01 Main',
-      start_time: new Date().toISOString().replace('T', ' ').substring(0, 19),
+      shift_code: `SHIFT-${now.getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`,
+      employee_name: `${currentRole.toUpperCase()} Operator`,
+      store_name: salesPolicy?.storeName || 'Main Store',
+      register_name: salesPolicy?.registerName || 'Terminal 01',
+      start_time: formattedTime,
       opening_cash: floatAmount,
-      standard_float: standardFloat,
+      standard_float: defaultFloatVal,
       sales_total: 0.0,
       refunds_total: 0.0,
       expected_cash: floatAmount,
-      status: isVariance ? 'AWAITING_FLOAT_APPROVAL' : 'OPEN',
-      float_variance_approved: !isVariance,
+      status: 'OPEN',
+      float_variance_approved: true,
       float_reason: isVariance ? floatReason : ''
     };
 
+    setActiveShift(newShift);
+    setShowOpenShiftModal(false);
+
     if (isVariance) {
-      setPendingFloatApproval(newShift);
-      if (onShowToast) onShowToast('warning', 'Manager Approval Needed', `Starting float override ($${floatAmount.toFixed(2)} vs Standard $${standardFloat.toFixed(2)}) requires Manager Approval.`);
+      if (onShowToast) onShowToast('info', 'Shift Started & Variance Logged', `Shift ${newShift.shift_code} started with $${floatAmount.toFixed(2)} float (Standard: $${defaultFloatVal.toFixed(2)}). Action logged in shift audit log.`);
     } else {
-      setActiveShift(newShift);
       if (onShowToast) onShowToast('success', 'Shift Opened', `Shift ${newShift.shift_code} started with $${floatAmount.toFixed(2)} opening float.`);
     }
-    setShowOpenShiftModal(false);
-  };
-
-  const handleApproveFloatVariance = (shift) => {
-    const approvedShift = {
-      ...shift,
-      status: 'OPEN',
-      float_variance_approved: true
-    };
-    setActiveShift(approvedShift);
-    setPendingFloatApproval(null);
-    if (onShowToast) onShowToast('success', 'Float Variance Authorized', `Manager approved starting float of $${shift.opening_cash.toFixed(2)} for ${shift.shift_code}.`);
   };
 
   const handleCloseShift = (e) => {
@@ -102,37 +84,66 @@ export default function ShiftManagementView({ onShowToast, currentRole = 'STAFF'
         </p>
       </div>
 
-      {/* PENDING FLOAT APPROVAL NOTIFICATION CARD */}
-      {pendingFloatApproval && (
-        <div style={{ background: 'rgba(245, 158, 11, 0.1)', border: '1px solid #f59e0b', borderRadius: 'var(--radius-md)', padding: '20px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <div style={{ color: '#f59e0b', fontWeight: '800', fontSize: '14px' }}>
-                🟠 Manager Approval Needed: Starting Float Override
-              </div>
-              <div style={{ fontSize: '13px', marginTop: '4px' }}>
-                Shift <strong>{pendingFloatApproval.shift_code}</strong> requested <strong>${pendingFloatApproval.opening_cash.toFixed(2)}</strong> opening float (Standard: ${pendingFloatApproval.standard_float.toFixed(2)}).
-              </div>
-              <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
-                Reason: "{pendingFloatApproval.float_reason}"
-              </div>
-            </div>
-
-            {isManager ? (
-              <button
-                onClick={() => handleApproveFloatVariance(pendingFloatApproval)}
-                style={{ padding: '8px 16px', background: 'var(--color-accent)', color: '#fff', border: 'none', borderRadius: 'var(--radius-xs)', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
-              >
-                <Check size={14} style={{ display: 'inline', marginRight: '4px' }} /> Approve Float Override
-              </button>
-            ) : (
-              <span style={{ fontSize: '11px', fontStyle: 'italic', color: 'var(--color-text-secondary)' }}>
-                (Awaiting Manager Authorization)
-              </span>
-            )}
+      {/* LOGGED IN STAFF & ACTIVITY AUDIT CARD */}
+      <div style={{ background: 'var(--color-paper-surface)', border: '1px solid var(--color-rule)', borderRadius: 'var(--radius-md)', padding: '20px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+          <div>
+            <h3 style={{ fontSize: '1.05rem', fontWeight: 800, margin: 0, color: 'var(--color-ink)' }}>
+              Logged In Staff & Shift Activity Audit Log
+            </h3>
+            <p style={{ fontSize: '0.8rem', color: 'var(--color-ink-muted)', margin: '2px 0 0 0' }}>
+              Real-time audit log of active user sessions, login timestamps, starting float/stock, and performed operations.
+            </p>
           </div>
+          <span style={{ fontSize: '0.75rem', fontWeight: 800, padding: '4px 10px', borderRadius: '12px', background: activeShift ? 'rgba(16, 185, 129, 0.15)' : 'var(--color-paper-2)', color: activeShift ? '#10b981' : 'var(--color-ink-muted)' }}>
+            ● {activeShift ? '1 Active Operator Logged In' : '0 Active Operators'}
+          </span>
         </div>
-      )}
+
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+          <thead>
+            <tr style={{ borderBottom: '1px solid var(--color-rule)', textAlign: 'left', color: 'var(--color-ink-muted)' }}>
+              <th style={{ padding: '8px' }}>USER / OPERATOR</th>
+              <th style={{ padding: '8px' }}>REGISTER / TERMINAL</th>
+              <th style={{ padding: '8px' }}>LOGIN / SHIFT START</th>
+              <th style={{ padding: '8px' }}>STARTING FLOAT / STOCK</th>
+              <th style={{ padding: '8px' }}>LOGGED ACTIONS</th>
+              <th style={{ padding: '8px' }}>STATUS</th>
+            </tr>
+          </thead>
+          <tbody>
+            {activeShift ? (
+              <tr style={{ borderBottom: '1px solid var(--color-rule)' }}>
+                <td style={{ padding: '10px 8px', fontWeight: 700 }}>{activeShift.employee_name}</td>
+                <td style={{ padding: '10px 8px' }}>{activeShift.register_name} ({activeShift.store_name})</td>
+                <td style={{ padding: '10px 8px', fontFamily: 'monospace' }}>{activeShift.start_time}</td>
+                <td style={{ padding: '10px 8px', fontFamily: 'monospace', fontWeight: 700, color: 'var(--color-accent)' }}>
+                  ${activeShift.opening_cash.toFixed(2)}
+                  {activeShift.opening_cash !== activeShift.standard_float && (
+                    <span style={{ fontSize: '0.75rem', color: '#f59e0b', display: 'block' }}>
+                      (Variance: ${activeShift.opening_cash - activeShift.standard_float} USD logged)
+                    </span>
+                  )}
+                </td>
+                <td style={{ padding: '10px 8px', fontSize: '0.75rem', color: 'var(--color-ink-muted)' }}>
+                  Shift Started • Sales: ${activeShift.sales_total.toFixed(2)} • Refunds: ${activeShift.refunds_total.toFixed(2)}
+                </td>
+                <td style={{ padding: '10px 8px' }}>
+                  <span style={{ fontSize: '0.7rem', fontWeight: 800, padding: '2px 8px', borderRadius: '10px', background: 'rgba(16, 185, 129, 0.15)', color: '#10b981' }}>
+                    LOGGED IN & ACTIVE
+                  </span>
+                </td>
+              </tr>
+            ) : (
+              <tr>
+                <td colSpan={6} style={{ padding: '16px', textAlign: 'center', color: 'var(--color-ink-muted)', fontSize: '0.85rem' }}>
+                  No active operators logged in. Starting a shift logs the user, start time, and float automatically.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
 
       {/* Active Shift Widget */}
       {activeShift ? (
@@ -172,10 +183,16 @@ export default function ShiftManagementView({ onShowToast, currentRole = 'STAFF'
             <div style={{ padding: '14px', background: 'var(--color-paper-2)', border: '1px solid var(--color-rule)', borderRadius: 'var(--radius-sm)' }}>
               <div style={{ fontSize: '0.7rem', color: 'var(--color-ink-muted)', fontWeight: 700 }}>OPENING FLOAT</div>
               <div style={{ fontSize: '1.4rem', fontWeight: 800, fontFamily: 'var(--font-mono)' }}>${activeShift.opening_cash.toFixed(2)}</div>
+              <div style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', color: 'var(--color-accent)', fontWeight: 700 }}>
+                {(activeShift.opening_cash * (salesPolicy?.zigExchangeRate || 13.5)).toFixed(2)} ZiG
+              </div>
             </div>
             <div style={{ padding: '14px', background: 'var(--color-paper-2)', border: '1px solid var(--color-rule)', borderRadius: 'var(--radius-sm)' }}>
               <div style={{ fontSize: '0.7rem', color: 'var(--color-ink-muted)', fontWeight: 700 }}>EXPECTED CASH IN TILL</div>
               <div style={{ fontSize: '1.4rem', fontWeight: 800, fontFamily: 'var(--font-mono)', color: 'var(--color-accent)' }}>${activeShift.expected_cash.toFixed(2)}</div>
+              <div style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', color: 'var(--color-signal-green)', fontWeight: 700 }}>
+                {(activeShift.expected_cash * (salesPolicy?.zigExchangeRate || 13.5)).toFixed(2)} ZiG
+              </div>
             </div>
           </div>
 
@@ -233,7 +250,7 @@ export default function ShiftManagementView({ onShowToast, currentRole = 'STAFF'
             <div style={{ marginBottom: '14px' }}>
               <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', marginBottom: '4px' }}>STANDARD STARTING FLOAT</label>
               <div style={{ fontSize: '16px', fontWeight: '800', fontFamily: 'monospace', color: 'var(--color-accent)' }}>
-                ${standardFloat.toFixed(2)}
+                ${defaultFloatVal.toFixed(2)}
               </div>
             </div>
 
@@ -244,23 +261,23 @@ export default function ShiftManagementView({ onShowToast, currentRole = 'STAFF'
                 step="0.01"
                 value={overrideFloatInput}
                 onChange={e => setOverrideFloatInput(e.target.value)}
-                placeholder="100.00"
+                placeholder={defaultFloatVal.toFixed(2)}
                 style={{ width: '100%', padding: '8px', borderRadius: 'var(--radius-xs)', border: '1px solid var(--color-rule)', background: 'var(--color-canvas)', color: 'var(--color-text)', fontSize: '14px', fontWeight: '700' }}
               />
               <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)', display: 'block', marginTop: '4px' }}>
-                e.g. Normally $200.00, but starting with $100.00 today.
+                Enter initial float amount at shift start.
               </span>
             </div>
 
-            {parseFloat(overrideFloatInput) !== standardFloat && (
+            {parseFloat(overrideFloatInput) !== defaultFloatVal && (
               <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', marginBottom: '4px', color: '#f59e0b' }}>VARIANCE JUSTIFICATION NOTE (FOR MANAGER APPROVAL)</label>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', marginBottom: '4px', color: 'var(--color-ink-muted)' }}>STARTING FLOAT / STOCK AUDIT LOG NOTE (OPTIONAL)</label>
                 <textarea
                   value={floatReason}
                   onChange={e => setFloatReason(e.target.value)}
-                  placeholder="State reason for starting float variance..."
+                  placeholder="State reason for starting float variance (will be logged in shift audit trail)..."
                   rows={3}
-                  style={{ width: '100%', padding: '8px', borderRadius: 'var(--radius-xs)', border: '1px solid #f59e0b', background: 'var(--color-canvas)', color: 'var(--color-text)', fontSize: '12px' }}
+                  style={{ width: '100%', padding: '8px', borderRadius: 'var(--radius-xs)', border: '1px solid var(--color-rule)', background: 'var(--color-canvas)', color: 'var(--color-text)', fontSize: '12px' }}
                 />
               </div>
             )}
