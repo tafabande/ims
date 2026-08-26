@@ -16,6 +16,7 @@ import {
   Printer
 } from 'lucide-react';
 import ReceiptModal from './ReceiptModal';
+import { can } from '../../utils/permissions';
 
 export default function SalesView({ 
   products, 
