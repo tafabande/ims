@@ -27,13 +27,16 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { apiFetch } from '../../utils/apiClient';
+import { can } from '../../utils/permissions';
 
-export default function IntegrityIntelligenceView({ onShowToast, currentRole, onNavigate }) {
+export default function IntegrityIntelligenceView({ onShowToast, currentRole = 'MANAGER', onNavigate }) {
   const [activeTab, setActiveTab] = useState('attention'); // 'attention' | 'exceptions' | 'lineage' | 'external_sources' | 'digital_twin'
   const [selectedEntityForLineage, setSelectedEntityForLineage] = useState(null);
   const [quarantineActionEntity, setQuarantineActionEntity] = useState(null);
   const [quarantineNote, setQuarantineNote] = useState('');
   const [selectedAisle, setSelectedAisle] = useState('A-02');
+
+  const isManager = can(currentRole, 'attention.decide');
 
   // Operational Exceptions Queue Data
   const [exceptions, setExceptions] = useState([
@@ -433,21 +436,27 @@ export default function IntegrityIntelligenceView({ onShowToast, currentRole, on
                     </button>
                   )}
 
-                  <button
-                    onClick={() => handleExecuteAction(item, item.actionType)}
-                    style={{
-                      padding: '7px 14px',
-                      background: item.color,
-                      color: '#fff',
-                      border: 'none',
-                      borderRadius: 'var(--radius-xs)',
-                      fontSize: '12px',
-                      fontWeight: '700',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    {item.actionLabel}
-                  </button>
+                  {isManager ? (
+                    <button
+                      onClick={() => handleExecuteAction(item, item.actionType)}
+                      style={{
+                        padding: '7px 14px',
+                        background: 'var(--color-accent)',
+                        color: '#fff',
+                        border: 'none',
+                        borderRadius: 'var(--radius-xs)',
+                        fontSize: '12px',
+                        fontWeight: '700',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {item.actionLabel}
+                    </button>
+                  ) : (
+                    <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)', fontStyle: 'italic', padding: '6px' }}>
+                      (View Only Mode — Anomaly ID: {item.code})
+                    </span>
+                  )}
                 </div>
               </div>
             </div>

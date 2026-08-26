@@ -8,9 +8,14 @@ import {
   TrendingDown,
   CheckCircle2,
   AlertCircle,
-  PlusCircle
+  PlusCircle,
+  Clock,
+  ArrowRightLeft,
+  Users,
+  ShieldCheck
 } from 'lucide-react';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
+import { can } from '../../utils/permissions';
 
 export default function DashboardView({ 
   products = [], 
@@ -27,7 +32,7 @@ export default function DashboardView({
   const totalValuation = products.reduce((acc, p) => acc + ((p.stock_quantity || 0) * (p.purchase_price || 0)), 0);
   const totalSalesRevenue = sales.reduce((acc, s) => acc + (s.total_amount || 0), 0);
 
-  // Dynamic Attention Items Array (derived from business rules & state)
+  // Dynamic Attention Items Array
   const attentionItems = [
     {
       id: 'REF-00042',
@@ -63,7 +68,7 @@ export default function DashboardView({
     }
   ];
 
-  // Dynamic Chart Data derived from sales & purchases
+  // Dynamic Chart Data
   const chartData = [
     { day: 'Mon', sales: 1450, purchases: 800 },
     { day: 'Tue', sales: 2100, purchases: 1100 },
@@ -74,7 +79,7 @@ export default function DashboardView({
     { day: 'Sun', sales: 3600, purchases: 1400 },
   ];
 
-  const isStaff = currentRole === 'STAFF';
+  const roleName = (currentRole || 'MANAGER').toUpperCase();
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -89,28 +94,42 @@ export default function DashboardView({
             <span style={{ fontSize: '0.75rem', color: 'var(--color-ink-muted)' }}>• Wednesday, 26 Aug 2026</span>
           </div>
           <h2 style={{ fontSize: '1.5rem', fontWeight: 800, margin: 0 }}>
-            {isStaff ? 'Staff Point of Sale & Store Overview' : 'Executive Operations & Control Dashboard'}
+            {roleName === 'STAFF' ? 'Store Front POS & Shift Terminal' :
+             roleName === 'WAREHOUSE' ? 'Warehouse Ingestion & Receiving Dashboard' :
+             roleName === 'APP_ADMIN' || roleName === 'SYSADMIN' ? 'System Administration & RBAC Control' :
+             'Executive Operations & Control Dashboard'}
           </h2>
         </div>
 
+        {/* Permission-Based Quick Action CTAs */}
         <div style={{ display: 'flex', gap: '10px' }}>
-          <button className="btn btn-primary" onClick={() => onNavigate('sales')}>
-            <ShoppingCart size={15} /> Launch POS Terminal
-          </button>
-
-          {isStaff ? (
-            <button className="btn btn-secondary" onClick={() => onNavigate('shifts')}>
-              <ShoppingBag size={15} /> Shift & Cash Till
+          {can(currentRole, 'sales.create') && (
+            <button className="btn btn-primary" onClick={() => onNavigate('sales')}>
+              <ShoppingCart size={15} /> Launch POS Terminal
             </button>
-          ) : (
+          )}
+
+          {can(currentRole, 'inventory.receive') && (
             <button className="btn btn-secondary" onClick={() => onNavigate('purchases')}>
               <ShoppingBag size={15} /> Receive Goods
+            </button>
+          )}
+
+          {can(currentRole, 'shifts.manage') && (
+            <button className="btn btn-secondary" onClick={() => onNavigate('shifts')}>
+              <Clock size={15} /> Shift & Cash Till
+            </button>
+          )}
+
+          {can(currentRole, 'users.manage') && (
+            <button className="btn btn-secondary" onClick={() => onNavigate('users')}>
+              <Users size={15} /> Manage Users & RBAC
             </button>
           )}
         </div>
       </div>
 
-      {/* 2. FOUR DIRECTIONAL KPI CARDS */}
+      {/* 2. DIRECTIONAL KPI CARDS (Permission Aware) */}
       <div style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
@@ -124,33 +143,35 @@ export default function DashboardView({
           </div>
           <div style={{ fontSize: '0.75rem', color: 'var(--color-ink-dim)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span>{totalStockQuantity.toLocaleString()} Total Units</span>
-            <span style={{ color: '#10b981', fontWeight: '700' }}>↑ +2.4% vs L7D</span>
+            <span style={{ color: 'var(--color-accent)', fontWeight: '700' }}>↑ +2.4% vs L7D</span>
           </div>
         </div>
 
         {/* Card 2: LOW STOCK */}
-        <div style={{ padding: '16px 20px', background: 'var(--color-paper-2)', borderRadius: 'var(--radius-md)', border: (lowStockItems.length + outOfStockItems.length) > 0 ? '1px solid rgba(245, 158, 11, 0.4)' : '1px solid var(--color-rule)' }}>
-          <div style={{ fontSize: '0.7rem', fontFamily: 'var(--font-mono)', color: 'var(--color-signal-amber)', fontWeight: 700 }}>LOW STOCK ALERTS</div>
-          <div style={{ fontSize: '1.75rem', fontWeight: 800, fontFamily: 'var(--font-display)', color: 'var(--color-signal-amber)', margin: '4px 0 2px 0' }}>
+        <div style={{ padding: '16px 20px', background: 'var(--color-paper-2)', borderRadius: 'var(--radius-md)', border: (lowStockItems.length + outOfStockItems.length) > 0 ? '1px solid var(--color-accent)' : '1px solid var(--color-rule)' }}>
+          <div style={{ fontSize: '0.7rem', fontFamily: 'var(--font-mono)', color: 'var(--color-ink-muted)', fontWeight: 700 }}>LOW STOCK ALERTS</div>
+          <div style={{ fontSize: '1.75rem', fontWeight: 800, fontFamily: 'var(--font-display)', margin: '4px 0 2px 0' }}>
             {lowStockItems.length + outOfStockItems.length} SKUs
           </div>
           <div style={{ fontSize: '0.75rem', color: 'var(--color-ink-dim)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span>{outOfStockItems.length} Depleted Out of Stock</span>
-            <span style={{ color: '#ef4444', fontWeight: '700' }}>{outOfStockItems.length > 0 ? 'Action Required' : 'Buffer OK'}</span>
+            <span>{outOfStockItems.length} Depleted</span>
+            <span style={{ color: 'var(--color-accent)', fontWeight: '700' }}>{outOfStockItems.length > 0 ? 'Action Needed' : 'Buffer OK'}</span>
           </div>
         </div>
 
-        {/* Card 3: INVENTORY VALUATION */}
-        <div style={{ padding: '16px 20px', background: 'var(--color-paper-2)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-rule)' }}>
-          <div style={{ fontSize: '0.7rem', fontFamily: 'var(--font-mono)', color: 'var(--color-ink-muted)', fontWeight: 700 }}>INVENTORY VALUE (COST BASIS)</div>
-          <div style={{ fontSize: '1.75rem', fontWeight: 800, fontFamily: 'var(--font-mono)', color: 'var(--color-signal-green)', margin: '4px 0 2px 0' }}>
-            ${totalValuation.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+        {/* Card 3: INVENTORY VALUATION (If permitted to view financial valuation) */}
+        {can(currentRole, 'reports.view') && (
+          <div style={{ padding: '16px 20px', background: 'var(--color-paper-2)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-rule)' }}>
+            <div style={{ fontSize: '0.7rem', fontFamily: 'var(--font-mono)', color: 'var(--color-ink-muted)', fontWeight: 700 }}>INVENTORY VALUE (COST BASIS)</div>
+            <div style={{ fontSize: '1.75rem', fontWeight: 800, fontFamily: 'var(--font-mono)', color: 'var(--color-accent)', margin: '4px 0 2px 0' }}>
+              ${totalValuation.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+            </div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--color-ink-dim)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>Cost Basis Capital</span>
+              <span style={{ color: 'var(--color-accent)', fontWeight: '700' }}>+$3,240 this month</span>
+            </div>
           </div>
-          <div style={{ fontSize: '0.75rem', color: 'var(--color-ink-dim)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span>Cost Basis Capital</span>
-            <span style={{ color: '#10b981', fontWeight: '700' }}>+$3,240 this month</span>
-          </div>
-        </div>
+        )}
 
         {/* Card 4: 7D SALES REVENUE */}
         <div style={{ padding: '16px 20px', background: 'var(--color-paper-2)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-rule)' }}>
@@ -160,125 +181,128 @@ export default function DashboardView({
           </div>
           <div style={{ fontSize: '0.75rem', color: 'var(--color-ink-dim)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span>{sales.length} Invoices Issued</span>
-            <span style={{ color: '#10b981', fontWeight: '700' }}>↑ +8.7% vs prev 7D</span>
+            <span style={{ color: 'var(--color-accent)', fontWeight: '700' }}>↑ +8.7% vs prev 7D</span>
           </div>
         </div>
       </div>
 
-      {/* 3. OPERATIONAL ATTENTION TABLE + OPERATIONAL HEALTH PROGRESS BARS */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: '2fr 1fr',
-        gap: '16px'
-      }}>
-        {/* OPERATIONAL ATTENTION TABLE */}
+      {/* 3. OPERATIONAL ATTENTION & HEALTH INSTRUMENT (Role Filtered) */}
+      {can(currentRole, 'attention.view') && (
         <div style={{
-          background: 'var(--color-paper)',
-          border: '1px solid var(--color-rule)',
-          borderRadius: 'var(--radius-sm)',
-          padding: '20px'
+          display: 'grid',
+          gridTemplateColumns: '2fr 1fr',
+          gap: '16px'
         }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '14px', fontWeight: '800', background: 'rgba(239, 68, 68, 0.2)', color: '#ef4444', padding: '2px 8px', borderRadius: '12px' }}>
-                🔴 4 ITEMS REQUIRE ACTION
-              </span>
+          {/* OPERATIONAL ATTENTION TABLE */}
+          <div style={{
+            background: 'var(--color-paper)',
+            border: '1px solid var(--color-accent)',
+            boxShadow: '0 0 10px rgba(59, 130, 246, 0.1)',
+            borderRadius: 'var(--radius-sm)',
+            padding: '20px'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--color-accent)' }}>
+                  Operational Attention Queue ({attentionItems.length} items)
+                </span>
+              </div>
+              <button
+                onClick={() => onNavigate('attention')}
+                style={{ background: 'none', border: 'none', color: 'var(--color-accent)', cursor: 'pointer', fontSize: '12px', fontWeight: '700' }}
+              >
+                Open Attention Center →
+              </button>
             </div>
-            <button
-              onClick={() => onNavigate('attention')}
-              style={{ background: 'none', border: 'none', color: 'var(--color-accent)', cursor: 'pointer', fontSize: '13px', fontWeight: '700' }}
-            >
-              Open Attention Control Center ({attentionItems.length}) →
-            </button>
-          </div>
 
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-            <thead>
-              <tr style={{ borderBottom: '1px solid var(--color-rule)', textAlign: 'left', color: 'var(--color-text-secondary)' }}>
-                <th style={{ padding: '8px' }}>Priority</th>
-                <th style={{ padding: '8px' }}>Issue & Context</th>
-                <th style={{ padding: '8px' }}>Ref ID</th>
-                <th style={{ padding: '8px', textAlign: 'right' }}>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {attentionItems.map((item) => (
-                <tr key={item.id} style={{ borderBottom: '1px solid var(--color-rule)' }}>
-                  <td style={{ padding: '10px 8px', fontWeight: '700', color: item.color }}>
-                    {item.badge}
-                  </td>
-                  <td style={{ padding: '10px 8px' }}>
-                    <div style={{ fontWeight: '700' }}>{item.title}</div>
-                    <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>{item.desc}</div>
-                  </td>
-                  <td style={{ padding: '10px 8px', fontFamily: 'monospace', fontWeight: '700', color: 'var(--color-accent)' }}>
-                    {item.id}
-                  </td>
-                  <td style={{ padding: '10px 8px', textAlign: 'right' }}>
-                    <button
-                      onClick={() => onNavigate('attention')}
-                      style={{
-                        padding: '5px 12px',
-                        background: `${item.color}18`,
-                        color: item.color,
-                        border: `1px solid ${item.color}40`,
-                        borderRadius: 'var(--radius-xs)',
-                        fontSize: '12px',
-                        fontWeight: '700',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      {item.actionLabel}
-                    </button>
-                  </td>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--color-rule)', textAlign: 'left', color: 'var(--color-text-secondary)' }}>
+                  <th style={{ padding: '8px' }}>Priority</th>
+                  <th style={{ padding: '8px' }}>Issue & Context</th>
+                  <th style={{ padding: '8px' }}>Ref ID</th>
+                  <th style={{ padding: '8px', textAlign: 'right' }}>Action</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {attentionItems.map((item) => (
+                  <tr key={item.id} style={{ borderBottom: '1px solid var(--color-rule)' }}>
+                    <td style={{ padding: '10px 8px', fontWeight: '700', color: 'var(--color-accent)' }}>
+                      {item.badge}
+                    </td>
+                    <td style={{ padding: '10px 8px' }}>
+                      <div style={{ fontWeight: '700' }}>{item.title}</div>
+                      <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>{item.desc}</div>
+                    </td>
+                    <td style={{ padding: '10px 8px', fontFamily: 'monospace', fontWeight: '700', color: 'var(--color-accent)' }}>
+                      {item.id}
+                    </td>
+                    <td style={{ padding: '10px 8px', textAlign: 'right' }}>
+                      <button
+                        onClick={() => onNavigate('attention')}
+                        style={{
+                          padding: '5px 12px',
+                          background: 'var(--color-canvas)',
+                          color: 'var(--color-text)',
+                          border: '1px solid var(--color-rule)',
+                          borderRadius: 'var(--radius-xs)',
+                          fontSize: '12px',
+                          fontWeight: '700',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        {item.actionLabel}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
 
-        {/* OPERATIONAL HEALTH INSTRUMENT */}
-        <div style={{
-          background: 'var(--color-paper)',
-          border: '1px solid var(--color-rule)',
-          borderRadius: 'var(--radius-sm)',
-          padding: '20px'
-        }}>
-          <h3 style={{ fontSize: '15px', fontWeight: '800', margin: '0 0 16px 0' }}>OPERATIONAL HEALTH INSTRUMENT</h3>
-          
-          <div style={{ display: 'grid', gap: '16px' }}>
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', fontWeight: '700', marginBottom: '6px' }}>
-                <span>Sales Target ($21.4K / $24.5K)</span>
-                <span style={{ color: 'var(--color-accent)' }}>87%</span>
+          {/* OPERATIONAL HEALTH INSTRUMENT */}
+          <div style={{
+            background: 'var(--color-paper)',
+            border: '1px solid var(--color-rule)',
+            borderRadius: 'var(--radius-sm)',
+            padding: '20px'
+          }}>
+            <h3 style={{ fontSize: '14px', fontWeight: '800', margin: '0 0 16px 0' }}>OPERATIONAL HEALTH INSTRUMENT</h3>
+            
+            <div style={{ display: 'grid', gap: '16px' }}>
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', fontWeight: '700', marginBottom: '6px' }}>
+                  <span>Sales Target ($21.4K / $24.5K)</span>
+                  <span style={{ color: 'var(--color-accent)' }}>87%</span>
+                </div>
+                <div style={{ width: '100%', height: '8px', background: 'var(--color-canvas)', borderRadius: '4px', overflow: 'hidden' }}>
+                  <div style={{ width: '87%', height: '100%', background: 'var(--color-accent)' }} />
+                </div>
               </div>
-              <div style={{ width: '100%', height: '8px', background: 'var(--color-canvas)', borderRadius: '4px', overflow: 'hidden' }}>
-                <div style={{ width: '87%', height: '100%', background: 'var(--color-accent)' }} />
-              </div>
-            </div>
 
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', fontWeight: '700', marginBottom: '6px' }}>
-                <span>Stock Position & Health</span>
-                <span style={{ color: '#10b981' }}>94%</span>
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', fontWeight: '700', marginBottom: '6px' }}>
+                  <span>Stock Position & Health</span>
+                  <span style={{ color: 'var(--color-accent)' }}>94%</span>
+                </div>
+                <div style={{ width: '100%', height: '8px', background: 'var(--color-canvas)', borderRadius: '4px', overflow: 'hidden' }}>
+                  <div style={{ width: '94%', height: '100%', background: 'var(--color-accent)' }} />
+                </div>
               </div>
-              <div style={{ width: '100%', height: '8px', background: 'var(--color-canvas)', borderRadius: '4px', overflow: 'hidden' }}>
-                <div style={{ width: '94%', height: '100%', background: '#10b981' }} />
-              </div>
-            </div>
 
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', fontWeight: '700', marginBottom: '6px' }}>
-                <span>Purchase Orders Fulfillment</span>
-                <span style={{ color: '#3b82f6' }}>72%</span>
-              </div>
-              <div style={{ width: '100%', height: '8px', background: 'var(--color-canvas)', borderRadius: '4px', overflow: 'hidden' }}>
-                <div style={{ width: '72%', height: '100%', background: '#3b82f6' }} />
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', fontWeight: '700', marginBottom: '6px' }}>
+                  <span>Purchase Orders Fulfillment</span>
+                  <span style={{ color: 'var(--color-accent)' }}>72%</span>
+                </div>
+                <div style={{ width: '100%', height: '8px', background: 'var(--color-canvas)', borderRadius: '4px', overflow: 'hidden' }}>
+                  <div style={{ width: '72%', height: '100%', background: 'var(--color-accent)' }} />
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* 4. SALES & PURCHASE ACTIVITY CHART */}
       <div style={{
@@ -294,21 +318,17 @@ export default function DashboardView({
           </div>
           <div style={{ display: 'flex', gap: '16px', fontSize: '0.75rem', fontFamily: 'var(--font-mono)' }}>
             <span style={{ color: 'var(--color-accent)', fontWeight: 700 }}>Revenue: ${totalSalesRevenue.toLocaleString()} (↑ +8.7%)</span>
-            <span style={{ color: '#3b82f6', fontWeight: 700 }}>Purchases: $8,900</span>
+            <span style={{ color: 'var(--color-ink-muted)', fontWeight: 700 }}>Purchases: $8,900</span>
           </div>
         </div>
 
-        <div style={{ width: '100%', height: 240 }}>
+        <div style={{ width: '100%', height: 220 }}>
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
               <defs>
                 <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="var(--color-accent)" stopOpacity={0.4}/>
                   <stop offset="95%" stopColor="var(--color-accent)" stopOpacity={0}/>
-                </linearGradient>
-                <linearGradient id="colorPurchases" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
-                  <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255, 255, 255, 0.05)" />
@@ -318,24 +338,25 @@ export default function DashboardView({
                 contentStyle={{ background: 'var(--color-paper-2)', border: '1px solid var(--color-rule)', borderRadius: '6px', fontSize: '0.8rem' }}
               />
               <Area type="monotone" dataKey="sales" stroke="var(--color-accent)" strokeWidth={2.5} fillOpacity={1} fill="url(#colorSales)" />
-              <Area type="monotone" dataKey="purchases" stroke="#3b82f6" strokeWidth={2} strokeDasharray="4 4" fillOpacity={1} fill="url(#colorPurchases)" />
             </AreaChart>
           </ResponsiveContainer>
         </div>
       </div>
 
-      {/* 5. SIDE-BY-SIDE: REORDER WATCHLIST + RECENT ACTIVITY (No heavy full ledger) */}
+      {/* 5. SIDE-BY-SIDE: REORDER WATCHLIST + RECENT ACTIVITY */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
         
         {/* REORDER WATCHLIST */}
         <div style={{ background: 'var(--color-paper)', border: '1px solid var(--color-rule)', borderRadius: 'var(--radius-sm)', padding: '20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
             <h3 style={{ fontSize: '1.05rem', fontWeight: 800, margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <AlertTriangle size={16} color="var(--color-signal-amber)" /> Reorder Watchlist
+              <AlertTriangle size={16} color="var(--color-accent)" /> Reorder Watchlist
             </h3>
-            <button className="btn btn-secondary btn-sm" onClick={() => onNavigate('purchases')}>
-              Generate Purchase Orders
-            </button>
+            {can(currentRole, 'purchases.create') && (
+              <button className="btn btn-secondary btn-sm" onClick={() => onNavigate('purchases')}>
+                Generate Purchase Orders
+              </button>
+            )}
           </div>
 
           {lowStockItems.length === 0 ? (
@@ -399,7 +420,7 @@ export default function DashboardView({
                 </div>
 
                 <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontWeight: 800, fontFamily: 'monospace', color: tx.quantity > 0 ? 'var(--color-signal-green)' : 'var(--color-signal-red)' }}>
+                  <div style={{ fontWeight: 800, fontFamily: 'monospace', color: 'var(--color-text)' }}>
                     {tx.quantity > 0 ? `+${tx.quantity}` : tx.quantity}
                   </div>
                   <div style={{ fontSize: '0.6875rem', color: 'var(--color-ink-dim)', fontFamily: 'monospace' }}>

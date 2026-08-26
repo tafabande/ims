@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { 
   AlertCircle, 
   AlertTriangle, 
@@ -20,27 +20,43 @@ import {
   Package,
   Layers,
   Filter,
-  CheckSquare
+  CheckSquare,
+  MessageSquare,
+  Lock,
+  Download,
+  ShieldCheck,
+  Send
 } from 'lucide-react';
+import { can } from '../../utils/permissions';
 
-export default function AttentionCenterView({ onShowToast, onNavigate }) {
-  const [activeTab, setActiveTab] = useState('ACTION_REQUIRED'); // 'ACTION_REQUIRED' | 'IMPORTANT' | 'INFORMATIONAL' | 'RESOLVED' | 'SETTINGS'
+export default function AttentionCenterView({ onShowToast, currentRole = 'MANAGER', onNavigate }) {
+  const [activeTab, setActiveTab] = useState('ACTION_REQUIRED'); // 'ACTION_REQUIRED' | 'IMPORTANT' | 'INFORMATIONAL' | 'RESOLVED' | 'HISTORY_BOARD' | 'SETTINGS'
   const [selectedAlertForExplanation, setSelectedAlertForExplanation] = useState(null);
-  const [showApprovalModal, setShowApprovalModal] = useState(null);
-  const [decisionNotes, setDecisionNotes] = useState('');
   
-  // Notification items state with full lifecycle
+  // Custom Modals State (No browser prompts!)
+  const [decisionModalEntity, setDecisionModalEntity] = useState(null); // { item, decision: 'APPROVE' | 'REJECT' | 'REQUEST_CHANGES' }
+  const [decisionNote, setDecisionNote] = useState('');
+  
+  const [staffNoteModalEntity, setStaffNoteModalEntity] = useState(null);
+  const [staffObservationNote, setStaffObservationNote] = useState('');
+
+  const [exportConsentModal, setExportConsentModal] = useState(null); // { datasetName: string }
+  const [exportReason, setExportReason] = useState('');
+
+  const isManager = can(currentRole, 'attention.decide');
+
+  // Notification items state with full lifecycle and staff notes
   const [notifications, setNotifications] = useState([
     {
       id: 1,
       code: 'NOTIF-2026-0091',
       category: 'REFUND_APPROVAL',
-      importance: 'ACTION_REQUIRED', // 🔴
+      importance: 'ACTION_REQUIRED',
       title: 'Refund Approval Required: #REF-00042',
       summary: 'Customer ABC Traders requested $340.00 refund on receipt SAL-00182.',
       requester: 'Sales Clerk (EMP-00014)',
       timestamp: '2026-08-26T01:45:00Z',
-      lifecycle: 'ACTION_REQUIRED', // CREATED | UNREAD | ACKNOWLEDGED | ACTION_REQUIRED | RESOLVED | ARCHIVED
+      lifecycle: 'ACTION_REQUIRED', // CREATED | UNREAD | ACKNOWLEDGED | ACTION_REQUIRED | RESOLVED | CLOSED
       details: {
         customer: 'ABC Traders',
         amount: 340.00,
@@ -56,13 +72,19 @@ export default function AttentionCenterView({ onShowToast, onNavigate }) {
         formula: 'Requested Refund ($340.00) > Staff Limit ($100.00) → Manager Approval Required',
         auditRef: 'AUD-REF-2026-0042',
         ledgerImpact: 'Pending $340.00 Debit to Cash Till & Stock Return to Warehouse Quarantine'
-      }
+      },
+      staffNotes: [
+        { author: 'John M. (Floor Staff)', time: '01:50 UTC', note: 'Customer returned unit unopened in original box.' }
+      ],
+      historyTrail: [
+        { time: '01:45 UTC', event: 'Ticket NOTIF-2026-0091 created by EMP-00014' }
+      ]
     },
     {
       id: 2,
       code: 'NOTIF-2026-0088',
       category: 'STOCK_ADJUSTMENT',
-      importance: 'ACTION_REQUIRED', // 🔴
+      importance: 'ACTION_REQUIRED',
       title: 'Stock Write-off Approval: #ADJ-00041',
       summary: 'Warehouse Staff requested -2 unit stock write-off on SKU-000482 at Harare Main.',
       requester: 'Warehouse Staff (EMP-00031)',
@@ -79,157 +101,133 @@ export default function AttentionCenterView({ onShowToast, onNavigate }) {
       whyExplanation: {
         trigger: 'Physical Stock Variance / Write-off Exception Threshold',
         formula: 'Write-off Value (2u × $450 = $900.00) > Auto-approve Threshold ($50.00)',
-        activityTrail: [
-          { step: 'Opening Balance', qty: 240 },
-          { step: 'Received (PO-00431)', qty: '+80' },
-          { step: 'Sales Recorded', qty: '-43' },
-          { step: 'Damages Reported', qty: '-2' },
-          { step: 'Expected Balance', qty: 275 },
-          { step: 'Physical Count', qty: 273 }
-        ],
         auditRef: 'AUD-ADJ-2026-0041'
-      }
+      },
+      staffNotes: [
+        { author: 'Peter K. (Warehouse Lead)', time: '01:35 UTC', note: 'Photos taken at dock and attached to shipment GRN.' }
+      ],
+      historyTrail: [
+        { time: '01:30 UTC', event: 'Ticket NOTIF-2026-0088 created by EMP-00031' }
+      ]
     },
     {
       id: 3,
       code: 'NOTIF-2026-0074',
       category: 'GOODS_RECEIVED_VARIANCE',
-      importance: 'IMPORTANT', // 🟠
+      importance: 'IMPORTANT',
       title: 'Goods Received Variance: PO-2026-00431',
       summary: 'Supplier XYZ Electronics delivered 96 units against 100 ordered (-4 unit variance).',
       requester: 'Receiving Operator (EMP-00022)',
       timestamp: '2026-08-26T01:10:00Z',
-      lifecycle: 'ACKNOWLEDGED',
+      lifecycle: 'IMPORTANT',
       details: {
-        po_number: 'PO-2026-00431',
+        po_code: 'PO-2026-00431',
         supplier: 'XYZ Electronics',
         ordered_qty: 100,
         received_qty: 96,
-        returned_qty: 4,
         variance: -4,
-        note: '4 units arrived with crushed outer cartons and were rejected at receiving bay.'
+        note: 'Supplier delivery note indicates 4 units backordered for delivery tomorrow.'
       },
       whyExplanation: {
-        trigger: 'Goods Received Discrepancy Rule',
-        formula: 'Received (96u) ≠ Ordered (100u) → Variance (-4u) logged to Supplier Claim Ledger',
-        auditRef: 'AUD-RCV-2026-0431'
-      }
-    },
-    {
-      id: 4,
-      code: 'NOTIF-2026-0062',
-      category: 'CRITICAL_STOCK',
-      importance: 'IMPORTANT', // 🟠
-      title: 'Critical Low Stock Warning: CAT6 Cable Roll 300m',
-      summary: 'Available stock (3u) is below safety reorder level (10u). Projected depletion in ~2 days.',
-      requester: 'Automated Inventory Monitor',
-      timestamp: '2026-08-26T00:50:00Z',
-      lifecycle: 'ACKNOWLEDGED',
-      details: {
-        sku: 'SKU-CABLE-CAT6',
-        product_name: 'CAT6 Cable Roll 300m',
-        current_stock: 3,
-        reorder_level: 10,
-        recommended_reorder: 50
+        trigger: 'Supplier Receiving Variance Rule (> 2% shortage)',
+        formula: 'Shortage (4 units = 4.0%) > Variance Tolerance (2.0%)',
+        auditRef: 'AUD-GRN-2026-00431'
       },
-      whyExplanation: {
-        trigger: 'Inventory Reorder Point Rule',
-        formula: 'Current Stock (3u) ≤ Reorder Level (10u) → Automated Reorder Alert Generated',
-        auditRef: 'AUD-INV-CAT6-001'
-      }
-    },
-    {
-      id: 5,
-      code: 'NOTIF-2026-0045',
-      category: 'STOCK_ORDER_CREATED',
-      importance: 'INFORMATIONAL', // 🔵
-      title: 'Routine Purchase Order Drafted: PO-2026-00432',
-      summary: '50 × CAT6 Cable ordered from Supplier X by Automated Replenishment system.',
-      requester: 'System Automated Replenishment',
-      timestamp: '2026-08-25T22:15:00Z',
-      lifecycle: 'ACKNOWLEDGED',
-      details: {
-        po_number: 'PO-2026-00432',
-        supplier: 'Supplier X',
-        total_items: 50
-      },
-      whyExplanation: {
-        trigger: 'Informational Event Rule (No Manager Action Required)',
-        formula: 'Routine PO creation within pre-approved budget limits',
-        auditRef: 'AUD-PO-2026-0432'
-      }
-    },
-    {
-      id: 6,
-      code: 'NOTIF-2026-0012',
-      category: 'REFUND_APPROVAL',
-      importance: 'RESOLVED', // ✓
-      title: 'Resolved (APPROVED): Refund #REF-00039',
-      summary: '$120.00 refund approved for customer John Moyo.',
-      requester: 'Manager (You)',
-      timestamp: '2026-08-25T16:30:00Z',
-      lifecycle: 'RESOLVED',
-      details: {
-        customer: 'John Moyo',
-        amount: 120.00,
-        decision: 'APPROVED',
-        note: 'Verified duplicate charge on merchant bank gateway.'
-      },
-      whyExplanation: {
-        trigger: 'Manager Signoff Completed',
-        formula: 'Approved → Financial Ledger Credited & Audit Log Signed',
-        auditRef: 'AUD-REF-2026-0039'
-      }
+      staffNotes: [],
+      historyTrail: [
+        { time: '01:10 UTC', event: 'Shortage recorded on GRN #882 by EMP-00022' }
+      ]
     }
   ]);
 
-  // Alert Rules Configuration State
-  const [alertSettings, setAlertSettings] = useState({
-    critical_stock: true,
-    low_stock: true,
-    goods_received: true,
-    goods_variance: true,
-    purchase_created: false, // Manager opted out of routine purchase noise
-    purchase_approved: true,
-    refund_requested: true,
-    payment_info_changed: true,
-    cash_variance: true,
-    shift_exception: true,
-    external_data_import: true
-  });
-
-  const handleDecision = (notificationId, decision) => {
+  // Handle Staff Note Attachment
+  const handleAddStaffNote = () => {
+    if (!staffNoteModalEntity || !staffObservationNote.trim()) return;
     setNotifications(prev => prev.map(n => {
-      if (n.id === notificationId) {
+      if (n.id === staffNoteModalEntity.id) {
+        return {
+          ...n,
+          staffNotes: [
+            ...n.staffNotes,
+            { author: `${currentRole} User`, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), note: staffObservationNote }
+          ],
+          historyTrail: [
+            ...n.historyTrail,
+            { time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), event: `Note attached by ${currentRole}: ${staffObservationNote}` }
+          ]
+        };
+      }
+      return n;
+    }));
+    if (onShowToast) onShowToast('info', 'Staff Observation Note Added', `Note attached to ticket #${staffNoteModalEntity.code}.`);
+    setStaffNoteModalEntity(null);
+    setStaffObservationNote('');
+  };
+
+  // Handle Manager Decision with Custom Modal & Mandatory Note
+  const handleExecuteManagerDecision = () => {
+    if (!decisionModalEntity || !decisionNote.trim()) {
+      if (onShowToast) onShowToast('warning', 'Manager Justification Required', 'You must provide a manager decision note before confirming.');
+      return;
+    }
+
+    const { item, decision } = decisionModalEntity;
+    setNotifications(prev => prev.map(n => {
+      if (n.id === item.id) {
         return {
           ...n,
           importance: 'RESOLVED',
           lifecycle: 'RESOLVED',
-          title: `Resolved (${decision}): ${n.title.replace('Approval Required:', '').replace('Approval:', '')}`,
-          details: { ...n.details, decision, managerNote: decisionNotes }
+          title: `Resolved (${decision}): ${n.title}`,
+          details: { ...n.details, managerDecision: decision, managerNote: decisionNote },
+          historyTrail: [
+            ...n.historyTrail,
+            { time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), event: `Manager Decision (${decision}) executed by ${currentRole}. Note: ${decisionNote}` }
+          ]
         };
       }
       return n;
     }));
 
     if (onShowToast) {
-      onShowToast('success', `Decision Executed (${decision})`, `Notification #${notificationId} resolved and logged in security audit trail.`);
+      onShowToast('success', `Decision Executed (${decision})`, `Ticket #${item.code} resolved. Note logged in audit ledger.`);
     }
 
-    setShowApprovalModal(null);
-    setDecisionNotes('');
+    setDecisionModalEntity(null);
+    setDecisionNote('');
   };
 
-  const actionRequiredCount = notifications.filter(n => n.importance === 'ACTION_REQUIRED').length;
-  const importantCount = notifications.filter(n => n.importance === 'IMPORTANT').length;
-  const informationalCount = notifications.filter(n => n.importance === 'INFORMATIONAL').length;
-  const resolvedCount = notifications.filter(n => n.importance === 'RESOLVED').length;
+  // Handle Ticket Closure
+  const handleCloseTicket = (item) => {
+    setNotifications(prev => prev.map(n => {
+      if (n.id === item.id) {
+        return { ...n, lifecycle: 'CLOSED' };
+      }
+      return n;
+    }));
+    if (onShowToast) onShowToast('info', 'Ticket Closed', `Ticket #${item.code} moved to archived ledger.`);
+  };
+
+  // Handle Sensitive Data Export Consent
+  const handleConfirmExport = () => {
+    if (!exportReason.trim()) {
+      if (onShowToast) onShowToast('warning', 'Export Reason Required', 'You must provide a business reason before exporting sensitive data.');
+      return;
+    }
+
+    if (onShowToast) {
+      onShowToast('success', 'Security Consent Authorized', `Export of ${exportConsentModal.datasetName} authorized by ${currentRole}. Security audit log logged.`);
+    }
+    setExportConsentModal(null);
+    setExportReason('');
+  };
 
   const filteredNotifications = notifications.filter(n => {
-    if (activeTab === 'ACTION_REQUIRED') return n.importance === 'ACTION_REQUIRED';
-    if (activeTab === 'IMPORTANT') return n.importance === 'IMPORTANT';
-    if (activeTab === 'INFORMATIONAL') return n.importance === 'INFORMATIONAL';
-    if (activeTab === 'RESOLVED') return n.importance === 'RESOLVED';
+    if (activeTab === 'ACTION_REQUIRED') return n.importance === 'ACTION_REQUIRED' && n.lifecycle !== 'CLOSED';
+    if (activeTab === 'IMPORTANT') return n.importance === 'IMPORTANT' && n.lifecycle !== 'CLOSED';
+    if (activeTab === 'INFORMATIONAL') return n.importance === 'INFORMATIONAL' && n.lifecycle !== 'CLOSED';
+    if (activeTab === 'RESOLVED') return n.importance === 'RESOLVED' && n.lifecycle !== 'CLOSED';
+    if (activeTab === 'HISTORY_BOARD') return true;
     return true;
   });
 
@@ -251,7 +249,7 @@ export default function AttentionCenterView({ onShowToast, onNavigate }) {
               width: '38px',
               height: '38px',
               borderRadius: 'var(--radius-sm)',
-              background: 'linear-gradient(135deg, #ef4444, #f59e0b)',
+              background: 'var(--color-accent)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -264,34 +262,36 @@ export default function AttentionCenterView({ onShowToast, onNavigate }) {
                 Operational Attention & Control Center
               </h1>
               <p style={{ fontSize: '13px', color: 'var(--color-text-secondary)', margin: '2px 0 0 0' }}>
-                Categorized Exception Dispatcher • 3-Outcome Authorizations • Business Rule Triggers & Audit Provenance
+                {isManager ? 'Manager Decision & Approval Engine • Mandatory Note Authorizations' : 'View Problems & Submit Staff Observations'}
               </p>
             </div>
           </div>
         </div>
 
-        {/* Action Button */}
-        <button
-          onClick={() => setActiveTab('SETTINGS')}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '8px',
-            background: 'var(--color-canvas)',
-            border: '1px solid var(--color-rule)',
-            borderRadius: 'var(--radius-xs)',
-            padding: '9px 16px',
-            fontSize: '13px',
-            fontWeight: '600',
-            cursor: 'pointer',
-            color: 'var(--color-text)'
-          }}
-        >
-          <Sliders size={16} /> Configure Alert Rules
-        </button>
+        {/* Sensitive Data Export Button */}
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button
+            onClick={() => setExportConsentModal({ datasetName: 'Customer & Financial Stock Ledger' })}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              background: 'var(--color-canvas)',
+              border: '1px solid var(--color-rule)',
+              borderRadius: 'var(--radius-xs)',
+              padding: '9px 16px',
+              fontSize: '13px',
+              fontWeight: '600',
+              cursor: 'pointer',
+              color: 'var(--color-text)'
+            }}
+          >
+            <Download size={16} /> Export Sensitive Ledger
+          </button>
+        </div>
       </div>
 
-      {/* Categorized Tab Bar */}
+      {/* Tab Bar */}
       <div style={{
         display: 'flex',
         gap: '8px',
@@ -300,11 +300,11 @@ export default function AttentionCenterView({ onShowToast, onNavigate }) {
         overflowX: 'auto'
       }}>
         {[
-          { id: 'ACTION_REQUIRED', label: 'Requires Action', badge: actionRequiredCount, icon: AlertCircle },
-          { id: 'IMPORTANT', label: 'Important Events', badge: importantCount, icon: AlertTriangle },
-          { id: 'INFORMATIONAL', label: 'Informational', badge: informationalCount, icon: Info },
-          { id: 'RESOLVED', label: 'Resolved / History', badge: resolvedCount, icon: CheckCircle2 },
-          { id: 'SETTINGS', label: 'Notification Settings', badge: 0, icon: Settings }
+          { id: 'ACTION_REQUIRED', label: 'Requires Action', icon: AlertCircle },
+          { id: 'IMPORTANT', label: 'Important Events', icon: AlertTriangle },
+          { id: 'INFORMATIONAL', label: 'Informational', icon: Info },
+          { id: 'RESOLVED', label: 'Resolved', icon: CheckCircle2 },
+          { id: 'HISTORY_BOARD', label: 'Conversation & Ticket History Board', icon: MessageSquare }
         ].map(tab => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -324,420 +324,220 @@ export default function AttentionCenterView({ onShowToast, onNavigate }) {
                 fontWeight: isActive ? '700' : '500',
                 fontSize: '13px',
                 cursor: 'pointer',
-                whiteSpace: 'nowrap',
-                transition: 'all 0.2s ease'
+                whiteSpace: 'nowrap'
               }}
             >
               <Icon size={16} color={isActive ? 'var(--color-accent)' : 'currentColor'} />
               <span>{tab.label}</span>
-              {tab.badge > 0 && !isActive && (
-                <span style={{
-                  width: '6px',
-                  height: '6px',
-                  borderRadius: '50%',
-                  background: 'var(--color-accent)',
-                  boxShadow: '0 0 6px var(--color-accent)'
-                }} />
-              )}
             </button>
           );
         })}
       </div>
 
-      {/* TAB CONTENTS */}
-
-      {/* 1. NOTIFICATION LIST (ACTION_REQUIRED, IMPORTANT, INFORMATIONAL, RESOLVED) */}
-      {activeTab !== 'SETTINGS' && (
-        <div>
-          {filteredNotifications.length === 0 ? (
-            <div style={{
-              background: 'var(--color-paper)',
-              border: '1px solid var(--color-rule)',
-              borderRadius: 'var(--radius-sm)',
-              padding: '48px',
-              textAlign: 'center',
-              color: 'var(--color-text-secondary)'
-            }}>
-              <CheckCircle2 size={42} style={{ color: '#10b981', marginBottom: '12px' }} />
-              <h3 style={{ fontSize: '16px', fontWeight: '700', margin: 0, color: 'var(--color-text)' }}>
-                No Pending Items in this Category
-              </h3>
-              <p style={{ fontSize: '13px', margin: '4px 0 0 0' }}>
-                All operational events have been reviewed and processed according to business rules.
-              </p>
-            </div>
-          ) : (
-            <div style={{ display: 'grid', gap: '16px' }}>
-              {filteredNotifications.map(item => {
-                const isActionReq = item.importance === 'ACTION_REQUIRED';
-                const isImportant = item.importance === 'IMPORTANT';
-                const isResolved = item.importance === 'RESOLVED';
-
-                return (
-                  <div
-                    key={item.id}
-                    style={{
-                      background: 'var(--color-paper)',
-                      border: isActionReq ? '1px solid #ef4444' : isImportant ? '1px solid #f59e0b' : '1px solid var(--color-rule)',
-                      borderRadius: 'var(--radius-sm)',
-                      padding: '20px',
-                      boxShadow: isActionReq ? '0 2px 12px rgba(239, 68, 68, 0.08)' : 'none'
-                    }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
-                      <div style={{ display: 'flex', gap: '14px', alignItems: 'flex-start' }}>
-                        <div style={{
-                          width: '36px',
-                          height: '36px',
-                          borderRadius: 'var(--radius-xs)',
-                          background: isActionReq ? 'rgba(239, 68, 68, 0.15)' : isImportant ? 'rgba(245, 158, 11, 0.15)' : isResolved ? 'rgba(16, 185, 129, 0.15)' : 'rgba(59, 130, 246, 0.15)',
-                          color: isActionReq ? '#ef4444' : isImportant ? '#f59e0b' : isResolved ? '#10b981' : '#3b82f6',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          flexShrink: 0
-                        }}>
-                          {isActionReq ? <AlertCircle size={20} /> : isImportant ? <AlertTriangle size={20} /> : isResolved ? <CheckCircle2 size={20} /> : <Info size={20} />}
-                        </div>
-
-                        <div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                            <h3 style={{ fontSize: '15px', fontWeight: '700', margin: 0 }}>
-                              {item.title}
-                            </h3>
-                            <span style={{ fontSize: '11px', fontFamily: 'monospace', background: 'var(--color-canvas)', border: '1px solid var(--color-rule)', padding: '2px 6px', borderRadius: '4px' }}>
-                              {item.code}
-                            </span>
-                            <span style={{
-                              fontSize: '11px',
-                              fontWeight: '700',
-                              padding: '2px 8px',
-                              borderRadius: '10px',
-                              background: isActionReq ? 'rgba(239, 68, 68, 0.15)' : isImportant ? 'rgba(245, 158, 11, 0.15)' : isResolved ? 'rgba(16, 185, 129, 0.15)' : 'rgba(59, 130, 246, 0.15)',
-                              color: isActionReq ? '#ef4444' : isImportant ? '#f59e0b' : isResolved ? '#10b981' : '#3b82f6'
-                            }}>
-                              {item.importance.replace('_', ' ')}
-                            </span>
-                          </div>
-
-                          <p style={{ fontSize: '13px', color: 'var(--color-text)', margin: '6px 0 10px 0', lineHeight: 1.4 }}>
-                            {item.summary}
-                          </p>
-
-                          <div style={{ display: 'flex', gap: '16px', fontSize: '12px', color: 'var(--color-text-secondary)', flexWrap: 'wrap' }}>
-                            <span><strong>Requester:</strong> {item.requester}</span>
-                            <span>•</span>
-                            <span><strong>Time:</strong> {new Date(item.timestamp).toLocaleString()}</span>
-                            {item.details?.reason && (
-                              <>
-                                <span>•</span>
-                                <span><strong>Reason:</strong> {item.details.reason}</span>
-                              </>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Action Buttons */}
-                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                        <button
-                          onClick={() => setSelectedAlertForExplanation(item)}
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            padding: '7px 12px',
-                            background: 'rgba(59, 130, 246, 0.1)',
-                            color: '#3b82f6',
-                            border: '1px solid rgba(59, 130, 246, 0.3)',
-                            borderRadius: 'var(--radius-xs)',
-                            fontSize: '12px',
-                            fontWeight: '600',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          <HelpCircle size={14} /> Why Am I Seeing This?
-                        </button>
-
-                        {isActionReq && (
-                          <button
-                            onClick={() => setShowApprovalModal(item)}
-                            style={{
-                              padding: '7px 14px',
-                              background: '#ef4444',
-                              color: '#fff',
-                              border: 'none',
-                              borderRadius: 'var(--radius-xs)',
-                              fontSize: '12px',
-                              fontWeight: '700',
-                              cursor: 'pointer'
-                            }}
-                          >
-                            Review & Execute Decision
-                          </button>
-                        )}
-                      </div>
-                    </div>
+      {/* TAB CONTENT: NOTIFICATIONS QUEUE */}
+      {activeTab !== 'HISTORY_BOARD' && (
+        <div style={{ display: 'grid', gap: '16px' }}>
+          {filteredNotifications.map(item => (
+            <div
+              key={item.id}
+              style={{
+                background: 'var(--color-paper)',
+                border: '1px solid var(--color-rule)',
+                borderRadius: 'var(--radius-sm)',
+                padding: '20px',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span style={{ fontSize: '11px', fontFamily: 'monospace', fontWeight: '800', padding: '2px 8px', borderRadius: '4px', background: 'var(--color-canvas)', border: '1px solid var(--color-rule)', color: 'var(--color-accent)' }}>
+                      TICKET ID: {item.code}
+                    </span>
+                    <h3 style={{ fontSize: '16px', fontWeight: '700', margin: 0 }}>
+                      {item.title}
+                    </h3>
                   </div>
-                );
-              })}
+
+                  <p style={{ fontSize: '13.5px', margin: '8px 0 0 0', color: 'var(--color-text)' }}>
+                    {item.summary}
+                  </p>
+
+                  <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '6px' }}>
+                    Requested by <strong>{item.requester}</strong> • {new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </div>
+
+                  {/* Staff Notes Attached */}
+                  {item.staffNotes.length > 0 && (
+                    <div style={{ marginTop: '12px', padding: '10px', background: 'var(--color-canvas)', border: '1px solid var(--color-rule)', borderRadius: 'var(--radius-xs)' }}>
+                      <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--color-accent)', marginBottom: '4px' }}>STAFF OBSERVATION NOTES:</div>
+                      {item.staffNotes.map((sn, idx) => (
+                        <div key={idx} style={{ fontSize: '12px', color: 'var(--color-text)' }}>
+                          <strong>{sn.author} ({sn.time}):</strong> "{sn.note}"
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Actions: Manager Decisions vs Staff Note Attachment */}
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <button
+                    onClick={() => setSelectedAlertForExplanation(item)}
+                    style={{ padding: '7px 12px', background: 'var(--color-canvas)', border: '1px solid var(--color-rule)', borderRadius: 'var(--radius-xs)', fontSize: '12px', cursor: 'pointer' }}
+                  >
+                    Why Am I Seeing This?
+                  </button>
+
+                  <button
+                    onClick={() => setStaffNoteModalEntity(item)}
+                    style={{ padding: '7px 12px', background: 'var(--color-canvas)', border: '1px solid var(--color-rule)', borderRadius: 'var(--radius-xs)', fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                  >
+                    <MessageSquare size={14} /> Attach Staff Note
+                  </button>
+
+                  {/* Manager Decision Buttons (Only shown if authorized) */}
+                  {isManager && item.lifecycle !== 'RESOLVED' && (
+                    <>
+                      <button
+                        onClick={() => setDecisionModalEntity({ item, decision: 'APPROVE' })}
+                        style={{ padding: '7px 14px', background: 'var(--color-accent)', color: '#fff', border: 'none', borderRadius: 'var(--radius-xs)', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
+                      >
+                        Approve
+                      </button>
+                      <button
+                        onClick={() => setDecisionModalEntity({ item, decision: 'REQUEST_CHANGES' })}
+                        style={{ padding: '7px 14px', background: 'var(--color-canvas)', border: '1px solid var(--color-rule)', borderRadius: 'var(--radius-xs)', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
+                      >
+                        Request Changes
+                      </button>
+                    </>
+                  )}
+
+                  {!isManager && (
+                    <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)', fontStyle: 'italic', padding: '6px' }}>
+                      (View Only Mode — Manager decision required)
+                    </span>
+                  )}
+                </div>
+              </div>
             </div>
-          )}
+          ))}
         </div>
       )}
 
-      {/* 2. NOTIFICATION SETTINGS & RULES CONFIGURATION */}
-      {activeTab === 'SETTINGS' && (
-        <div style={{ background: 'var(--color-paper)', border: '1px solid var(--color-rule)', borderRadius: 'var(--radius-sm)', padding: '24px' }}>
-          <div style={{ marginBottom: '20px' }}>
-            <h3 style={{ fontSize: '16px', fontWeight: '700', margin: 0 }}>Manager Operational Alert Rules & Noise Controls</h3>
-            <p style={{ fontSize: '13px', color: 'var(--color-text-secondary)', margin: '4px 0 0 0' }}>
-              Configure which business events trigger manager notifications vs quiet system background logging.
-            </p>
-          </div>
+      {/* TAB CONTENT: HISTORY & TICKET CONVERSATION BOARD */}
+      {activeTab === 'HISTORY_BOARD' && (
+        <div style={{ background: 'var(--color-paper)', border: '1px solid var(--color-rule)', borderRadius: 'var(--radius-sm)', padding: '20px' }}>
+          <h3 style={{ fontSize: '16px', fontWeight: '800', marginBottom: '16px' }}>Historical Message & Ticket Conversation Board</h3>
+          <p style={{ fontSize: '13px', color: 'var(--color-text-secondary)', marginBottom: '20px' }}>
+            Complete audit trail of all staff observations, manager decision notes, and ticket lifecycles.
+          </p>
 
-          <div style={{ display: 'grid', gap: '12px' }}>
-            {[
-              { key: 'critical_stock', title: 'Critical Stockout Alerts (Stock ≤ Reorder Level)', desc: 'Notify manager when stock reaches critical thresholds', category: 'Inventory' },
-              { key: 'low_stock', title: 'Low Stock Warnings', desc: 'Notify manager when stock drops below safety buffer', category: 'Inventory' },
-              { key: 'goods_received', title: 'Goods Received Confirmations', desc: 'Notify manager when purchase order deliveries arrive', category: 'Purchasing' },
-              { key: 'goods_variance', title: 'Goods Receiving Discrepancy / Variance', desc: 'Notify manager when received quantity differs from purchase order', category: 'Purchasing' },
-              { key: 'purchase_created', title: 'Routine Purchase Created', desc: 'Notify manager on every routine PO creation (Default OFF to avoid noise)', category: 'Purchasing' },
-              { key: 'purchase_approved', title: 'Purchase Approved & Issued', desc: 'Notify manager when supplier PO is authorized', category: 'Purchasing' },
-              { key: 'refund_requested', title: 'Refund Approval Required', desc: 'Notify manager when sales clerk requests customer refund', category: 'Sales & POS' },
-              { key: 'payment_info_changed', title: 'Payment Credentials Changed', desc: 'Notify manager on sensitive bank/payment modifications', category: 'Security' },
-              { key: 'cash_variance', title: 'Till Cash Variance Exception', desc: 'Notify manager when shift drawer count disagrees with POS ledger', category: 'Shifts & Till' },
-              { key: 'external_data_import', title: 'External Data Intake Execution', desc: 'Notify manager when bulk file or ERP integration commits records', category: 'Integration' }
-            ].map(rule => (
-              <div
-                key={rule.key}
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  padding: '14px 18px',
-                  background: 'var(--color-canvas)',
-                  border: '1px solid var(--color-rule)',
-                  borderRadius: 'var(--radius-xs)'
-                }}
-              >
-                <div>
-                  <div style={{ fontSize: '14px', fontWeight: '600' }}>{rule.title}</div>
-                  <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '2px' }}>{rule.desc}</div>
+          <div style={{ display: 'grid', gap: '14px' }}>
+            {notifications.map(ticket => (
+              <div key={ticket.id} style={{ padding: '16px', background: 'var(--color-canvas)', border: '1px solid var(--color-rule)', borderRadius: 'var(--radius-xs)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span style={{ fontFamily: 'monospace', fontWeight: '800', color: 'var(--color-accent)', fontSize: '12px' }}>{ticket.code}</span>
+                    <strong style={{ fontSize: '14px' }}>{ticket.title}</strong>
+                    <span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '11px', fontWeight: '700', background: ticket.lifecycle === 'RESOLVED' ? 'rgba(16, 185, 129, 0.15)' : 'var(--color-paper)', border: '1px solid var(--color-rule)' }}>
+                      {ticket.lifecycle}
+                    </span>
+                  </div>
+
+                  {ticket.lifecycle !== 'CLOSED' && (
+                    <button
+                      onClick={() => handleCloseTicket(ticket)}
+                      style={{ padding: '5px 10px', background: 'var(--color-paper)', border: '1px solid var(--color-rule)', borderRadius: 'var(--radius-xs)', fontSize: '11px', cursor: 'pointer' }}
+                    >
+                      Close Ticket
+                    </button>
+                  )}
                 </div>
 
-                <label style={{ position: 'relative', display: 'inline-block', width: '44px', height: '24px', cursor: 'pointer' }}>
-                  <input
-                    type="checkbox"
-                    checked={alertSettings[rule.key]}
-                    onChange={e => setAlertSettings({ ...alertSettings, [rule.key]: e.target.checked })}
-                    style={{ opacity: 0, width: 0, height: 0 }}
-                  />
-                  <span style={{
-                    position: 'absolute',
-                    inset: 0,
-                    backgroundColor: alertSettings[rule.key] ? 'var(--color-accent)' : '#64748b',
-                    borderRadius: '24px',
-                    transition: '0.2s'
-                  }}>
-                    <span style={{
-                      position: 'absolute',
-                      content: '""',
-                      height: '18px',
-                      width: '18px',
-                      left: alertSettings[rule.key] ? '22px' : '3px',
-                      bottom: '3px',
-                      backgroundColor: 'white',
-                      borderRadius: '50%',
-                      transition: '0.2s'
-                    }} />
-                  </span>
-                </label>
+                <div style={{ marginTop: '10px', fontSize: '12px', color: 'var(--color-text-secondary)' }}>
+                  History Trail:
+                  {ticket.historyTrail.map((h, i) => (
+                    <div key={i} style={{ marginLeft: '12px', marginTop: '2px' }}>• [{h.time}] {h.event}</div>
+                  ))}
+                </div>
               </div>
             ))}
           </div>
-
-          <button
-            onClick={() => {
-              if (onShowToast) onShowToast('success', 'Alert Rules Saved', 'Manager operational alert settings updated successfully.');
-            }}
-            style={{
-              marginTop: '20px',
-              padding: '10px 20px',
-              background: 'var(--color-accent)',
-              color: '#fff',
-              border: 'none',
-              borderRadius: 'var(--radius-xs)',
-              fontWeight: '700',
-              cursor: 'pointer'
-            }}
-          >
-            Save Alert Rule Preferences
-          </button>
         </div>
       )}
 
-      {/* 3. MODAL: "WHY AM I SEEING THIS?" EXPLAINABILITY DRAWER */}
-      {selectedAlertForExplanation && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          background: 'rgba(0,0,0,0.6)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1100,
-          padding: '20px'
-        }}>
-          <div style={{
-            background: 'var(--color-paper)',
-            border: '1px solid var(--color-rule)',
-            borderRadius: 'var(--radius-sm)',
-            width: '620px',
-            maxWidth: '100%',
-            maxHeight: '90vh',
-            overflowY: 'auto',
-            padding: '24px'
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid var(--color-rule)', paddingBottom: '12px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <HelpCircle size={22} style={{ color: '#3b82f6' }} />
-                <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700' }}>
-                  Why Am I Seeing This Alert?
-                </h3>
-              </div>
-              <button onClick={() => setSelectedAlertForExplanation(null)} style={{ background: 'none', border: 'none', color: 'var(--color-text-secondary)', cursor: 'pointer' }}>
+      {/* 1. CUSTOM MODAL: MANDATORY MANAGER DECISION NOTE (No generic window prompt!) */}
+      {decisionModalEntity && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: '20px' }}>
+          <div style={{ background: 'var(--color-paper)', border: '1px solid var(--color-rule)', borderRadius: 'var(--radius-sm)', width: '500px', maxWidth: '100%', padding: '24px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '800' }}>
+                Manager Decision: {decisionModalEntity.decision}
+              </h3>
+              <button onClick={() => setDecisionModalEntity(null)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
                 <X size={20} />
               </button>
             </div>
 
-            <div style={{ background: 'rgba(59, 130, 246, 0.08)', border: '1px solid #3b82f6', borderRadius: 'var(--radius-xs)', padding: '14px', marginBottom: '20px' }}>
-              <div style={{ fontSize: '12px', fontWeight: '700', color: '#3b82f6', textTransform: 'uppercase' }}>
-                {selectedAlertForExplanation.code} • {selectedAlertForExplanation.category}
-              </div>
-              <div style={{ fontSize: '15px', fontWeight: '700', marginTop: '4px', color: 'var(--color-text)' }}>
-                {selectedAlertForExplanation.title}
-              </div>
+            <div style={{ fontSize: '13px', marginBottom: '14px' }}>
+              Target Ticket: <strong>{decisionModalEntity.item.code}</strong> — {decisionModalEntity.item.title}
             </div>
 
-            {/* Explanation Breakdown Card */}
-            <div style={{ display: 'grid', gap: '16px' }}>
-              <div>
-                <label style={{ fontSize: '12px', fontWeight: '700', color: 'var(--color-text-secondary)', textTransform: 'uppercase' }}>Business Rule Trigger</label>
-                <div style={{ fontSize: '14px', fontWeight: '600', marginTop: '4px', padding: '10px', background: 'var(--color-canvas)', border: '1px solid var(--color-rule)', borderRadius: 'var(--radius-xs)' }}>
-                  ⚡ {selectedAlertForExplanation.whyExplanation?.trigger}
-                </div>
-              </div>
-
-              <div>
-                <label style={{ fontSize: '12px', fontWeight: '700', color: 'var(--color-text-secondary)', textTransform: 'uppercase' }}>Mathematical & Policy Formula</label>
-                <div style={{ fontSize: '13px', fontFamily: 'monospace', marginTop: '4px', padding: '12px', background: 'var(--color-canvas)', border: '1px solid var(--color-rule)', borderRadius: 'var(--radius-xs)', color: 'var(--color-accent)' }}>
-                  {selectedAlertForExplanation.whyExplanation?.formula}
-                </div>
-              </div>
-
-              {/* Activity Trail if available */}
-              {selectedAlertForExplanation.whyExplanation?.activityTrail && (
-                <div>
-                  <label style={{ fontSize: '12px', fontWeight: '700', color: 'var(--color-text-secondary)', textTransform: 'uppercase' }}>Ledger Activity Trail</label>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '6px', fontSize: '13px' }}>
-                    <thead>
-                      <tr style={{ borderBottom: '1px solid var(--color-rule)', textAlign: 'left' }}>
-                        <th style={{ padding: '8px' }}>Operation Step</th>
-                        <th style={{ padding: '8px', textAlign: 'right' }}>Quantity</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {selectedAlertForExplanation.whyExplanation.activityTrail.map((st, i) => (
-                        <tr key={i} style={{ borderBottom: '1px solid var(--color-rule)' }}>
-                          <td style={{ padding: '8px' }}>{st.step}</td>
-                          <td style={{ padding: '8px', textAlign: 'right', fontFamily: 'monospace', fontWeight: '700' }}>{st.qty}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <div style={{ padding: '10px', background: 'var(--color-canvas)', border: '1px solid var(--color-rule)', borderRadius: 'var(--radius-xs)', fontSize: '12px' }}>
-                  <div style={{ color: 'var(--color-text-secondary)' }}>Audit Record Reference</div>
-                  <div style={{ fontFamily: 'monospace', fontWeight: '700', marginTop: '2px' }}>
-                    {selectedAlertForExplanation.whyExplanation?.auditRef}
-                  </div>
-                </div>
-                <div style={{ padding: '10px', background: 'var(--color-canvas)', border: '1px solid var(--color-rule)', borderRadius: 'var(--radius-xs)', fontSize: '12px' }}>
-                  <div style={{ color: 'var(--color-text-secondary)' }}>Source of Truth</div>
-                  <div style={{ fontWeight: '700', color: '#10b981', marginTop: '2px' }}>
-                    ✓ Immutable PostgreSQL Audit Ledger
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'flex-end' }}>
-              <button
-                onClick={() => setSelectedAlertForExplanation(null)}
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', marginBottom: '6px' }}>
+                Mandatory Manager Decision Note / Audit Justification:
+              </label>
+              <textarea
+                value={decisionNote}
+                onChange={e => setDecisionNote(e.target.value)}
+                placeholder="Enter mandatory justification note for audit ledger..."
+                rows={4}
                 style={{
-                  padding: '9px 18px',
-                  background: 'var(--color-accent)',
-                  color: '#fff',
-                  border: 'none',
+                  width: '100%',
+                  padding: '10px',
                   borderRadius: 'var(--radius-xs)',
-                  fontWeight: '600',
-                  cursor: 'pointer'
+                  border: '1px solid var(--color-rule)',
+                  background: 'var(--color-canvas)',
+                  color: 'var(--color-text)',
+                  fontSize: '13px'
                 }}
-              >
-                Close Explanation
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button onClick={() => setDecisionModalEntity(null)} style={{ padding: '9px 16px', background: 'var(--color-canvas)', border: '1px solid var(--color-rule)', borderRadius: 'var(--radius-xs)', cursor: 'pointer' }}>Cancel</button>
+              <button onClick={handleExecuteManagerDecision} style={{ padding: '9px 18px', background: 'var(--color-accent)', color: '#fff', border: 'none', borderRadius: 'var(--radius-xs)', fontWeight: '700', cursor: 'pointer' }}>
+                Confirm & Log Decision
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* 4. MODAL: 3-OUTCOME APPROVAL EXECUTION ENGINE */}
-      {showApprovalModal && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          background: 'rgba(0,0,0,0.6)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1100,
-          padding: '20px'
-        }}>
-          <div style={{
-            background: 'var(--color-paper)',
-            border: '1px solid var(--color-rule)',
-            borderRadius: 'var(--radius-sm)',
-            width: '540px',
-            maxWidth: '100%',
-            padding: '24px'
-          }}>
+      {/* 2. CUSTOM MODAL: STAFF OBSERVATION NOTE */}
+      {staffNoteModalEntity && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: '20px' }}>
+          <div style={{ background: 'var(--color-paper)', border: '1px solid var(--color-rule)', borderRadius: 'var(--radius-sm)', width: '480px', maxWidth: '100%', padding: '24px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
               <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '800' }}>
-                Execute Controlled Approval Decision
+                Attach Staff Observation Note
               </h3>
-              <button onClick={() => setShowApprovalModal(null)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
+              <button onClick={() => setStaffNoteModalEntity(null)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
                 <X size={20} />
               </button>
             </div>
 
-            <div style={{ background: 'var(--color-canvas)', border: '1px solid var(--color-rule)', borderRadius: 'var(--radius-xs)', padding: '14px', marginBottom: '16px' }}>
-              <div style={{ fontSize: '12px', color: 'var(--color-accent)', fontWeight: '700' }}>{showApprovalModal.code}</div>
-              <div style={{ fontSize: '14px', fontWeight: '700', marginTop: '2px' }}>{showApprovalModal.title}</div>
-              <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)', marginTop: '4px' }}>{showApprovalModal.summary}</div>
+            <div style={{ fontSize: '13px', marginBottom: '14px' }}>
+              Target Ticket: <strong>{staffNoteModalEntity.code}</strong>
             </div>
 
-            <div style={{ marginBottom: '16px' }}>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '6px' }}>
-                Manager Decision Notes / Justification
-              </label>
+            <div style={{ marginBottom: '20px' }}>
               <textarea
-                value={decisionNotes}
-                onChange={e => setDecisionNotes(e.target.value)}
-                placeholder="Enter mandatory audit review notes..."
+                value={staffObservationNote}
+                onChange={e => setStaffObservationNote(e.target.value)}
+                placeholder="e.g. Found 2 extra boxes under pallet 4 on Aisle A-02."
                 rows={3}
                 style={{
                   width: '100%',
@@ -751,78 +551,94 @@ export default function AttentionCenterView({ onShowToast, onNavigate }) {
               />
             </div>
 
-            {/* 3 Symmetrical Outcome Buttons */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
-              <button
-                onClick={() => handleDecision(showApprovalModal.id, 'APPROVED')}
-                style={{
-                  padding: '12px',
-                  background: '#10b981',
-                  color: '#fff',
-                  border: 'none',
-                  borderRadius: 'var(--radius-xs)',
-                  fontWeight: '700',
-                  cursor: 'pointer',
-                  fontSize: '13px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '4px'
-                }}
-              >
-                <Check size={16} /> Approve
-              </button>
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button onClick={() => setStaffNoteModalEntity(null)} style={{ padding: '9px 16px', background: 'var(--color-canvas)', border: '1px solid var(--color-rule)', borderRadius: 'var(--radius-xs)', cursor: 'pointer' }}>Cancel</button>
+              <button onClick={handleAddStaffNote} style={{ padding: '9px 18px', background: 'var(--color-accent)', color: '#fff', border: 'none', borderRadius: 'var(--radius-xs)', fontWeight: '700', cursor: 'pointer' }}>Attach Note</button>
+            </div>
+          </div>
+        </div>
+      )}
 
-              <button
-                onClick={() => {
-                  if (!decisionNotes.trim()) {
-                    alert('Notes required for rejection');
-                    return;
-                  }
-                  handleDecision(showApprovalModal.id, 'REJECTED');
-                }}
-                style={{
-                  padding: '12px',
-                  background: '#ef4444',
-                  color: '#fff',
-                  border: 'none',
-                  borderRadius: 'var(--radius-xs)',
-                  fontWeight: '700',
-                  cursor: 'pointer',
-                  fontSize: '13px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '4px'
-                }}
-              >
-                <X size={16} /> Reject
+      {/* 3. CUSTOM MODAL: SENSITIVE DATA EXPORT CONSENT */}
+      {exportConsentModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: '20px' }}>
+          <div style={{ background: 'var(--color-paper)', border: '1px solid var(--color-rule)', borderRadius: 'var(--radius-sm)', width: '520px', maxWidth: '100%', padding: '24px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <Lock size={22} style={{ color: 'var(--color-accent)' }} />
+                <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '800' }}>
+                  Sensitive Data Export Consent Required
+                </h3>
+              </div>
+              <button onClick={() => setExportConsentModal(null)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
+                <X size={20} />
               </button>
+            </div>
 
-              <button
-                onClick={() => {
-                  if (!decisionNotes.trim()) {
-                    alert('Notes required for requesting changes');
-                    return;
-                  }
-                  handleDecision(showApprovalModal.id, 'CHANGES_REQUESTED');
-                }}
+            <div style={{ background: 'var(--color-canvas)', border: '1px solid var(--color-rule)', borderRadius: 'var(--radius-xs)', padding: '12px', fontSize: '12.5px', marginBottom: '16px' }}>
+              ⚠️ You are attempting to export sensitive dataset: <strong>{exportConsentModal.datasetName}</strong>. Every export is permanently logged with your user ID and IP address into the security compliance audit trail.
+            </div>
+
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', marginBottom: '6px' }}>
+                Export Reason / Business Justification:
+              </label>
+              <textarea
+                value={exportReason}
+                onChange={e => setExportReason(e.target.value)}
+                placeholder="e.g. Monthly external financial audit compliance export for Q3."
+                rows={3}
                 style={{
-                  padding: '12px',
-                  background: '#f59e0b',
-                  color: '#fff',
-                  border: 'none',
+                  width: '100%',
+                  padding: '10px',
                   borderRadius: 'var(--radius-xs)',
-                  fontWeight: '700',
-                  cursor: 'pointer',
-                  fontSize: '13px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '4px'
+                  border: '1px solid var(--color-rule)',
+                  background: 'var(--color-canvas)',
+                  color: 'var(--color-text)',
+                  fontSize: '13px'
                 }}
-              >
-                <RotateCcw size={16} /> Request Changes
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button onClick={() => setExportConsentModal(null)} style={{ padding: '9px 16px', background: 'var(--color-canvas)', border: '1px solid var(--color-rule)', borderRadius: 'var(--radius-xs)', cursor: 'pointer' }}>Cancel</button>
+              <button onClick={handleConfirmExport} style={{ padding: '9px 18px', background: 'var(--color-accent)', color: '#fff', border: 'none', borderRadius: 'var(--radius-xs)', fontWeight: '700', cursor: 'pointer' }}>
+                Authorize Export & Log
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* WHY EXPLANATION MODAL */}
+      {selectedAlertForExplanation && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: '20px' }}>
+          <div style={{ background: 'var(--color-paper)', border: '1px solid var(--color-rule)', borderRadius: 'var(--radius-sm)', width: '580px', maxWidth: '100%', padding: '24px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid var(--color-rule)', paddingBottom: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <HelpCircle size={22} color="var(--color-accent)" />
+                <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '800' }}>
+                  Why Am I Seeing This?
+                </h3>
+              </div>
+              <button onClick={() => setSelectedAlertForExplanation(null)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <div style={{ fontSize: '13px', lineHeight: 1.6 }}>
+              <div><strong>Trigger Rule:</strong> {selectedAlertForExplanation.whyExplanation.trigger}</div>
+              <div style={{ marginTop: '8px', fontFamily: 'monospace', background: 'var(--color-canvas)', padding: '10px', border: '1px solid var(--color-rule)', borderRadius: 'var(--radius-xs)' }}>
+                {selectedAlertForExplanation.whyExplanation.formula}
+              </div>
+              <div style={{ marginTop: '12px', fontSize: '12px', color: 'var(--color-text-secondary)' }}>
+                Audit Reference: {selectedAlertForExplanation.whyExplanation.auditRef}
+              </div>
+            </div>
+
+            <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end' }}>
+              <button onClick={() => setSelectedAlertForExplanation(null)} style={{ padding: '9px 18px', background: 'var(--color-accent)', color: '#fff', border: 'none', borderRadius: 'var(--radius-xs)', fontWeight: '600', cursor: 'pointer' }}>
+                Close Explanation
               </button>
             </div>
           </div>
