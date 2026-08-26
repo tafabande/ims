@@ -358,9 +358,12 @@ export default function App() {
               <ProductsView
                 products={products}
                 categories={categories}
+                suppliers={suppliers}
                 onAddProduct={handleAddProduct}
                 onUpdateProduct={handleUpdateProduct}
                 onDeleteProduct={handleDeleteProduct}
+                currentRole={currentRole}
+                onShowToast={handleShowToast}
               />
             )}
 
