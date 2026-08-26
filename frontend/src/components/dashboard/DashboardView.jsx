@@ -101,29 +101,34 @@ export default function DashboardView({
           </h2>
         </div>
 
-        {/* Permission-Based Quick Action CTAs */}
+        {/* Role-Aware Specific Quick Action CTAs */}
         <div style={{ display: 'flex', gap: '10px' }}>
-          {can(currentRole, 'sales.create') && (
-            <button className="btn btn-primary" onClick={() => onNavigate('sales')}>
-              <ShoppingCart size={15} /> Launch POS Terminal
-            </button>
+          {roleName === 'STAFF' && (
+            <>
+              <button className="btn btn-primary" onClick={() => onNavigate('sales')}>
+                <ShoppingCart size={15} /> Launch POS Terminal
+              </button>
+              <button className="btn btn-secondary" onClick={() => onNavigate('shifts')}>
+                <Clock size={15} /> Shift & Cash Till
+              </button>
+            </>
           )}
 
-          {can(currentRole, 'inventory.receive') && (
-            <button className="btn btn-secondary" onClick={() => onNavigate('purchases')}>
+          {roleName === 'WAREHOUSE' && (
+            <button className="btn btn-primary" onClick={() => onNavigate('purchases')}>
               <ShoppingBag size={15} /> Receive Goods
             </button>
           )}
 
-          {can(currentRole, 'shifts.manage') && (
-            <button className="btn btn-secondary" onClick={() => onNavigate('shifts')}>
-              <Clock size={15} /> Shift & Cash Till
+          {roleName === 'MANAGER' && (
+            <button className="btn btn-primary" onClick={() => onNavigate('attention')}>
+              <ShieldCheck size={15} /> Open Operational Attention
             </button>
           )}
 
-          {can(currentRole, 'users.manage') && (
-            <button className="btn btn-secondary" onClick={() => onNavigate('users')}>
-              <Users size={15} /> Manage Users & RBAC
+          {(roleName === 'APP_ADMIN' || roleName === 'SYSADMIN' || roleName === 'ADMIN') && (
+            <button className="btn btn-primary" onClick={() => onNavigate('users')}>
+              <Users size={15} /> System Users & RBAC Control
             </button>
           )}
         </div>

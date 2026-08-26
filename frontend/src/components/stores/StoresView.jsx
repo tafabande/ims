@@ -48,20 +48,16 @@ export default function StoresView({ onShowToast, currentRole = 'MANAGER' }) {
     operating_hours: '08:00 - 18:00'
   });
 
-  const canManageStores = ['MANAGER', 'APP_ADMIN', 'SYSADMIN', 'ADMIN'].includes((currentRole || '').toUpperCase());
+  const isAdmin = ['APP_ADMIN', 'SYSADMIN', 'ADMIN'].includes((currentRole || '').toUpperCase());
 
-  const handleCreateStore = (e) => {
-    e.preventDefault();
-    const newStore = {
-      id: Date.now(),
-      ...formData,
-      status: 'ACTIVE',
-      warehouses: [{ id: Date.now() + 1, warehouse_code: `WH-${formData.store_code.replace('STR-', '')}-01`, name: `${formData.name} Warehouse` }],
-      registers: [{ id: Date.now() + 2, register_code: `POS-${formData.store_code.replace('STR-', '')}-01`, name: 'Till 01 Main', status: 'CLOSED' }]
-    };
-    setStores([...stores, newStore]);
-    setIsModalOpen(false);
-    onShowToast?.('success', 'Store Created', `Branch '${newStore.name}' (${newStore.store_code}) registered.`);
+  const handleDeactivateStore = (storeId) => {
+    setStores(prev => prev.map(st => {
+      if (st.id === storeId) {
+        return { ...st, status: st.status === 'ACTIVE' ? 'ARCHIVED' : 'ACTIVE' };
+      }
+      return st;
+    }));
+    onShowToast?.('info', 'Branch Status Updated', 'Store status updated by Admin.');
   };
 
   return (
@@ -76,7 +72,7 @@ export default function StoresView({ onShowToast, currentRole = 'MANAGER' }) {
             Physical store branches, warehouse allocations, and POS register terminals.
           </p>
         </div>
-        {canManageStores && (
+        {isAdmin && (
           <button
             onClick={() => setIsModalOpen(true)}
             style={{
@@ -127,7 +123,8 @@ export default function StoresView({ onShowToast, currentRole = 'MANAGER' }) {
               </div>
               <span style={{
                 fontSize: '0.7rem', fontFamily: 'var(--font-mono)', padding: '2px 8px', borderRadius: '12px',
-                background: 'rgba(34, 197, 94, 0.15)', color: 'var(--color-signal-green)', fontWeight: 700
+                background: s.status === 'ACTIVE' ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                color: s.status === 'ACTIVE' ? 'var(--color-signal-green)' : '#ef4444', fontWeight: 700
               }}>
                 {s.status}
               </span>
@@ -141,11 +138,22 @@ export default function StoresView({ onShowToast, currentRole = 'MANAGER' }) {
             </div>
 
             <div style={{
-              borderTop: '1px solid var(--color-rule)', paddingTop: '12px', display: 'flex', justifyContent: 'space-between',
+              borderTop: '1px solid var(--color-rule)', paddingTop: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
               fontSize: '0.75rem', fontFamily: 'var(--font-mono)'
             }}>
               <div><Warehouse size={12} style={{ display: 'inline', marginRight: '4px' }} /> Warehouses: <strong>{s.warehouses.length}</strong></div>
               <div><Store size={12} style={{ display: 'inline', marginRight: '4px' }} /> POS Tills: <strong>{s.registers.length}</strong></div>
+              
+              {isAdmin ? (
+                <button
+                  onClick={() => handleDeactivateStore(s.id)}
+                  style={{ padding: '4px 8px', background: 'var(--color-canvas)', border: '1px solid var(--color-rule)', borderRadius: '4px', fontSize: '11px', cursor: 'pointer' }}
+                >
+                  {s.status === 'ACTIVE' ? 'Archive Branch' : 'Reactivate'}
+                </button>
+              ) : (
+                <span style={{ fontSize: '10px', color: 'var(--color-ink-muted)', fontStyle: 'italic' }}>(Admin Protected)</span>
+              )}
             </div>
           </div>
         ))}
