@@ -5,24 +5,34 @@ import GlobalCommandPalette from './components/layout/GlobalCommandPalette';
 import ToastNotification from './components/common/ToastNotification';
 import LoginView from './components/auth/LoginView';
 
-import DashboardView from './components/dashboard/DashboardView';
-import ProductsView from './components/products/ProductsView';
-import InventoryView from './components/inventory/InventoryView';
-import SalesView from './components/sales/SalesView';
-import PurchasesView from './components/purchases/PurchasesView';
-import SuppliersView from './components/suppliers/SuppliersView';
-import CustomersView from './components/customers/CustomersView';
-import ReportsView from './components/reports/ReportsView';
-import UsersView from './components/users/UsersView';
-import AuditLogsView from './components/audit/AuditLogsView';
+import { lazy, Suspense } from 'react';
 
-import StoresView from './components/stores/StoresView';
-import ShiftManagementView from './components/shifts/ShiftManagementView';
-import ReturnsView from './components/returns/ReturnsView';
-import TransfersView from './components/transfers/TransfersView';
-import StocktakeView from './components/stocktake/StocktakeView';
-import PromotionsView from './components/promotions/PromotionsView';
-import EmployeesView from './components/employees/EmployeesView';
+import DashboardView from './components/dashboard/DashboardView';
+
+// Lazy-loaded Feature Modules (Code-split into dedicated chunks)
+const ProductsView = lazy(() => import('./components/products/ProductsView'));
+const InventoryView = lazy(() => import('./components/inventory/InventoryView'));
+const SalesView = lazy(() => import('./components/sales/SalesView'));
+const PurchasesView = lazy(() => import('./components/purchases/PurchasesView'));
+const SuppliersView = lazy(() => import('./components/suppliers/SuppliersView'));
+const CustomersView = lazy(() => import('./components/customers/CustomersView'));
+const ReportsView = lazy(() => import('./components/reports/ReportsView'));
+const UsersView = lazy(() => import('./components/users/UsersView'));
+const AuditLogsView = lazy(() => import('./components/audit/AuditLogsView'));
+
+const StoresView = lazy(() => import('./components/stores/StoresView'));
+const ShiftManagementView = lazy(() => import('./components/shifts/ShiftManagementView'));
+const ReturnsView = lazy(() => import('./components/returns/ReturnsView'));
+const TransfersView = lazy(() => import('./components/transfers/TransfersView'));
+const StocktakeView = lazy(() => import('./components/stocktake/StocktakeView'));
+const PromotionsView = lazy(() => import('./components/promotions/PromotionsView'));
+const EmployeesView = lazy(() => import('./components/employees/EmployeesView'));
+const IntegrityIntelligenceView = lazy(() => import('./components/integrity/IntegrityIntelligenceView'));
+const DataIntakeView = lazy(() => import('./components/ingestion/DataIntakeView'));
+const PlanningView = lazy(() => import('./components/planning/PlanningView'));
+
+
+
 
 import { 
   INITIAL_PRODUCTS, 
@@ -258,148 +268,167 @@ export default function App() {
 
         {/* Main Content Area */}
         <main style={{ flex: 1, padding: '24px', maxWidth: '1400px' }}>
-          {activeTab === 'dashboard' && (
-            <DashboardView
-              products={products}
-              transactions={transactions}
-              sales={sales}
-              onNavigate={setActiveTab}
-            />
-          )}
+          <Suspense fallback={
+            <div className="py-20 flex flex-col items-center justify-center text-slate-400 space-y-3">
+              <div className="w-8 h-8 border-4 border-amber-500/30 border-t-amber-500 rounded-full animate-spin"></div>
+              <p className="text-sm font-semibold tracking-wide">Loading module bundle...</p>
+            </div>
+          }>
+            {activeTab === 'dashboard' && (
+              <DashboardView
+                products={products}
+                transactions={transactions}
+                sales={sales}
+                onNavigate={setActiveTab}
+              />
+            )}
 
-          {activeTab === 'stores' && (
-            <StoresView
-              currentRole={currentRole}
-              onShowToast={handleShowToast}
-            />
-          )}
+            {activeTab === 'stores' && (
+              <StoresView
+                currentRole={currentRole}
+                onShowToast={handleShowToast}
+              />
+            )}
 
-          {activeTab === 'shifts' && (
-            <ShiftManagementView
-              onShowToast={handleShowToast}
-            />
-          )}
+            {activeTab === 'shifts' && (
+              <ShiftManagementView
+                currentRole={currentRole}
+                onShowToast={handleShowToast}
+              />
+            )}
 
-          {activeTab === 'returns' && (
-            <ReturnsView
-              onShowToast={handleShowToast}
-            />
-          )}
+            {activeTab === 'data_intake' && (
+              <DataIntakeView
+                currentRole={currentRole}
+                onShowToast={handleShowToast}
+              />
+            )}
 
-          {activeTab === 'transfers' && (
-            <TransfersView
-              onShowToast={handleShowToast}
-            />
-          )}
+            {activeTab === 'integrity' && (
+              <IntegrityIntelligenceView
+                currentRole={currentRole}
+                onShowToast={handleShowToast}
+              />
+            )}
 
-          {activeTab === 'stocktake' && (
-            <StocktakeView
-              onShowToast={handleShowToast}
-            />
-          )}
-
-          {activeTab === 'promotions' && (
-            <PromotionsView
-              currentRole={currentRole}
-              onShowToast={handleShowToast}
-            />
-          )}
-
-          {activeTab === 'employees' && (
-            <EmployeesView
-              currentRole={currentRole}
-              onShowToast={handleShowToast}
-            />
-          )}
+            {activeTab === 'planning' && (
+              <PlanningView
+                currentRole={currentRole}
+                onShowToast={handleShowToast}
+              />
+            )}
 
 
+            {activeTab === 'returns' && (
+              <ReturnsView
+                products={products}
+                onShowToast={handleShowToast}
+              />
+            )}
 
-          {activeTab === 'products' && (
-            <ProductsView
-              products={products}
-              categories={categories}
-              suppliers={suppliers}
-              onAddProduct={handleAddProduct}
-              onUpdateProduct={handleUpdateProduct}
-              onDeleteProduct={handleDeleteProduct}
-              currentRole={currentRole}
-              onShowToast={handleShowToast}
-            />
-          )}
+            {activeTab === 'transfers' && (
+              <TransfersView
+                products={products}
+                onShowToast={handleShowToast}
+              />
+            )}
 
-          {activeTab === 'inventory' && (
-            <InventoryView
-              products={products}
-              transactions={transactions}
-              onStockAdjustment={handleStockAdjustment}
-              currentRole={currentRole}
-              onShowToast={handleShowToast}
-            />
-          )}
+            {activeTab === 'stocktake' && (
+              <StocktakeView
+                products={products}
+                onShowToast={handleShowToast}
+              />
+            )}
 
-          {activeTab === 'sales' && (
-            <SalesView
-              sales={sales}
-              products={products}
-              customers={customers}
-              onProcessSale={handleProcessSale}
-              currentRole={currentRole}
-              onShowToast={handleShowToast}
-            />
-          )}
+            {activeTab === 'promotions' && (
+              <PromotionsView
+                products={products}
+                onShowToast={handleShowToast}
+              />
+            )}
 
-          {activeTab === 'purchases' && (
-            <PurchasesView
-              purchases={purchases}
-              suppliers={suppliers}
-              products={products}
-              onCreatePurchase={handleCreatePurchase}
-              onReceivePurchase={handleReceivePurchase}
-              currentRole={currentRole}
-              onShowToast={handleShowToast}
-            />
-          )}
+            {activeTab === 'employees' && (
+              <EmployeesView
+                currentRole={currentRole}
+                onShowToast={handleShowToast}
+              />
+            )}
 
-          {activeTab === 'suppliers' && (
-            <SuppliersView
-              suppliers={suppliers}
-              onAddSupplier={handleAddSupplier}
-              currentRole={currentRole}
-              onShowToast={handleShowToast}
-            />
-          )}
+            {activeTab === 'products' && (
+              <ProductsView
+                products={products}
+                categories={categories}
+                onAddProduct={handleAddProduct}
+                onUpdateProduct={handleUpdateProduct}
+                onDeleteProduct={handleDeleteProduct}
+              />
+            )}
 
-          {activeTab === 'customers' && (
-            <CustomersView
-              customers={customers}
-              onAddCustomer={handleAddCustomer}
-              onShowToast={handleShowToast}
-            />
-          )}
+            {activeTab === 'inventory' && (
+              <InventoryView
+                products={products}
+                categories={categories}
+                onStockMovement={handleStockAdjustment}
+              />
+            )}
 
-          {activeTab === 'reports' && (
-            <ReportsView
-              products={products}
-              sales={sales}
-              purchases={purchases}
-              categories={categories}
-              onShowToast={handleShowToast}
-            />
-          )}
+            {activeTab === 'sales' && (
+              <SalesView
+                products={products}
+                sales={sales}
+                customers={customers}
+                onAddSale={handleProcessSale}
+              />
+            )}
 
-          {activeTab === 'users' && (
-            <UsersView
-              users={users}
-              currentRole={currentRole}
-            />
-          )}
+            {activeTab === 'purchases' && (
+              <PurchasesView
+                products={products}
+                purchases={purchases}
+                suppliers={suppliers}
+                onAddPurchase={handleCreatePurchase}
+                onReceivePurchase={handleReceivePurchase}
+              />
+            )}
 
-          {activeTab === 'audit' && (
-            <AuditLogsView
-              transactions={transactions}
-              onShowToast={handleShowToast}
-            />
-          )}
+            {activeTab === 'suppliers' && (
+              <SuppliersView
+                suppliers={suppliers}
+                onAddSupplier={handleAddSupplier}
+              />
+            )}
+
+            {activeTab === 'customers' && (
+              <CustomersView
+                customers={customers}
+                onAddCustomer={handleAddCustomer}
+              />
+            )}
+
+            {activeTab === 'reports' && (
+              <ReportsView
+                products={products}
+                sales={sales}
+                purchases={purchases}
+                categories={categories}
+                onShowToast={handleShowToast}
+              />
+            )}
+
+            {activeTab === 'users' && (
+              <UsersView
+                users={users}
+                currentRole={currentRole}
+              />
+            )}
+
+            {activeTab === 'audit' && (
+              <AuditLogsView
+                transactions={transactions}
+                onShowToast={handleShowToast}
+              />
+            )}
+          </Suspense>
         </main>
       </div>
 

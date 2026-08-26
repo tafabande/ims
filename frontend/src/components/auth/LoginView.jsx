@@ -2,20 +2,27 @@ import React, { useState } from 'react';
 import { Box, Lock, User, ShieldCheck, ArrowRight } from 'lucide-react';
 
 export default function LoginView({ onLogin }) {
-  const [username, setUsername] = useState('admin');
-  const [password, setPassword] = useState('••••••••');
-  const [role, setRole] = useState('APP_ADMIN');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [role, setRole] = useState('STAFF');
   const [error, setError] = useState('');
+
+  const fillDevPreset = (presetRole, devUser) => {
+    setUsername(devUser);
+    setPassword('SecurePass123!');
+    setRole(presetRole);
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!username.trim() || !password.trim()) {
-      setError('Please enter a valid username and password.');
+      setError('Please enter your credentials to authenticate.');
       return;
     }
     setError('');
     onLogin(role, username);
   };
+
 
   return (
     <div style={{
@@ -132,7 +139,12 @@ export default function LoginView({ onLogin }) {
             Sign In to IMS <ArrowRight size={16} />
           </button>
         </form>
+
+        <div style={{ marginTop: '24px', paddingTop: '16px', borderTop: '1px solid var(--color-rule)', textAlign: 'center', fontSize: '0.75rem', color: 'var(--color-ink-muted)' }}>
+          New account? Contact your System Administrator to provision access.
+        </div>
       </div>
     </div>
   );
 }
+

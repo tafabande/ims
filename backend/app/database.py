@@ -31,3 +31,19 @@ def set_session_rls_context(db, location_id: str = None, org_id: str = None):
             db.execute(text("SET LOCAL app.location_id = :loc"), {"loc": str(location_id)})
         if org_id:
             db.execute(text("SET LOCAL app.org_id = :org"), {"org": str(org_id)})
+
+# Auto-migrate missing columns for SQLite local dev
+with engine.connect() as conn:
+    for stmt in [
+        "ALTER TABLE integration_accounts ADD COLUMN description TEXT;",
+        "ALTER TABLE import_batches ADD COLUMN file_size INTEGER DEFAULT 0;",
+        "ALTER TABLE import_batches ADD COLUMN column_mapping_json TEXT;",
+        "ALTER TABLE import_batches ADD COLUMN storage_path VARCHAR(255);",
+        "ALTER TABLE import_batches ADD COLUMN approval_id INTEGER;"
+    ]:
+        try:
+            conn.execute(text(stmt))
+            conn.commit()
+        except Exception:
+            pass
+

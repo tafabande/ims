@@ -103,37 +103,28 @@ export default function Navbar({
           {theme === 'dark' ? <Sun size={16} color="var(--color-signal-amber)" /> : <Moon size={16} color="var(--color-accent)" />}
         </button>
 
-        {/* Role Selector Pill */}
+        {/* Authenticated Server Role Badge */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
           gap: '6px',
           background: 'var(--color-accent-subtle)',
           borderRadius: 'var(--radius-sm)',
-          padding: '4px 8px'
+          padding: '5px 10px',
+          border: '1px solid rgba(59, 130, 246, 0.2)'
         }}>
           <ShieldCheck size={14} color="var(--color-accent)" />
-          <select
-            value={currentRole}
-            onChange={(e) => setCurrentRole(e.target.value)}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              color: 'var(--color-accent)',
-              fontWeight: 700,
-              fontSize: '0.75rem',
-              fontFamily: 'var(--font-mono)',
-              outline: 'none',
-              cursor: 'pointer'
-            }}
-          >
-            <option value="APP_ADMIN" style={{ background: 'var(--color-paper-surface)', color: 'var(--color-ink)' }}>ROLE: APP ADMIN</option>
-            <option value="SYSADMIN" style={{ background: 'var(--color-paper-surface)', color: 'var(--color-ink)' }}>ROLE: SYSADMIN</option>
-            <option value="MANAGER" style={{ background: 'var(--color-paper-surface)', color: 'var(--color-ink)' }}>ROLE: MANAGER</option>
-            <option value="STAFF" style={{ background: 'var(--color-paper-surface)', color: 'var(--color-ink)' }}>ROLE: STAFF</option>
-            <option value="AUDITOR" style={{ background: 'var(--color-paper-surface)', color: 'var(--color-ink)' }}>ROLE: AUDITOR</option>
-          </select>
+          <span style={{
+            color: 'var(--color-accent)',
+            fontWeight: 700,
+            fontSize: '0.75rem',
+            fontFamily: 'var(--font-mono)',
+            letterSpacing: '0.5px'
+          }}>
+            ROLE: {currentRole ? currentRole.toUpperCase() : 'USER'}
+          </span>
         </div>
+
 
         {/* Logout Button */}
         <button

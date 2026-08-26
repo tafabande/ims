@@ -533,9 +533,9 @@ class StockReservation(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     reservation_code = Column(String(50), unique=True, index=True, nullable=False) # e.g. RES-2026-00017
-    cart_id = Column(Integer, ForeignKey("carts.id"), nullable=False)
+    cart_id = Column(Integer, ForeignKey("carts.id"), nullable=True)
     product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
-    store_id = Column(Integer, ForeignKey("stores.id"), nullable=False)
+    store_id = Column(Integer, ForeignKey("stores.id"), nullable=True)
     warehouse_id = Column(Integer, ForeignKey("warehouses.id"), nullable=True)
     quantity = Column(Integer, nullable=False)
     status = Column(String(50), default="ACTIVE") # ACTIVE, CONVERTED, EXPIRED, CANCELLED
@@ -825,4 +825,186 @@ class UserSession(Base):
     device = relationship("UserDevice")
 
 
+class InventoryAnomaly(Base):
+    __tablename__ = "inventory_anomalies"
 
+    id = Column(Integer, primary_key=True, index=True)
+    anomaly_code = Column(String(50), unique=True, index=True, nullable=False) # e.g. ANOM-2026-0041
+    product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
+    warehouse_id = Column(Integer, ForeignKey("warehouses.id"), nullable=True)
+    opening_stock = Column(Integer, default=0)
+    received_qty = Column(Integer, default=0)
+    returns_qty = Column(Integer, default=0)
+    sales_qty = Column(Integer, default=0)
+    damage_qty = Column(Integer, default=0)
+    adjustments_qty = Column(Integer, default=0)
+    expected_stock = Column(Integer, nullable=False)
+    system_stock = Column(Integer, nullable=False)
+    variance = Column(Integer, nullable=False) # expected - actual
+    risk_score = Column(Float, default=0.0) # 0 to 100
+    risk_level = Column(String(50), default="MEDIUM") # NORMAL, MONITOR, REVIEW, HIGH_RISK, CRITICAL
+    status = Column(String(50), default="OPEN") # OPEN, UNDER_INVESTIGATION, RESOLVED, DISMISSED
+    reasons_json = Column(Text, nullable=True) # JSON string of contributing risk factors
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    product = relationship("Product")
+    warehouse = relationship("Warehouse")
+
+
+class InvestigationCase(Base):
+    __tablename__ = "investigation_cases"
+
+    id = Column(Integer, primary_key=True, index=True)
+    case_code = Column(String(50), unique=True, index=True, nullable=False) # e.g. INVEST-2026-0041
+    anomaly_id = Column(Integer, ForeignKey("inventory_anomalies.id"), nullable=True)
+    product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
+    warehouse_id = Column(Integer, ForeignKey("warehouses.id"), nullable=True)
+    risk_score = Column(Float, default=0.0)
+    risk_level = Column(String(50), default="HIGH_RISK")
+    status = Column(String(50), default="OPEN") # OPEN, IN_PROGRESS, RESOLVED, CLOSED
+    assigned_to_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    resolution_notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    closed_at = Column(DateTime, nullable=True)
+
+    anomaly = relationship("InventoryAnomaly")
+    product = relationship("Product")
+    warehouse = relationship("Warehouse")
+    assigned_user = relationship("User")
+
+
+class BLEDeviceLocation(Base):
+    __tablename__ = "ble_device_locations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tag_id = Column(String(100), unique=True, index=True, nullable=False) # e.g. BLE-TAG-0091
+    product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
+    expected_location = Column(String(100), nullable=False) # e.g. Shelf A3
+    detected_location = Column(String(100), nullable=False) # e.g. Shelf B2
+    rssi_dbm = Column(Integer, default=-65) # Signal strength in dBm
+    confidence_percentage = Column(Float, default=82.0)
+    has_mismatch = Column(Boolean, default=False)
+    updated_at = Column(DateTime, default=datetime.utcnow)
+
+    product = relationship("Product")
+
+
+class ImportBatch(Base):
+    __tablename__ = "import_batches"
+
+    id = Column(Integer, primary_key=True, index=True)
+    batch_id = Column(String(50), unique=True, index=True, nullable=False) # e.g. IMP-2026-00041
+    filename = Column(String(255), nullable=False)
+    file_hash = Column(String(64), index=True, nullable=False) # SHA-256
+    file_size = Column(Integer, default=0)
+    uploader_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    source_type = Column(String(50), default="CSV") # CSV, EXCEL, API, MANUAL
+    entity_type = Column(String(50), nullable=False) # PRODUCTS, EMPLOYEES, CUSTOMERS, SUPPLIERS, OPENING_STOCK, PURCHASES, SALES
+    record_count = Column(Integer, default=0)
+    valid_count = Column(Integer, default=0)
+    rejected_count = Column(Integer, default=0)
+    status = Column(String(50), default="STAGED") # STAGED, VALIDATED, REQUIRES_CORRECTION, PENDING_APPROVAL, APPROVED, REJECTED, IMPORTED, FAILED
+    column_mapping_json = Column(Text, nullable=True) # Business -> IMS field mapping JSON
+    storage_path = Column(String(255), nullable=True)
+    approval_id = Column(Integer, ForeignKey("approval_requests.id"), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    approved_at = Column(DateTime, nullable=True)
+    approved_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+
+    uploader = relationship("User", foreign_keys=[uploader_user_id])
+    approver = relationship("User", foreign_keys=[approved_by_user_id])
+    records = relationship("ImportRecord", back_populates="batch", cascade="all, delete-orphan")
+
+
+class ImportRecord(Base):
+    __tablename__ = "import_records"
+
+    id = Column(Integer, primary_key=True, index=True)
+    batch_id = Column(String(50), ForeignKey("import_batches.batch_id"), nullable=False)
+    row_number = Column(Integer, nullable=False)
+    raw_data_json = Column(Text, nullable=False)
+    normalized_data_json = Column(Text, nullable=True)
+    validation_status = Column(String(50), default="VALID") # VALID, REJECTED, WARNING
+    error_message = Column(Text, nullable=True)
+    imported_entity_id = Column(String(100), nullable=True) # ID or Code of created entity after approval
+
+    batch = relationship("ImportBatch", back_populates="records")
+
+
+class IntegrationAccount(Base):
+    __tablename__ = "integration_accounts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    account_id = Column(String(50), unique=True, index=True, nullable=False) # e.g. INT-2026-00012
+    name = Column(String(150), nullable=False) # e.g. Accounting ERP System
+    description = Column(Text, nullable=True)
+    status = Column(String(50), default="ACTIVE") # ACTIVE, SUSPENDED, REVOKED
+    scopes_json = Column(Text, default="[]") # e.g. ["products:read", "sales:create"]
+    created_at = Column(DateTime, default=datetime.utcnow)
+    expires_at = Column(DateTime, nullable=True)
+
+    keys = relationship("IntegrationApiKey", back_populates="account", cascade="all, delete-orphan")
+    activity_logs = relationship("IntegrationActivityLog", back_populates="account", cascade="all, delete-orphan")
+
+
+class IntegrationApiKey(Base):
+    __tablename__ = "integration_api_keys"
+
+    id = Column(Integer, primary_key=True, index=True)
+    account_id = Column(String(50), ForeignKey("integration_accounts.account_id"), nullable=False)
+    api_key_hash = Column(String(128), unique=True, index=True, nullable=False) # Hashed key
+    prefix = Column(String(20), nullable=False) # e.g. ims_live_a1b2
+    name = Column(String(100), nullable=False) # e.g. Production Secret Key
+    created_at = Column(DateTime, default=datetime.utcnow)
+    last_used_at = Column(DateTime, nullable=True)
+    revoked_at = Column(DateTime, nullable=True)
+
+    account = relationship("IntegrationAccount", back_populates="keys")
+
+
+class IntegrationActivityLog(Base):
+    __tablename__ = "integration_activity_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    account_id = Column(String(50), ForeignKey("integration_accounts.account_id"), nullable=False)
+    endpoint = Column(String(255), nullable=False)
+    method = Column(String(10), nullable=False)
+    status_code = Column(Integer, nullable=False)
+    ip_address = Column(String(50), nullable=True)
+    request_id = Column(String(100), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    account = relationship("IntegrationAccount", back_populates="activity_logs")
+
+
+class Organisation(Base):
+    __tablename__ = "organisations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    org_code = Column(String(50), unique=True, index=True, nullable=False) # e.g. ORG-000001
+    trading_name = Column(String(255), nullable=False) # e.g. Taa Electronics
+    legal_name = Column(String(255), nullable=False) # e.g. Taa Electronics (Pvt) Ltd
+    business_type = Column(String(100), nullable=False, default="Retail") # Retail, Wholesale, Manufacturing, Distribution, Service, Mixed
+    industry = Column(String(100), nullable=False, default="Electronics") # Telecommunications, Electronics, Grocery, Automotive, Hardware, etc.
+    domain = Column(String(100), nullable=False, default="Electronics & Telecommunications")
+    operating_model = Column(String(100), default="Warehouse + Retail") # Single Store, Multi-Store, Warehouse + Retail, Distribution Network
+    status = Column(String(50), default="ACTIVE") # ACTIVE, SUSPENDED
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    classification_history = relationship("OrganisationClassificationHistory", back_populates="organisation", cascade="all, delete-orphan")
+
+
+class OrganisationClassificationHistory(Base):
+    __tablename__ = "organisation_classification_history"
+
+    id = Column(Integer, primary_key=True, index=True)
+    organisation_id = Column(Integer, ForeignKey("organisations.id"), nullable=False)
+    classification_type = Column(String(50), nullable=False) # INDUSTRY, BUSINESS_TYPE, OPERATING_MODEL
+    old_value = Column(String(255), nullable=True)
+    new_value = Column(String(255), nullable=False)
+    reason = Column(Text, nullable=True)
+    changed_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    changed_at = Column(DateTime, default=datetime.utcnow)
+
+    organisation = relationship("Organisation", back_populates="classification_history")
+    changed_by = relationship("User")

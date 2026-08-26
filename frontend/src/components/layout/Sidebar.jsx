@@ -17,8 +17,12 @@ import {
   ArrowRightLeft,
   ClipboardList,
   Tag,
-  LogOut
+  LogOut,
+  Layers,
+  FileSpreadsheet,
+  TrendingUp
 } from 'lucide-react';
+
 
 export default function Sidebar({ activeTab, setActiveTab, currentRole, onLogout }) {
   const navSections = [
@@ -29,7 +33,14 @@ export default function Sidebar({ activeTab, setActiveTab, currentRole, onLogout
       ]
     },
     {
+      title: 'DATA MANAGEMENT',
+      items: [
+        { id: 'data_intake', label: 'Data Intake & Import Center', shortcut: '', icon: Layers, roles: ['APP_ADMIN', 'SYSADMIN', 'MANAGER', 'STAFF', 'AUDITOR', 'ADMIN'] }
+      ]
+    },
+    {
       title: 'STORE OPERATIONS',
+
       items: [
         { id: 'stores', label: 'Store & Branch Management', shortcut: '', icon: Building2, roles: ['MANAGER', 'APP_ADMIN'] },
         { id: 'shifts', label: 'Shift & Cash Till', shortcut: '', icon: Clock, roles: ['STAFF'] },
@@ -43,6 +54,7 @@ export default function Sidebar({ activeTab, setActiveTab, currentRole, onLogout
       title: 'OPERATIONS',
       items: [
         { id: 'inventory', label: 'Stock & Audit Ledger', shortcut: 'Alt+I', icon: Boxes, roles: ['MANAGER', 'STAFF', 'AUDITOR', 'APP_ADMIN'] },
+        { id: 'integrity', label: 'Integrity & Anomaly Engine', shortcut: '', icon: ShieldAlert, roles: ['MANAGER', 'STAFF', 'AUDITOR', 'APP_ADMIN', 'ADMIN'] },
         { id: 'sales', label: 'Sales & POS Terminal', shortcut: 'Alt+S', icon: ShoppingCart, roles: ['MANAGER', 'STAFF', 'AUDITOR'] },
         { id: 'purchases', label: 'Purchase Orders', shortcut: 'Alt+B', icon: ShoppingBag, roles: ['MANAGER', 'AUDITOR'] }
       ]
@@ -57,9 +69,17 @@ export default function Sidebar({ activeTab, setActiveTab, currentRole, onLogout
       ]
     },
     {
-      title: 'ANALYTICS',
+      title: 'ANALYTICS & PLANNING',
       items: [
-        { id: 'reports', label: 'Reports & Analytics', shortcut: 'Alt+R', icon: BarChart3, roles: ['MANAGER', 'APP_ADMIN', 'AUDITOR', 'ADMIN'] }
+        { id: 'reports', label: 'Reports & Analytics', shortcut: 'Alt+R', icon: BarChart3, roles: ['MANAGER', 'APP_ADMIN', 'AUDITOR', 'ADMIN'] },
+        { id: 'planning', label: 'Planning & Forecasting', shortcut: '', icon: TrendingUp, roles: ['MANAGER', 'APP_ADMIN', 'AUDITOR', 'ADMIN'] }
+      ]
+    },
+
+    {
+      title: 'DATA & INTEGRATIONS',
+      items: [
+        { id: 'import_center', label: 'Import Center & APIs', shortcut: '', icon: FileSpreadsheet, roles: ['APP_ADMIN', 'ADMIN', 'MANAGER', 'AUDITOR'] }
       ]
     },
     {

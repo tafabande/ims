@@ -145,15 +145,17 @@ def create_product(product_in: ProductCreate, db: Session = Depends(get_db)):
     Auto-generates product_code PRD-XXXXXX.
     """
     existing_sku = db.query(Product).filter(Product.sku == product_in.sku).first()
-    if existing_sku:
-        raise HTTPException(status_code=400, detail="SKU already exists in inventory database.")
+    prod_data = product_in.model_dump()
+    prod_data["stock_quantity"] = 0
+    prod_data["reserved_quantity"] = 0
 
     product = Product(
-        **product_in.model_dump()
+        **prod_data
     )
     db.add(product)
     db.commit()
     db.refresh(product)
+
 
     product.product_code = f"PRD-{product.id:06d}"
     db.commit()
@@ -223,16 +225,17 @@ def update_product(product_id: int, product_in: ProductUpdate, db: Session = Dep
 @router.delete("/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_product(product_id: int, db: Session = Depends(get_db)):
     """
-    Delete from PostgreSQL source of truth -> Invalidate Redis cache
+    Archive Product Lifecycle: Soft-deletes product (active = False) to preserve historical sales, POs, and transaction ledger integrity.
     """
     product = db.query(Product).filter(Product.id == product_id).first()
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
-    
-    db.delete(product)
+
+    product.active = False
     db.commit()
 
     delete_cache(f"product:{product_id}")
     invalidate_pattern("products:*")
     invalidate_pattern("dashboard:*")
     return None
+

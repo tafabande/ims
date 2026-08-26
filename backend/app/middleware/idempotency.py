@@ -13,6 +13,7 @@ except Exception:
     redis_client = None
 
 IDEMPOTENCY_TTL_SECONDS = 86400 # 24 hours retention
+MEMORY_IDEMPOTENCY_STORE = {}
 
 class IdempotencyMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
@@ -23,6 +24,7 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
 
         cache_key = f"idempotency:{idempotency_key}"
 
+        # 1. Check Redis Cache
         if redis_client:
             try:
                 cached_raw = redis_client.get(cache_key)
@@ -33,17 +35,31 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                         content=cached["content"],
                         headers={
                             "X-Idempotency-Hit": "true",
-                            "X-Idempotency-Key": idempotency_key
+                            "X-Idempotency-Key": idempotency_key,
+                            "X-Cache-Lookup": "IDEMPOTENT_REPLAY"
                         }
                     )
             except Exception:
                 pass
 
+        # 2. Check In-Memory Fallback Store
+        if cache_key in MEMORY_IDEMPOTENCY_STORE:
+            cached = MEMORY_IDEMPOTENCY_STORE[cache_key]
+            return JSONResponse(
+                status_code=cached["status_code"],
+                content=cached["content"],
+                headers={
+                    "X-Idempotency-Hit": "true",
+                    "X-Idempotency-Key": idempotency_key,
+                    "X-Cache-Lookup": "IDEMPOTENT_REPLAY"
+                }
+            )
+
         # Execute downstream request
         response = await call_next(request)
 
         # Cache successful response for 24 hours
-        if redis_client and 200 <= response.status_code < 300:
+        if 200 <= response.status_code < 300:
             try:
                 # Read response body stream
                 response_body = [section async for section in response.body_iterator]
@@ -56,7 +72,12 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                         "status_code": response.status_code,
                         "content": payload
                     }
-                    redis_client.set(cache_key, json.dumps(cache_payload), ex=IDEMPOTENCY_TTL_SECONDS)
+                    if redis_client:
+                        try:
+                            redis_client.set(cache_key, json.dumps(cache_payload), ex=IDEMPOTENCY_TTL_SECONDS)
+                        except Exception:
+                            pass
+                    MEMORY_IDEMPOTENCY_STORE[cache_key] = cache_payload
                 except Exception:
                     pass
 
@@ -70,6 +91,7 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                 pass
 
         return response
+
 
 def iterate_in_threadpool(iterable):
     async def _iterator():

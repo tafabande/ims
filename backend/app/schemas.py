@@ -858,6 +858,261 @@ class RiskEvaluationResponse(BaseModel):
     risk_level: str # LOW, MEDIUM, HIGH, CRITICAL
     is_device_trusted: bool
     step_up_required: bool # True if action requires MFA/Manager approval
-    reasons: List[str]
+    reasons: List[str] = []
+    model_config = ConfigDict(from_attributes=True)
+
+class InventoryAnomalyResponse(BaseModel):
+    id: int
+    anomaly_code: str
+    product_id: int
+    product_sku: Optional[str] = None
+    product_name: Optional[str] = None
+    warehouse_id: Optional[int] = None
+    opening_stock: int
+    received_qty: int
+    returns_qty: int
+    sales_qty: int
+    damage_qty: int
+    adjustments_qty: int
+    expected_stock: int
+    system_stock: int
+    variance: int
+    risk_score: float
+    risk_level: str
+    status: str
+    reasons: List[str] = []
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+class EvidenceTimelineItem(BaseModel):
+    timestamp: str
+    event_type: str # SALE, ADJUSTMENT, DEVICE_CHANGE, RECEIVING, ANOMALY_DETECTED
+    actor_name: str
+    reference_code: str
+    description: str
+    details: Optional[str] = None
+
+class InvestigationCaseResponse(BaseModel):
+    id: int
+    case_code: str
+    anomaly_id: Optional[int] = None
+    product_id: int
+    product_sku: Optional[str] = None
+    product_name: Optional[str] = None
+    warehouse_name: Optional[str] = None
+    expected_stock: int
+    actual_stock: int
+    variance: int
+    risk_score: float
+    risk_level: str
+    status: str
+    evidence_timeline: List[EvidenceTimelineItem] = []
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+class StockReservationRequest(BaseModel):
+    product_id: int
+    warehouse_id: Optional[int] = None
+    quantity: int
+    duration_minutes: int = 15
+
+class StockReservationResponse(BaseModel):
+    id: int
+    reservation_code: str
+    product_id: int
+    product_name: Optional[str] = None
+    reserved_quantity: int
+    status: str
+    created_at: datetime
+    expires_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+class ExplainLineageNode(BaseModel):
+    label: str
+    amount_or_qty: Any
+    operation: str # +, -, =, or summary
+    details: Optional[str] = None
+
+class LineageExplanationResponse(BaseModel):
+    entity_type: str # STOCK, REVENUE, MARGIN
+    title: str
+    current_value: Any
+    equation_formula: str
+    lineage_items: List[ExplainLineageNode] = []
+
+class BLELocationResponse(BaseModel):
+    id: int
+    tag_id: str
+    product_id: int
+    product_sku: str
+    product_name: str
+    expected_location: str
+    detected_location: str
+    rssi_dbm: int
+    confidence_percentage: float
+    has_mismatch: bool
+    updated_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+
+# ==========================================
+# DATA INGESTION, STAGING & IMPORT SCHEMAS
+# ==========================================
+
+class ImportRecordResponse(BaseModel):
+    id: int
+    batch_id: str
+    row_number: int
+    raw_data_json: str
+    normalized_data_json: Optional[str] = None
+    validation_status: str
+    error_message: Optional[str] = None
+    imported_entity_id: Optional[str] = None
+    model_config = ConfigDict(from_attributes=True)
+
+class ImportBatchResponse(BaseModel):
+    id: int
+    batch_id: str
+    filename: str
+    file_hash: str
+    file_size: Optional[int] = 0
+    uploader_user_id: Optional[int] = None
+    source_type: str
+    entity_type: str
+    record_count: int
+    valid_count: int
+    rejected_count: int
+    status: str
+    column_mapping_json: Optional[str] = None
+    storage_path: Optional[str] = None
+    approval_id: Optional[int] = None
+    created_at: datetime
+    approved_at: Optional[datetime] = None
+    approved_by_user_id: Optional[int] = None
+    is_duplicate_warning: bool = False
+    previous_batch_id: Optional[str] = None
+    model_config = ConfigDict(from_attributes=True)
+
+class ColumnMappingRequest(BaseModel):
+    entity_type: str # PRODUCTS, EMPLOYEES, CUSTOMERS, SUPPLIERS, OPENING_STOCK, PURCHASES, SALES
+    file_headers: List[str]
+    column_mapping: Dict[str, str] # e.g. {"Employee No": "employee_id", "Employee Name": "full_name"}
+
+class ImportStageRequest(BaseModel):
+    entity_type: str
+    filename: str
+    raw_csv_content: str
+    column_mapping: Optional[Dict[str, str]] = None
+
+class ValidationResultResponse(BaseModel):
+    batch_id: str
+    total_records: int
+    valid_records: int
+    rejected_records: int
+    status: str
+    is_duplicate: bool = False
+    duplicate_warning_message: Optional[str] = None
+    errors: List[Dict[str, Any]] = []
+
+# ==========================================
+# INTEGRATION ACCOUNTS & API KEYS SCHEMAS
+# ==========================================
+
+class IntegrationAccountCreate(BaseModel):
+    name: str
+    description: Optional[str] = None
+    scopes: List[str] = [] # e.g. ["products:read", "sales:create"]
+
+class IntegrationAccountResponse(BaseModel):
+    id: int
+    account_id: str
+    name: str
+    description: Optional[str] = None
+    status: str
+    scopes: List[str] = []
+    created_at: datetime
+    expires_at: Optional[datetime] = None
+    model_config = ConfigDict(from_attributes=True)
+
+class IntegrationApiKeyCreate(BaseModel):
+    name: str # Key friendly name e.g. "POS Integration Key"
+
+class IntegrationApiKeyResponse(BaseModel):
+    id: int
+    account_id: str
+    name: str
+    prefix: str
+    plain_text_api_key: Optional[str] = None # Returned only once on key creation
+    created_at: datetime
+    last_used_at: Optional[datetime] = None
+    revoked_at: Optional[datetime] = None
+    model_config = ConfigDict(from_attributes=True)
+
+class IntegrationActivityLogResponse(BaseModel):
+    id: int
+    account_id: str
+    endpoint: str
+    http_method: str
+    status_code: int
+    ip_address: str
+    error_message: Optional[str] = None
+    timestamp: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+# External Integration Payload Schemas (Strict Validation for REST API Integration)
+class ExternalProductCreate(BaseModel):
+    sku: str
+    name: str
+    category_name: Optional[str] = "General"
+    supplier_name: Optional[str] = None
+    purchase_price: float
+    selling_price: float
+    reorder_level: int = 10
+    unit: str = "Units"
+    barcode: Optional[str] = None
+
+class ExternalEmployeeCreate(BaseModel):
+    employee_code: str
+    first_name: str
+    last_name: str
+    email: str
+    job_title: Optional[str] = "CASHIER"
+    department: Optional[str] = "Sales"
+    phone: Optional[str] = None
+
+class ExternalCustomerCreate(BaseModel):
+    name: str
+    email: Optional[str] = None
+    phone: Optional[str] = None
+
+class ExternalSupplierCreate(BaseModel):
+    name: str
+    contact_person: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    address: Optional[str] = None
+
+class ExternalSaleItemCreate(BaseModel):
+    sku: str
+    quantity: int
+    unit_price: float
+
+class ExternalSaleCreate(BaseModel):
+    external_invoice_ref: str
+    customer_name: Optional[str] = "Walk-in Customer"
+    payment_method: str = "CASH"
+    items: List[ExternalSaleItemCreate]
+
+class ExternalPurchaseItemCreate(BaseModel):
+    sku: str
+    quantity: int
+    unit_cost: float
+
+class ExternalPurchaseCreate(BaseModel):
+    external_po_ref: str
+    supplier_name: str
+    items: List[ExternalPurchaseItemCreate]
+
+
 
 

@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends, Request
 from typing import List
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+
 import uuid
 
 from app.schemas import LoginRequest, TokenResponse, RefreshTokenRequest, SessionResponse
@@ -25,8 +26,8 @@ SESSION_DATABASE = [
         "device_info": "Chrome on Windows 11 (Desktop)",
         "ip_address": "192.168.1.105",
         "active": True,
-        "created_at": datetime.utcnow().isoformat(),
-        "expires_at": (datetime.utcnow() + timedelta(days=7)).isoformat()
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "expires_at": (datetime.now(timezone.utc) + timedelta(days=7)).isoformat()
     },
     {
         "session_id": "SESS-9002",
@@ -36,8 +37,8 @@ SESSION_DATABASE = [
         "device_info": "Safari on macOS (MacBook Pro)",
         "ip_address": "192.168.1.112",
         "active": True,
-        "created_at": datetime.utcnow().isoformat(),
-        "expires_at": (datetime.utcnow() + timedelta(days=7)).isoformat()
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "expires_at": (datetime.now(timezone.utc) + timedelta(days=7)).isoformat()
     }
 ]
 
@@ -75,9 +76,10 @@ def login(credentials: LoginRequest, request: Request):
         "device_info": request.headers.get("User-Agent", "Web Browser"),
         "ip_address": request.client.host if request.client else "127.0.0.1",
         "active": True,
-        "created_at": datetime.utcnow().isoformat(),
-        "expires_at": (datetime.utcnow() + timedelta(days=7)).isoformat()
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "expires_at": (datetime.now(timezone.utc) + timedelta(days=7)).isoformat()
     }
+
     SESSION_DATABASE.insert(0, new_session)
 
     return TokenResponse(

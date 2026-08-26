@@ -12,8 +12,10 @@ UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024 # 10 MB Limit
-ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".pdf", ".csv"}
-ALLOWED_MIME_TYPES = {"image/jpeg", "image/png", "application/pdf", "text/csv", "application/vnd.ms-excel"}
+from app.services.iam_service import require_permission
+
+ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".pdf", ".csv", ".xlsx", ".xls"}
+ALLOWED_MIME_TYPES = {"image/jpeg", "image/png", "application/pdf", "text/csv", "application/vnd.ms-excel", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}
 
 class FileMetadataResponse(BaseModel):
     file_id: str
@@ -27,7 +29,10 @@ class FileMetadataResponse(BaseModel):
 FILE_METADATA_STORE = []
 
 @router.post("/upload", response_model=FileMetadataResponse)
-async def upload_file(file: UploadFile = File(...)):
+async def upload_file(
+    file: UploadFile = File(...),
+    auth_ctx: dict = Depends(require_permission("products:read"))
+):
     """
     Secure File Upload Service — Validates 10MB size limit, extension whitelist, calculates SHA256 checksum, and renames with UUID.
     """
@@ -75,8 +80,11 @@ async def upload_file(file: UploadFile = File(...)):
     return FileMetadataResponse(**metadata)
 
 @router.get("/list", response_model=List[FileMetadataResponse])
-def list_uploaded_files():
+def list_uploaded_files(
+    auth_ctx: dict = Depends(require_permission("products:read"))
+):
     """
     List all uploaded files and security metadata
     """
     return FILE_METADATA_STORE
+
