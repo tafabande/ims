@@ -38,18 +38,15 @@ export default function UsersView({ users: initialUsers, currentRole, onShowToas
   };
 
   const permissionsMatrix = [
-    { module: 'View products', admin: true, manager: true, staff: true },
-    { module: 'Create products', admin: true, manager: true, staff: false },
-    { module: 'Edit products', admin: true, manager: true, staff: false },
-    { module: 'Delete products', admin: true, manager: false, staff: false },
-    { module: 'View inventory stock', admin: true, manager: true, staff: true },
-    { module: 'Adjust stock (In/Out)', admin: true, manager: true, staff: false },
-    { module: 'Receive stock', admin: true, manager: true, staff: true },
-    { module: 'Process / Complete sale', admin: true, manager: true, staff: true },
-    { module: 'Manage employees', admin: true, manager: false, staff: false },
-    { module: 'Manage system users', admin: true, manager: false, staff: false },
-    { module: 'View audit logs', admin: true, manager: true, staff: false },
-    { module: 'Manage system settings', admin: true, manager: false, staff: false },
+    { module: 'View products catalog', admin: true, manager: true, seller: true, mover: true, auditor: true },
+    { module: 'Create / Edit products', admin: true, manager: true, seller: false, mover: false, auditor: false },
+    { module: 'View inventory stock ledgers', admin: true, manager: true, seller: true, mover: true, auditor: true },
+    { module: 'Move / Transport stock pallets', admin: true, manager: true, seller: false, mover: true, auditor: false },
+    { module: 'Process / Complete POS sales', admin: true, manager: false, seller: true, mover: false, auditor: false },
+    { module: 'Approve high-value sales (> $1,000)', admin: true, manager: true, seller: false, mover: false, auditor: false },
+    { module: 'Configure payment surcharges & gateways', admin: true, manager: true, seller: false, mover: false, auditor: false },
+    { module: 'Export sensitive CSV data files', admin: true, manager: false, seller: false, mover: false, auditor: false },
+    { module: 'Manage users & RBAC roles', admin: true, manager: false, seller: false, mover: false, auditor: false }
   ];
 
   const raciMatrix = [

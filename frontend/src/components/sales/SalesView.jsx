@@ -9,44 +9,69 @@ import {
   Receipt, 
   CreditCard, 
   DollarSign, 
-  QrCode, 
   User, 
   Download,
   AlertTriangle,
-  Printer
+  Settings,
+  ShieldCheck,
+  Building2,
+  X,
+  Check
 } from 'lucide-react';
 import ReceiptModal from './ReceiptModal';
 import { can } from '../../utils/permissions';
 
 export default function SalesView({ 
-  products, 
-  customers, 
-  sales, 
+  products = [], 
+  customers = [], 
+  sales = [], 
   onProcessSale, 
   onExportCSV,
-  currentRole,
+  currentRole = 'STAFF',
   onShowToast
 }) {
-  const [activeTab, setActiveTab] = useState('pos'); // pos or history
+  const isManager = can(currentRole, 'sales.policy') || can(currentRole, 'attention.decide');
+
+  const [activeTab, setActiveTab] = useState(isManager ? 'manager_control' : 'pos'); // 'pos' | 'history' | 'manager_control'
   const [searchTerm, setSearchTerm] = useState('');
   const [cart, setCart] = useState([]);
   const [customerId, setCustomerId] = useState(customers[0]?.id || 1);
-  const [paymentMethod, setPaymentMethod] = useState('Cash');
   const [activeInvoice, setActiveInvoice] = useState(null);
   const [validationError, setValidationError] = useState('');
 
-  // Manager Surcharge Setup State
-  const [ecoSurchargePct, setEcoSurchargePct] = useState(2.5); // EcoCash 2.5% surcharge
-  const [cardSurchargePct, setCardSurchargePct] = useState(1.5); // Card 1.5% surcharge
-  const [showSurchargeModal, setShowSurchargeModal] = useState(false);
+  // Manager Payment Gateways & Surcharge Configuration
+  const [gateways, setGateways] = useState([
+    { id: 'cash', name: 'Cash (USD / ZiG)', type: 'CASH', surchargePct: 0.0, enabled: true, usage: 'BOTH' },
+    { id: 'ecocash', name: 'EcoCash Mobile Money', type: 'MOBILE_WALLET', surchargePct: 2.5, enabled: true, usage: 'BOTH' },
+    { id: 'telecash', name: 'Telecash Mobile', type: 'MOBILE_WALLET', surchargePct: 2.0, enabled: true, usage: 'CUSTOMER' },
+    { id: 'onemoney', name: 'OneMoney NetOne', type: 'MOBILE_WALLET', surchargePct: 2.0, enabled: true, usage: 'CUSTOMER' },
+    { id: 'omari', name: 'O\'Mari Mobile Wallet', type: 'MOBILE_WALLET', surchargePct: 1.8, enabled: true, usage: 'CUSTOMER' },
+    { id: 'innbucks', name: 'InnBucks Retail Voucher', type: 'RETAIL_WALLET', surchargePct: 1.0, enabled: true, usage: 'BOTH' },
+    { id: 'card_local', name: 'Debit / Credit Card (Local EFTPOS)', type: 'CARD', surchargePct: 1.5, enabled: true, usage: 'BOTH' },
+    { id: 'zipit', name: 'Inter-Bank ZIPIT Transfer', type: 'BANK_INTERBANK', surchargePct: 1.0, enabled: true, usage: 'BOTH' },
+    { id: 'rtgs', name: 'RTGS Electronic Bank Transfer', type: 'BANK_DOMESTIC', surchargePct: 0.5, enabled: true, usage: 'BOTH' },
+    { id: 'nostro', name: 'Nostro FCA USD Wire', type: 'BANK_NOSTRO', surchargePct: 0.0, enabled: true, usage: 'SUPPLIER' },
+    { id: 'intl_tt', name: 'International Telegraphic Wire (TT)', type: 'BANK_INTL', surchargePct: 3.0, enabled: true, usage: 'SUPPLIER' }
+  ]);
 
-  const isManager = can(currentRole, 'attention.decide');
+  const [selectedGatewayId, setSelectedGatewayId] = useState('cash');
+  const [showConfigModal, setShowConfigModal] = useState(false);
 
-  const filteredProducts = products.filter(p => 
-    p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    p.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (p.barcode && p.barcode.includes(searchTerm))
-  );
+  // High-Value Sales Pending Approval Queue
+  const [pendingLargeSales, setPendingLargeSales] = useState([
+    {
+      id: 901,
+      invoice_number: 'INV-PEND-0041',
+      customer_name: 'Apex Commercial Supplies',
+      total_amount: 3450.00,
+      discount_requested: '12% High Volume Discount',
+      submitted_by: 'Charlie Staff (EMP-00014)',
+      timestamp: '2026-08-26 02:15:00',
+      items: [{ product_name: 'Dell XPS 15 Workstation Laptop', quantity: 3, unit_price: 1150.00 }]
+    }
+  ]);
+
+  const activeGateway = gateways.find(g => g.id === selectedGatewayId) || gateways[0];
 
   const addToCart = (product) => {
     setValidationError('');
@@ -54,17 +79,17 @@ export default function SalesView({
     
     if (existing) {
       if (existing.quantity + 1 > product.stock_quantity) {
-        const msg = `Unable to add unit: ${product.name} has only ${product.stock_quantity} units available in stock. Reduce quantity or reorder stock.`;
+        const msg = `Unable to add unit: ${product.name} has only ${product.stock_quantity} units available.`;
         setValidationError(msg);
-        if (onShowToast) onShowToast(msg, 'danger');
+        onShowToast?.(msg, 'danger');
         return;
       }
       setCart(cart.map(item => item.product_id === product.id ? { ...item, quantity: item.quantity + 1 } : item));
     } else {
       if (product.stock_quantity < 1) {
-        const msg = `Cannot sell ${product.name}: Item is currently OUT OF STOCK. Reorder stock to resume sales.`;
+        const msg = `Cannot sell ${product.name}: Item is OUT OF STOCK.`;
         setValidationError(msg);
-        if (onShowToast) onShowToast(msg, 'danger');
+        onShowToast?.(msg, 'danger');
         return;
       }
       setCart([...cart, {
@@ -83,12 +108,12 @@ export default function SalesView({
     const prod = products.find(p => p.id === productId);
     
     if (newQty > prod.stock_quantity) {
-      const msg = `Quantity bound exceeded: ${prod.name} has only ${prod.stock_quantity} units available. Reduce cart quantity to ${prod.stock_quantity} or less.`;
+      const msg = `Quantity limit exceeded: ${prod.name} has only ${prod.stock_quantity} units.`;
       setValidationError(msg);
-      if (onShowToast) onShowToast(msg, 'danger');
+      onShowToast?.(msg, 'danger');
       return;
     }
-    
+
     if (newQty <= 0) {
       setCart(cart.filter(item => item.product_id !== productId));
     } else {
@@ -96,44 +121,42 @@ export default function SalesView({
     }
   };
 
-  const removeFromCart = (productId) => {
-    setCart(cart.filter(item => item.product_id !== productId));
-  };
-
   const subtotal = cart.reduce((acc, item) => acc + (item.quantity * item.unit_price), 0);
-  const tax = subtotal * 0.10; // 10% tax
-  const surchargePct = paymentMethod === 'EcoCash Mobile Money' ? ecoSurchargePct : (paymentMethod === 'Credit Card' || paymentMethod === 'Debit Card') ? cardSurchargePct : 0;
-  const surchargeAmount = (subtotal + tax) * (surchargePct / 100);
+  const tax = subtotal * 0.10;
+  const surchargeAmount = (subtotal + tax) * (activeGateway.surchargePct / 100);
   const grandTotal = subtotal + tax + surchargeAmount;
 
   const handleCheckout = () => {
     if (cart.length === 0) return;
-    setValidationError('');
 
-    // Double check stock
-    for (const item of cart) {
-      const prod = products.find(p => p.id === item.product_id);
-      if (item.quantity > prod.stock_quantity) {
-        const msg = `Sale blocked: ${prod.name} has only ${prod.stock_quantity} units available, but cart contains ${item.quantity}. Reduce quantity to ${prod.stock_quantity} or less.`;
-        setValidationError(msg);
-        if (onShowToast) onShowToast(msg, 'danger');
-        return;
-      }
+    // Check if large sale threshold (> $1,000) requiring manager approval
+    if (grandTotal > 1000) {
+      const largeSaleReq = {
+        id: Date.now(),
+        invoice_number: `INV-PEND-${Math.floor(1000 + Math.random() * 9000)}`,
+        customer_name: customers.find(c => c.id === parseInt(customerId, 10))?.name || 'Walk-in Customer',
+        total_amount: grandTotal,
+        submitted_by: 'Cashier Staff',
+        timestamp: new Date().toISOString(),
+        items: cart.map(i => ({ product_name: i.product_name, quantity: i.quantity, unit_price: i.unit_price }))
+      };
+      setPendingLargeSales([largeSaleReq, ...pendingLargeSales]);
+      setCart([]);
+      onShowToast?.('warning', 'Manager Approval Required', `Sale total ($${grandTotal.toFixed(2)}) exceeds $1,000 threshold. Submitted to Manager Queue.`);
+      return;
     }
-
-    const customer = customers.find(c => c.id === parseInt(customerId, 10));
 
     const newSale = {
       id: Date.now(),
       invoice_number: `INV-2026-${Math.floor(1000 + Math.random() * 9000)}`,
       customer_id: parseInt(customerId, 10),
-      customer_name: customer ? customer.name : 'Walk-in Customer',
+      customer_name: customers.find(c => c.id === parseInt(customerId, 10))?.name || 'Walk-in Customer',
       total_amount: grandTotal,
       payment_status: 'PAID',
-      payment_method: paymentMethod,
-      timestamp: new Date().toISOString(),
+      payment_method: activeGateway.name,
+      surcharge_applied: surchargeAmount,
       created_at: new Date().toISOString(),
-      user_name: currentRole === 'ADMIN' ? 'Alice Admin' : currentRole === 'MANAGER' ? 'Bob Manager' : 'Charlie Staff',
+      user_name: 'Charlie Staff',
       items: cart.map(item => ({
         product_id: item.product_id,
         product_name: item.product_name,
@@ -142,206 +165,288 @@ export default function SalesView({
       }))
     };
 
-    onProcessSale(newSale);
+    onProcessSale?.(newSale);
     setActiveInvoice(newSale);
     setCart([]);
-    if (onShowToast) onShowToast(`Sale completed successfully! Invoice ${newSale.invoice_number} created ($${grandTotal.toFixed(2)}).`, 'success');
+    onShowToast?.('success', 'Sale Processed', `Invoice ${newSale.invoice_number} created ($${grandTotal.toFixed(2)}).`);
   };
 
-  const exportSalesCSV = () => {
-    const headers = ["Invoice #", "Customer", "Total Amount", "Payment Method", "Issued By", "Timestamp"];
-    const rows = sales.map(s => [
-      s.invoice_number,
-      `"${s.customer_name}"`,
-      s.total_amount,
-      s.payment_method,
-      `"${s.user_name || s.created_by}"`,
-      `"${new Date(s.created_at || s.timestamp).toLocaleString()}"`
-    ]);
-    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map(e => e.join(","))].join("\n");
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `sales_history_${Date.now()}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  const handleApproveLargeSale = (saleId) => {
+    const sale = pendingLargeSales.find(s => s.id === saleId);
+    if (!sale) return;
+
+    onProcessSale?.({
+      ...sale,
+      payment_status: 'PAID',
+      created_at: new Date().toISOString()
+    });
+
+    setPendingLargeSales(prev => prev.filter(s => s.id !== saleId));
+    onShowToast?.('success', 'Sale Authorized', `Manager approved high-value sale ${sale.invoice_number} ($${sale.total_amount.toFixed(2)}).`);
   };
+
+  const handleRejectLargeSale = (saleId) => {
+    setPendingLargeSales(prev => prev.filter(s => s.id !== saleId));
+    onShowToast?.('danger', 'Sale Declined', `Manager declined high-value sale.`);
+  };
+
+  const handleToggleGateway = (id) => {
+    setGateways(prev => prev.map(g => {
+      if (g.id === id) {
+        return { ...g, enabled: !g.enabled };
+      }
+      return g;
+    }));
+    onShowToast?.('info', 'Gateway Updated', 'Payment gateway configuration updated.');
+  };
+
+  const handleUpdateSurcharge = (id, newPct) => {
+    setGateways(prev => prev.map(g => {
+      if (g.id === id) {
+        return { ...g, surchargePct: parseFloat(newPct) || 0 };
+      }
+      return g;
+    }));
+  };
+
+  const filteredProducts = products.filter(p => 
+    p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    p.sku.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       {/* Top Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
         <div>
-          <h2 style={{ fontSize: '1.5rem', fontWeight: 800 }}>Sales & POS Terminal</h2>
+          <h2 style={{ fontSize: '1.5rem', fontWeight: 800 }}>
+            {isManager ? 'Sales Operations & Gateway Policy Control' : 'Sales & POS Terminal Checkout'}
+          </h2>
           <p style={{ color: 'var(--color-ink-muted)', fontSize: '0.875rem', fontFamily: 'var(--font-mono)' }}>
-            Point of Sale terminal, customer checkout, and tax receipt generator.
+            {isManager 
+              ? 'Configure Mobile & Bank Gateways, set surcharges, and authorize high-value sales.' 
+              : 'Process front-desk customer sales, collect payments, and print receipts.'}
           </p>
         </div>
 
         <div style={{ display: 'flex', gap: '10px' }}>
+          {isManager && (
+            <button 
+              className={`btn ${activeTab === 'manager_control' ? 'btn-primary' : 'btn-secondary'}`} 
+              onClick={() => setActiveTab('manager_control')}
+            >
+              <ShieldCheck size={15} /> Manager Policy & Approvals ({pendingLargeSales.length})
+            </button>
+          )}
+
           <button 
             className={`btn ${activeTab === 'pos' ? 'btn-primary' : 'btn-secondary'}`} 
             onClick={() => setActiveTab('pos')}
           >
-            <ShoppingCart size={15} /> POS Terminal Checkout
+            <ShoppingCart size={15} /> POS Terminal
           </button>
           <button 
             className={`btn ${activeTab === 'history' ? 'btn-primary' : 'btn-secondary'}`} 
             onClick={() => setActiveTab('history')}
           >
-            <Receipt size={15} /> Sales History & Invoices ({sales.length})
+            <Receipt size={15} /> Sales History
           </button>
         </div>
       </div>
 
-      {/* POS View Mode */}
-      {activeTab === 'pos' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: '20px', alignItems: 'start' }}>
-          {/* Left Column: Product Selection Grid */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div className="hm-panel" style={{ padding: '14px' }}>
-              <div style={{ position: 'relative' }}>
-                <Search size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-ink-muted)' }} />
-                <input
-                  type="text"
-                  className="input-field"
-                  style={{ paddingLeft: '38px' }}
-                  placeholder="Search Product Name, SKU, or Scan Barcode..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  autoFocus
-                />
+      {/* MANAGER CONTROL & GATEWAY SURCHARGE TAB */}
+      {activeTab === 'manager_control' && isManager && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          
+          {/* High-Value Sales Pending Approval Queue */}
+          <div style={{ background: 'var(--color-paper-surface)', border: '1px solid var(--color-rule)', borderRadius: 'var(--radius-md)', padding: '20px' }}>
+            <h3 style={{ fontSize: '16px', fontWeight: '800', margin: '0 0 14px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <ShieldCheck size={18} color="var(--color-accent)" /> Pending High-Value & Discount Sale Approvals
+            </h3>
+
+            {pendingLargeSales.length === 0 ? (
+              <div style={{ fontSize: '13px', color: 'var(--color-ink-muted)', fontStyle: 'italic' }}>
+                No pending high-value sales requiring manager sign-off.
+              </div>
+            ) : (
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid var(--color-rule)', textAlign: 'left' }}>
+                    <th style={{ padding: '8px' }}>INVOICE</th>
+                    <th style={{ padding: '8px' }}>CUSTOMER</th>
+                    <th style={{ padding: '8px' }}>TOTAL AMOUNT</th>
+                    <th style={{ padding: '8px' }}>SUBMITTED BY</th>
+                    <th style={{ padding: '8px' }}>ACTION</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pendingLargeSales.map(s => (
+                    <tr key={s.id} style={{ borderBottom: '1px solid var(--color-rule)' }}>
+                      <td style={{ padding: '10px', fontFamily: 'monospace', fontWeight: '700', color: 'var(--color-accent)' }}>{s.invoice_number}</td>
+                      <td style={{ padding: '10px' }}>{s.customer_name}</td>
+                      <td style={{ padding: '10px', fontFamily: 'monospace', fontWeight: '800' }}>${s.total_amount.toFixed(2)}</td>
+                      <td style={{ padding: '10px' }}>{s.submitted_by}</td>
+                      <td style={{ padding: '10px', display: 'flex', gap: '6px' }}>
+                        <button
+                          onClick={() => handleApproveLargeSale(s.id)}
+                          style={{ padding: '6px 12px', background: '#10b981', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: '700', fontSize: '12px' }}
+                        >
+                          Approve Sale
+                        </button>
+                        <button
+                          onClick={() => handleRejectLargeSale(s.id)}
+                          style={{ padding: '6px 12px', background: '#ef4444', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: '700', fontSize: '12px' }}
+                        >
+                          Reject
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+
+          {/* Payment Gateways & Surcharges Configuration Grid */}
+          <div style={{ background: 'var(--color-paper-surface)', border: '1px solid var(--color-rule)', borderRadius: 'var(--radius-md)', padding: '20px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <div>
+                <h3 style={{ fontSize: '16px', fontWeight: '800', margin: 0 }}>Payment Gateways & Surcharge Rates (Customer & Supplier)</h3>
+                <p style={{ fontSize: '13px', color: 'var(--color-ink-muted)', margin: '4px 0 0 0' }}>
+                  Enable or disable mobile wallets (EcoCash, Telecash, OneMoney, O'Mari, InnBucks) and banks (ZIPIT, RTGS, Nostro, Intl TT).
+                </p>
               </div>
             </div>
 
-            {validationError && (
-              <div style={{
-                background: 'var(--color-accent-subtle)',
-                border: '1px solid var(--color-signal-red)',
-                borderRadius: 'var(--radius-sm)',
-                padding: '10px 14px',
-                fontSize: '0.8rem',
-                color: 'var(--color-signal-red)',
-                fontWeight: 600,
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px'
-              }}>
-                <AlertTriangle size={16} /> {validationError}
-              </div>
-            )}
-
-            {/* Product Cards Grid */}
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
-              gap: '12px',
-              maxHeight: 'calc(100vh - 280px)',
-              overflowY: 'auto',
-              paddingRight: '4px'
-            }}>
-              {filteredProducts.map(product => {
-                const isOut = product.stock_quantity === 0;
-                const isLow = product.stock_quantity <= product.reorder_level;
-
-                return (
-                  <div
-                    key={product.id}
-                    className="hm-card"
-                    onClick={() => !isOut && addToCart(product)}
-                    style={{
-                      padding: '14px',
-                      cursor: isOut ? 'not-allowed' : 'pointer',
-                      opacity: isOut ? 0.5 : 1,
-                      display: 'flex',
-                      flexDirection: 'column',
-                      justify: 'space-between',
-                      minHeight: '130px'
-                    }}
-                  >
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '14px' }}>
+              {gateways.map(g => (
+                <div key={g.id} style={{ background: 'var(--color-paper-2)', border: '1px solid var(--color-rule)', borderRadius: 'var(--radius-xs)', padding: '14px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <div>
-                      <div style={{ fontSize: '0.7rem', fontFamily: 'var(--font-mono)', color: 'var(--color-accent)', fontWeight: 700 }}>
-                        {product.sku}
-                      </div>
-                      <div style={{ fontWeight: 700, fontSize: '0.9rem', marginTop: '2px', lineHeight: '1.2' }}>
-                        {product.name}
-                      </div>
+                      <div style={{ fontWeight: '700', fontSize: '14px' }}>{g.name}</div>
+                      <span style={{ fontSize: '11px', fontFamily: 'monospace', color: 'var(--color-accent)' }}>{g.type}</span>
                     </div>
-
-                    <div style={{ marginTop: '12px', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
-                      <div>
-                        <div style={{ fontSize: '1.1rem', fontWeight: 800, fontFamily: 'var(--font-mono)' }}>
-                          ${product.selling_price.toFixed(2)}
-                        </div>
-                        <div style={{ fontSize: '0.7rem', color: isOut ? 'var(--color-signal-red)' : isLow ? 'var(--color-signal-amber)' : 'var(--color-ink-muted)' }}>
-                          Stock: {product.stock_quantity} {product.unit}
-                        </div>
-                      </div>
-
-                      <button
-                        className={`btn btn-sm ${isOut ? 'btn-secondary' : 'btn-primary'}`}
-                        disabled={isOut}
-                        style={{ padding: '4px 8px' }}
-                      >
-                        <Plus size={14} /> Add
-                      </button>
-                    </div>
+                    <input
+                      type="checkbox"
+                      checked={g.enabled}
+                      onChange={() => handleToggleGateway(g.id)}
+                      style={{ cursor: 'pointer', width: '16px', height: '16px' }}
+                    />
                   </div>
-                );
-              })}
+
+                  <div style={{ marginTop: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <label style={{ fontSize: '12px', fontWeight: '600' }}>SURCHARGE (%):</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      value={g.surchargePct}
+                      onChange={e => handleUpdateSurcharge(g.id, e.target.value)}
+                      style={{ width: '80px', padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--color-rule)', background: 'var(--color-canvas)', color: 'var(--color-text)', fontFamily: 'monospace', fontSize: '12px', fontWeight: '700' }}
+                    />
+                  </div>
+                  <div style={{ fontSize: '11px', color: 'var(--color-ink-muted)', marginTop: '6px' }}>
+                    Usage Scope: <strong>{g.usage}</strong>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
 
-          {/* Right Column: Checkout Cart Summary */}
-          <div className="hm-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px', minHeight: 'calc(100vh - 210px)' }}>
-            <div style={{ borderBottom: '1px solid var(--color-rule)', paddingBottom: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ fontSize: '1.1rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <ShoppingCart size={18} color="var(--color-accent)" /> Active Cart Summary
-              </h3>
-              <span style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', color: 'var(--color-ink-muted)' }}>
-                {cart.reduce((a, b) => a + b.quantity, 0)} Items
-              </span>
+        </div>
+      )}
+
+      {/* POS TERMINAL CHECKOUT TAB */}
+      {activeTab === 'pos' && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: '20px' }}>
+          
+          {/* Left Column: Product Selection Catalog */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--color-paper-surface)', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-rule)' }}>
+              <Search size={18} color="var(--color-ink-muted)" />
+              <input
+                type="text"
+                placeholder="Search products by SKU or Name..."
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                style={{ border: 'none', background: 'transparent', width: '100%', outline: 'none', color: 'var(--color-ink)', fontSize: '0.9rem' }}
+              />
             </div>
 
-            {/* Customer & Payment Options */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <div>
-                <label className="input-label">Customer Record</label>
-                <select
-                  className="input-field"
-                  value={customerId}
-                  onChange={e => setCustomerId(e.target.value)}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '12px', maxHeight: '550px', overflowY: 'auto' }}>
+              {filteredProducts.map(p => (
+                <div
+                  key={p.id}
+                  onClick={() => addToCart(p)}
+                  style={{
+                    background: 'var(--color-paper-surface)',
+                    border: '1px solid var(--color-rule)',
+                    borderRadius: 'var(--radius-sm)',
+                    padding: '14px',
+                    cursor: p.stock_quantity > 0 ? 'pointer' : 'not-allowed',
+                    opacity: p.stock_quantity > 0 ? 1 : 0.5,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justify: 'space-between',
+                    gap: '10px'
+                  }}
                 >
-                  {customers.map(c => (
-                    <option key={c.id} value={c.id}>{c.name} ({c.email || c.phone || 'Walk-in'})</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="input-label">Payment Method</label>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '6px' }}>
-                  {['Cash', 'EcoCash Mobile Money', 'Credit Card', 'Debit Card'].map(method => (
-                    <button
-                      key={method}
-                      type="button"
-                      onClick={() => setPaymentMethod(method)}
-                      className={`btn ${paymentMethod === method ? 'btn-primary' : 'btn-secondary'}`}
-                      style={{ fontSize: '0.75rem', padding: '6px' }}
-                    >
-                      {method}
-                    </button>
-                  ))}
+                  <div>
+                    <span style={{ fontSize: '0.7rem', fontFamily: 'var(--font-mono)', color: 'var(--color-accent)', fontWeight: 700 }}>{p.sku}</span>
+                    <h4 style={{ fontSize: '0.9rem', fontWeight: 700, margin: '2px 0 0 0', color: 'var(--color-ink)' }}>{p.name}</h4>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                    <span style={{ fontSize: '1rem', fontWeight: 800, fontFamily: 'var(--font-mono)', color: 'var(--color-signal-green)' }}>${p.selling_price.toFixed(2)}</span>
+                    <span style={{ fontSize: '0.75rem', color: p.stock_quantity <= p.reorder_level ? 'var(--color-signal-red)' : 'var(--color-ink-muted)', fontWeight: 700 }}>
+                      Stock: {p.stock_quantity}
+                    </span>
+                  </div>
                 </div>
-              </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Right Column: Checkout Cart & Gateway Selection */}
+          <div style={{ background: 'var(--color-paper-surface)', border: '1px solid var(--color-rule)', borderRadius: 'var(--radius-md)', padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 800, margin: 0 }}>Checkout Register</h3>
+
+            {/* Customer Select */}
+            <div>
+              <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-ink-muted)', display: 'block', marginBottom: '4px' }}>SELECT CUSTOMER</label>
+              <select
+                value={customerId}
+                onChange={e => setCustomerId(e.target.value)}
+                style={{ width: '100%', padding: '8px', borderRadius: 'var(--radius-xs)', border: '1px solid var(--color-rule)', background: 'var(--color-paper-2)', color: 'var(--color-ink)', fontSize: '0.85rem' }}
+              >
+                {customers.map(c => (
+                  <option key={c.id} value={c.id}>{c.name} ({c.customer_code || 'REG'})</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Configured Payment Gateways */}
+            <div>
+              <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-ink-muted)', display: 'block', marginBottom: '4px' }}>
+                PAYMENT GATEWAY ({activeGateway.surchargePct > 0 ? `+${activeGateway.surchargePct}% Surcharge` : 'No Surcharge'})
+              </label>
+              <select
+                value={selectedGatewayId}
+                onChange={e => setSelectedGatewayId(e.target.value)}
+                style={{ width: '100%', padding: '8px', borderRadius: 'var(--radius-xs)', border: '1px solid var(--color-rule)', background: 'var(--color-paper-2)', color: 'var(--color-ink)', fontSize: '0.85rem', fontWeight: '700' }}
+              >
+                {gateways.filter(g => g.enabled && (g.usage === 'CUSTOMER' || g.usage === 'BOTH')).map(g => (
+                  <option key={g.id} value={g.id}>
+                    {g.name} {g.surchargePct > 0 ? `(+${g.surchargePct}%)` : ''}
+                  </option>
+                ))}
+              </select>
             </div>
 
             {/* Cart Items List */}
-            <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '260px' }}>
+            <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '220px' }}>
               {cart.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '30px 10px', color: 'var(--color-ink-dim)', fontSize: '0.85rem' }}>
-                  Cart is empty.<br />Click products on the left to add items to checkout.
+                  Cart is empty. Click items to add.
                 </div>
               ) : (
                 cart.map(item => (
@@ -352,45 +457,34 @@ export default function SalesView({
                         ${item.unit_price.toFixed(2)} each
                       </div>
                     </div>
-
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'var(--color-paper-surface)', borderRadius: 'var(--radius-xs)', padding: '2px' }}>
-                        <button onClick={() => updateCartQty(item.product_id, item.quantity - 1)} style={{ background: 'none', border: 'none', color: 'var(--color-ink)', cursor: 'pointer', padding: '2px 4px' }}>
-                          <Minus size={12} />
-                        </button>
-                        <span style={{ fontSize: '0.85rem', fontWeight: 800, fontFamily: 'var(--font-mono)', minWidth: '20px', textAlign: 'center' }}>
-                          {item.quantity}
-                        </span>
-                        <button onClick={() => updateCartQty(item.product_id, item.quantity + 1)} style={{ background: 'none', border: 'none', color: 'var(--color-ink)', cursor: 'pointer', padding: '2px 4px' }}>
-                          <Plus size={12} />
-                        </button>
-                      </div>
-
-                      <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 800, fontSize: '0.85rem', width: '60px', textAlign: 'right' }}>
-                        ${(item.quantity * item.unit_price).toFixed(2)}
-                      </div>
-
-                      <button onClick={() => removeFromCart(item.product_id)} style={{ background: 'none', border: 'none', color: 'var(--color-signal-red)', cursor: 'pointer' }}>
-                        <Trash2 size={14} />
-                      </button>
+                      <button onClick={() => updateCartQty(item.product_id, item.quantity - 1)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><Minus size={12} /></button>
+                      <span style={{ fontWeight: 800, fontFamily: 'monospace' }}>{item.quantity}</span>
+                      <button onClick={() => updateCartQty(item.product_id, item.quantity + 1)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><Plus size={12} /></button>
                     </div>
                   </div>
                 ))
               )}
             </div>
 
-            {/* Calculations & Complete Sale Button */}
+            {/* Totals & Complete Sale */}
             <div style={{ borderTop: '1px solid var(--color-rule)', paddingTop: '12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--color-ink-muted)', fontFamily: 'var(--font-mono)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', fontFamily: 'monospace' }}>
                 <span>Subtotal:</span>
                 <span>${subtotal.toFixed(2)}</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--color-ink-muted)', fontFamily: 'var(--font-mono)' }}>
-                <span>Estimated Tax (10%):</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', fontFamily: 'monospace' }}>
+                <span>Tax (10%):</span>
                 <span>${tax.toFixed(2)}</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.2rem', fontWeight: 800, fontFamily: 'var(--font-mono)', color: 'var(--color-signal-green)', marginTop: '4px' }}>
-                <span>SALE TOTAL:</span>
+              {activeGateway.surchargePct > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', fontFamily: 'monospace', color: '#f59e0b' }}>
+                  <span>Gateway Surcharge ({activeGateway.surchargePct}%):</span>
+                  <span>+${surchargeAmount.toFixed(2)}</span>
+                </div>
+              )}
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.2rem', fontWeight: 800, fontFamily: 'monospace', color: 'var(--color-signal-green)', marginTop: '4px' }}>
+                <span>GRAND TOTAL:</span>
                 <span>${grandTotal.toFixed(2)}</span>
               </div>
 
@@ -407,68 +501,37 @@ export default function SalesView({
         </div>
       )}
 
-      {/* Sales History View Mode */}
+      {/* SALES HISTORY TAB */}
       {activeTab === 'history' && (
-        <div className="hm-panel" style={{ padding: '0px', overflow: 'hidden' }}>
-          <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--color-rule)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ fontWeight: 700, fontFamily: 'var(--font-mono)' }}>
-              Completed Sales Transactions Ledger
-            </div>
-            <button className="btn btn-secondary btn-sm" onClick={exportSalesCSV}>
-              <Download size={14} /> Export Sales CSV
-            </button>
-          </div>
-
-          <div className="custom-table-container">
-            <table className="custom-table">
-              <thead>
-                <tr>
-                  <th>Invoice #</th>
-                  <th>Sale Date & Time</th>
-                  <th>Customer Name</th>
-                  <th>Payment Method</th>
-                  <th>Issued By</th>
-                  <th>Sale Total</th>
-                  <th style={{ textAlign: 'right' }}>Actions</th>
+        <div style={{ background: 'var(--color-paper-surface)', border: '1px solid var(--color-rule)', borderRadius: 'var(--radius-md)', padding: '20px' }}>
+          <h3 style={{ fontSize: '1.05rem', fontWeight: 800, marginBottom: '16px' }}>Verified Completed Sales Ledger</h3>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid var(--color-rule)', textAlign: 'left', color: 'var(--color-ink-muted)' }}>
+                <th style={{ padding: '10px' }}>INVOICE #</th>
+                <th style={{ padding: '10px' }}>CUSTOMER</th>
+                <th style={{ padding: '10px' }}>TOTAL</th>
+                <th style={{ padding: '10px' }}>GATEWAY</th>
+                <th style={{ padding: '10px' }}>ISSUED BY</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sales.map(s => (
+                <tr key={s.id} style={{ borderBottom: '1px solid var(--color-rule)' }}>
+                  <td style={{ padding: '10px', fontFamily: 'monospace', fontWeight: 700, color: 'var(--color-accent)' }}>{s.invoice_number}</td>
+                  <td style={{ padding: '10px' }}>{s.customer_name}</td>
+                  <td style={{ padding: '10px', fontFamily: 'monospace', fontWeight: 800 }}>${s.total_amount.toFixed(2)}</td>
+                  <td style={{ padding: '10px' }}>{s.payment_method}</td>
+                  <td style={{ padding: '10px' }}>{s.user_name || 'Cashier Staff'}</td>
                 </tr>
-              </thead>
-              <tbody>
-                {sales.map(sale => (
-                  <tr key={sale.id}>
-                    <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--color-accent)' }}>
-                      {sale.invoice_number}
-                    </td>
-                    <td style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', color: 'var(--color-ink-muted)' }}>
-                      {new Date(sale.created_at || sale.timestamp).toLocaleString()}
-                    </td>
-                    <td style={{ fontWeight: 700 }}>{sale.customer_name}</td>
-                    <td><span className="badge badge-info">{sale.payment_method}</span></td>
-                    <td style={{ fontSize: '0.85rem' }}>{sale.user_name || sale.created_by || 'Cashier'}</td>
-                    <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 800, color: 'var(--color-signal-green)' }}>
-                      ${sale.total_amount.toFixed(2)}
-                    </td>
-                    <td style={{ textAlign: 'right' }}>
-                      <button
-                        className="btn btn-secondary btn-sm"
-                        onClick={() => setActiveInvoice(sale)}
-                      >
-                        <Printer size={12} /> View Receipt
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 
-      {/* Thermal Receipt Print Modal */}
       {activeInvoice && (
-        <ReceiptModal
-          sale={activeInvoice}
-          onClose={() => setActiveInvoice(null)}
-        />
+        <ReceiptModal invoice={activeInvoice} onClose={() => setActiveInvoice(null)} />
       )}
     </div>
   );
