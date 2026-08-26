@@ -29,7 +29,8 @@ export default function Sidebar({ activeTab, setActiveTab, currentRole, onLogout
     {
       title: 'MAIN OVERVIEW',
       items: [
-        { id: 'dashboard', label: 'Dashboard Overview', shortcut: 'Alt+D', icon: LayoutDashboard, roles: ['APP_ADMIN', 'SYSADMIN', 'MANAGER', 'STAFF', 'AUDITOR', 'ADMIN'] }
+        { id: 'dashboard', label: 'Dashboard Overview', shortcut: 'Alt+D', icon: LayoutDashboard, roles: ['APP_ADMIN', 'SYSADMIN', 'MANAGER', 'STAFF', 'AUDITOR', 'ADMIN'] },
+        { id: 'attention', label: 'Operational Attention', actionBadge: 2, importantBadge: 2, shortcut: 'Alt+A', icon: ShieldAlert, roles: ['APP_ADMIN', 'SYSADMIN', 'MANAGER', 'STAFF', 'AUDITOR', 'ADMIN'] }
       ]
     },
     {
@@ -176,6 +177,16 @@ export default function Sidebar({ activeTab, setActiveTab, currentRole, onLogout
                   >
                     <Icon size={16} color={isActive ? 'var(--color-accent)' : 'currentColor'} />
                     <span style={{ flex: 1 }}>{item.label}</span>
+                    {item.actionBadge > 0 && (
+                      <span style={{ fontSize: '10px', fontWeight: 800, background: 'rgba(239, 68, 68, 0.2)', color: '#ef4444', padding: '1px 6px', borderRadius: '10px' }}>
+                        🔴 {item.actionBadge}
+                      </span>
+                    )}
+                    {item.importantBadge > 0 && (
+                      <span style={{ fontSize: '10px', fontWeight: 800, background: 'rgba(245, 158, 11, 0.2)', color: '#f59e0b', padding: '1px 6px', borderRadius: '10px' }}>
+                        🟠 {item.importantBadge}
+                      </span>
+                    )}
                   </button>
                 );
               })}

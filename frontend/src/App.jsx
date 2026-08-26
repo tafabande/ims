@@ -30,6 +30,7 @@ const EmployeesView = lazy(() => import('./components/employees/EmployeesView'))
 const IntegrityIntelligenceView = lazy(() => import('./components/integrity/IntegrityIntelligenceView'));
 const DataIntakeView = lazy(() => import('./components/ingestion/DataIntakeView'));
 const PlanningView = lazy(() => import('./components/planning/PlanningView'));
+const AttentionCenterView = lazy(() => import('./components/attention/AttentionCenterView'));
 
 
 
@@ -279,6 +280,13 @@ export default function App() {
                 products={products}
                 transactions={transactions}
                 sales={sales}
+                onNavigate={setActiveTab}
+              />
+            )}
+
+            {activeTab === 'attention' && (
+              <AttentionCenterView
+                onShowToast={handleShowToast}
                 onNavigate={setActiveTab}
               />
             )}

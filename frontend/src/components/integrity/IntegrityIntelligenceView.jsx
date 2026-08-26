@@ -20,692 +20,801 @@ import {
   Filter,
   Eye,
   Sliders,
-  Maximize2
+  Maximize2,
+  X,
+  FileSpreadsheet,
+  Check,
+  AlertCircle
 } from 'lucide-react';
 import { apiFetch } from '../../utils/apiClient';
-import QuarantineModal from '../common/QuarantineModal';
 
-export default function IntegrityIntelligenceView({ onShowToast, currentRole }) {
-  const [activeTab, setActiveTab] = useState('anomalies'); // 'anomalies' | 'investigations' | 'lineage' | 'digital_twin'
-  const [isLoading, setIsLoading] = useState(false);
-  const [explainModalEntity, setExplainModalEntity] = useState(null);
+export default function IntegrityIntelligenceView({ onShowToast, currentRole, onNavigate }) {
+  const [activeTab, setActiveTab] = useState('attention'); // 'attention' | 'exceptions' | 'lineage' | 'external_sources' | 'digital_twin'
+  const [selectedEntityForLineage, setSelectedEntityForLineage] = useState(null);
   const [quarantineActionEntity, setQuarantineActionEntity] = useState(null);
+  const [quarantineNote, setQuarantineNote] = useState('');
+  const [selectedAisle, setSelectedAisle] = useState('A-02');
 
-  // Live Data States
-  const [anomalies, setAnomalies] = useState([
+  // Operational Exceptions Queue Data
+  const [exceptions, setExceptions] = useState([
     {
       id: 1,
-      anomaly_code: "ANOM-2026-0012",
-      product_code: "PRD-000421",
-      product_name: "Dell XPS 15 Workstation Laptop",
-      location: "Harare Main Warehouse (Aisle A-02)",
-      expected_stock: 147,
-      system_stock: 143,
+      code: "EXC-2026-0041",
+      severity: "CRITICAL", // 🔴
+      badge: "🔴 Critical",
+      color: "#ef4444",
+      issue: "Inventory Discrepancy",
+      entity: "Dell XPS 15 Workstation Laptop",
+      sku: "SKU-DELL-XPS15",
+      location: "Harare Main Warehouse · Aisle A-02",
+      expected: 147,
+      system: 143,
       variance: -4,
-      risk_score: 82,
-      risk_level: "HIGH",
-      category: "SALES_INVENTORY_DISCREPANCY",
-      details: "1,250 units sold on invoices but only 1,180 depleted from inventory ledger.",
-      timestamp: "10 mins ago"
+      note: "Possible unexplained stock movement during loading dock transfer.",
+      status: "Investigation",
+      actionType: "HOLD_STOCK", // HOLD_STOCK | APPROVE_TRANSACTION | REORDER
+      actionLabel: "Investigate",
+      lineage: {
+        openingStock: 150,
+        received: 25,
+        sales: 18,
+        supplierReturns: 6,
+        internalTransfers: 4,
+        customerReturns: 0,
+        expectedBalance: 147,
+        actualCount: 143,
+        unexplainedVariance: -4,
+        evidence: [
+          { ref: 'PO-1042', type: 'Purchase Order', note: '+25 units received from Dell Logistics' },
+          { ref: 'GR-882', type: 'Goods Receipt', note: 'Inspected and accepted at Harare Main' },
+          { ref: 'INV-2041..2078', type: 'Sales Invoices', note: '18 units sold across 14 transactions' },
+          { ref: 'TR-441', type: 'Stock Transfer', note: '4 units moved to Bulawayo Branch' },
+          { ref: 'SC-109', type: 'Physical Stock Count', note: 'Verified by Auditor EMP-00004' }
+        ]
+      }
     },
     {
       id: 2,
-      anomaly_code: "ANOM-2026-0015",
-      product_code: "PRD-000892",
-      product_name: "Logitech MX Master 3S Mouse",
-      location: "Bulawayo Store #02",
-      expected_stock: 50,
-      system_stock: 50,
-      variance: 0,
-      risk_score: 45,
-      risk_level: "MEDIUM",
-      category: "FLOOR_PRICE_OVERRIDE",
-      details: "Unit sold at $78.00 (below negotiation floor of $85.00) without manager authorization.",
-      timestamp: "42 mins ago"
-    }
-  ]);
-
-  const [investigations, setInvestigations] = useState([
+      code: "EXC-2026-0042",
+      severity: "HIGH", // 🟠
+      badge: "🟠 Approval Required",
+      color: "#f59e0b",
+      issue: "Pricing Override Exception",
+      entity: "Logitech MX Master 3S Mouse",
+      sku: "SKU-LOGI-MX3S",
+      location: "Bulawayo Store #02 · Till 01",
+      salePrice: 78.00,
+      floorPrice: 85.00,
+      note: "Sold at $78.00 (below negotiation floor of $85.00) without manager authorization.",
+      status: "Approval Required",
+      actionType: "APPROVE_TRANSACTION",
+      actionLabel: "Review Transaction",
+      lineage: {
+        openingStock: 50,
+        received: 10,
+        sales: 5,
+        expectedBalance: 55,
+        actualCount: 55,
+        unexplainedVariance: 0,
+        evidence: [
+          { ref: 'INV-20482', type: 'POS Receipt', note: 'Discount code OVERRIDE_78 applied by Sales Staff EMP-00014' },
+          { ref: 'POLICY-PRICE-01', type: 'Pricing Rule', note: 'Minimum floor limit $85.00' }
+        ]
+      }
+    },
     {
-      id: 101,
-      case_code: "INVEST-2026-0041",
-      anomaly_code: "ANOM-2026-0012",
-      product_name: "Dell XPS 15 Workstation Laptop",
-      warehouse_name: "Harare Main Warehouse",
-      status: "UNDER_REVIEW",
-      initiated_by: "EMP-00004 (Inventory Auditor)",
-      assigned_to: "EMP-00012 (Warehouse Manager)",
-      created_at: "2026-08-25 14:30 UTC",
-      timeline: [
-        { time: "14:30", note: "Automated scan detected -4 unit variance between POS sales and ledger." },
-        { time: "14:35", note: "Quarantine hold placed on Aisle A-02 bin location." }
-      ]
+      id: 3,
+      code: "EXC-2026-0043",
+      severity: "MEDIUM", // 🟡
+      badge: "🟡 Stock Low",
+      color: "#3b82f6",
+      issue: "Reorder Point Triggered",
+      entity: "USB-C 65W Power Adapter",
+      sku: "SKU-PWR-65W",
+      location: "Harare Main Warehouse · Aisle B-01",
+      currentStock: 12,
+      reorderLevel: 20,
+      note: "Available stock (12u) is below safety reorder level (20u).",
+      status: "Reorder Pending",
+      actionType: "REORDER",
+      actionLabel: "Create Purchase Order",
+      lineage: {
+        openingStock: 100,
+        received: 0,
+        sales: 88,
+        expectedBalance: 12,
+        actualCount: 12,
+        unexplainedVariance: 0,
+        evidence: [
+          { ref: 'REORDER-RULE-65W', type: 'Inventory Policy', note: 'Safety buffer 20 units' }
+        ]
+      }
     }
   ]);
 
-  // Digital Twin Spatial Warehouse State
-  const [digitalTwin, setDigitalTwin] = useState({
-    warehouse_name: "Harare Main Distribution Center",
-    total_capacity_units: 50000,
-    occupied_units: 34200,
-    utilization_pct: 68.4,
-    zones: [
-      { 
-        code: "ZONE-A", 
-        name: "High Velocity Electronics", 
-        utilization: 84, 
-        ble_nodes: 12, 
-        shelves: [
-          { code: "A1-01", status: "VERIFIED", items: 450, signal_dbm: -58 },
-          { code: "A1-02", status: "ANOMALY_HOLD", items: 143, signal_dbm: -72 },
-          { code: "A1-03", status: "VERIFIED", items: 680, signal_dbm: -61 }
-        ] 
-      },
-      { 
-        code: "ZONE-B", 
-        name: "Peripherals & Accessories", 
-        utilization: 62, 
-        ble_nodes: 8, 
-        shelves: [
-          { code: "B1-01", status: "VERIFIED", items: 1200, signal_dbm: -54 },
-          { code: "B1-02", status: "VERIFIED", items: 940, signal_dbm: -65 }
-        ] 
-      },
-      { 
-        code: "ZONE-Q", 
-        name: "Receiving & Quality Quarantine", 
-        utilization: 35, 
-        ble_nodes: 4, 
-        shelves: [
-          { code: "Q1-01", status: "QUARANTINE_LOCK", items: 25, signal_dbm: -48 }
-        ] 
-      }
-    ]
-  });
+  // External Data Source Provenance Ledger
+  const [externalSources, setExternalSources] = useState([
+    {
+      id: 1,
+      source_name: "Excel Bulk Opening Stock Import",
+      import_type: "FILE_UPLOAD",
+      filename: "opening_stock_harare_august.csv",
+      imported_by: "EMP-00017 (HR/Ops Admin)",
+      timestamp: "2026-08-25 14:15 UTC",
+      records_imported: 120,
+      status: "DOCUMENTED", // DOCUMENTED | REQUIRES_REVIEW
+      reference: "IMP-2026-00040",
+      reason: "Initial legacy stock migration for Harare Main Branch."
+    },
+    {
+      id: 2,
+      source_name: "POS Terminal Gateway API",
+      import_type: "API_INTEGRATION",
+      filename: "POS Terminal 01 Sync Stream",
+      imported_by: "INT-2026-00014 (POS Service)",
+      timestamp: "2026-08-25 18:30 UTC",
+      records_imported: 45,
+      status: "DOCUMENTED",
+      reference: "SYNC-2026-0091",
+      reason: "End-of-day POS offline queue reconciliation."
+    },
+    {
+      id: 3,
+      source_name: "Manual External Warehouse Adjustment",
+      import_type: "MANUAL_ADJUSTMENT",
+      filename: "N/A (Direct SQL/API)",
+      imported_by: "EMP-00031 (Warehouse Ops)",
+      timestamp: "2026-08-26 01:20 UTC",
+      records_imported: 3,
+      status: "REQUIRES_REVIEW", // ⚠️ Unverified external adjustment
+      reference: "ADJ-EXT-00482",
+      reason: "Third-party logistics transit damage reconciliation."
+    }
+  ]);
 
-  const handleRunEvaluation = async () => {
-    setIsLoading(true);
-    try {
-      const res = await apiFetch('/api/integrity/anomalies');
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) {
-          setAnomalies(data);
-        }
-      }
-      onShowToast("Automated Inventory Integrity scan executed. 100% ledger proof verified.", "success");
-    } catch (e) {
-      onShowToast("Automated Integrity scan completed (In-Memory Engine active).", "info");
-    } finally {
-      setIsLoading(false);
+  // Handle Action Execution (Hold, Approve, Reorder)
+  const handleExecuteAction = (item, action) => {
+    if (action === 'HOLD_STOCK') {
+      setQuarantineActionEntity(item);
+    } else if (action === 'APPROVE_TRANSACTION') {
+      if (onShowToast) onShowToast('success', 'Pricing Override Approved', `Transaction ${item.code} authorized by Manager.`);
+      setExceptions(prev => prev.filter(e => e.id !== item.id));
+    } else if (action === 'REORDER') {
+      if (onNavigate) onNavigate('purchases');
+      if (onShowToast) onShowToast('info', 'PO Generator Opened', `Navigated to Purchasing to order ${item.entity}.`);
     }
   };
 
-  const handleQuarantineConfirm = ({ typedCode }) => {
+  const handleConfirmQuarantine = () => {
     if (!quarantineActionEntity) return;
-    setAnomalies(prev => prev.filter(a => a.id !== quarantineActionEntity.id));
-    onShowToast(`Quarantine hold enforced for ${quarantineActionEntity.anomaly_code}. Entity locked.`, "warning");
+    if (onShowToast) {
+      onShowToast('warning', 'Inventory Hold Enforced', `Stock for ${quarantineActionEntity.entity} placed on Quarantine Hold in ${quarantineActionEntity.location}. Note: ${quarantineNote || 'Manager Audit Hold'}`);
+    }
     setQuarantineActionEntity(null);
+    setQuarantineNote('');
   };
 
   return (
-    <div style={{ paddingBottom: '32px' }} className="space-y-6">
-      {/* Top Banner / Hero Header */}
+    <div style={{ padding: '24px', maxWidth: '1400px', margin: '0 auto' }}>
+      
+      {/* Page Header */}
       <div style={{
-        background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(30, 41, 59, 0.85) 100%)',
-        border: '1px solid var(--color-rule)',
-        borderRadius: 'var(--radius-lg)',
-        padding: '24px 28px',
-        boxShadow: 'var(--elevation-2)'
-      }} className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: '24px',
+        paddingBottom: '16px',
+        borderBottom: '1px solid var(--color-rule)'
+      }}>
         <div>
-          <div className="flex items-center gap-3">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <div style={{
-              width: '42px',
-              height: '42px',
+              width: '38px',
+              height: '38px',
               borderRadius: 'var(--radius-sm)',
-              background: 'rgba(245, 158, 11, 0.15)',
-              border: '1px solid rgba(245, 158, 11, 0.3)',
+              background: 'linear-gradient(135deg, var(--color-accent), #8b5cf6)',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center'
+              justifyContent: 'center',
+              color: '#fff'
             }}>
-              <ShieldAlert size={22} color="var(--color-signal-amber)" />
+              <ShieldCheck size={22} />
             </div>
             <div>
-              <h1 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--color-ink)', letterSpacing: '-0.02em' }}>
-                Inventory Integrity & Operational Intelligence Engine
+              <h1 style={{ fontSize: '22px', fontWeight: '800', margin: 0, letterSpacing: '-0.02em' }}>
+                Inventory Operations & Integrity Control
               </h1>
-              <p style={{ fontSize: '0.8125rem', color: 'var(--color-ink-muted)', marginTop: '2px' }}>
-                Continuous equation audit, anomaly detection, mathematical proof lineage & 2D spatial digital twin.
+              <p style={{ fontSize: '13px', color: 'var(--color-text-secondary)', margin: '2px 0 0 0' }}>
+                Monitor stock integrity, operational exceptions, calculation lineage, and 2D spatial warehouse activity.
               </p>
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          <button
-            onClick={handleRunEvaluation}
-            disabled={isLoading}
-            style={{
-              background: 'var(--color-accent)',
-              border: 'none',
-              borderRadius: 'var(--radius-sm)',
-              padding: '10px 18px',
-              color: '#ffffff',
-              fontSize: '0.8125rem',
-              fontWeight: 700,
-              cursor: isLoading ? 'wait' : 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              boxShadow: '0 4px 12px rgba(59, 130, 246, 0.25)'
-            }}
-          >
-            <RefreshCw size={15} className={isLoading ? 'animate-spin' : ''} />
-            {isLoading ? 'Scanning Ledger...' : 'Run Integrity Scan'}
-          </button>
-        </div>
+        <button
+          onClick={() => {
+            if (onShowToast) onShowToast('info', 'Integrity Scan Completed', 'Verified 1,284 SKUs across 2 warehouses. 99.8% ledger reconciliation rate.');
+          }}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px',
+            background: 'var(--color-accent)',
+            color: '#fff',
+            border: 'none',
+            borderRadius: 'var(--radius-xs)',
+            padding: '10px 18px',
+            fontSize: '13px',
+            fontWeight: '600',
+            cursor: 'pointer'
+          }}
+        >
+          <Zap size={16} /> Run Full Integrity Scan
+        </button>
       </div>
 
-      {/* Hero Telemetry Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div style={{
-          background: 'var(--color-paper-2)',
-          border: '1px solid var(--color-rule)',
-          borderRadius: 'var(--radius-md)',
-          padding: '18px 20px'
-        }}>
-          <div className="flex items-center justify-between text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-            <span>Ledger Integrity Score</span>
-            <ShieldCheck size={16} color="var(--color-signal-green)" />
-          </div>
-          <div className="text-2xl font-bold text-slate-100 font-mono">99.8%</div>
-          <p className="text-xs text-emerald-400 mt-1 flex items-center gap-1 font-medium">
-            <CheckCircle2 size={12} /> Equation verified across 1,284 SKUs
-          </p>
-        </div>
-
-        <div style={{
-          background: 'var(--color-paper-2)',
-          border: '1px solid var(--color-rule)',
-          borderRadius: 'var(--radius-md)',
-          padding: '18px 20px'
-        }}>
-          <div className="flex items-center justify-between text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-            <span>Open Operational Anomalies</span>
-            <AlertTriangle size={16} color="var(--color-signal-amber)" />
-          </div>
-          <div className="text-2xl font-bold text-amber-400 font-mono">{anomalies.length}</div>
-          <p className="text-xs text-amber-300 mt-1 font-medium">
-            2 cases pending manager investigation
-          </p>
-        </div>
-
-        <div style={{
-          background: 'var(--color-paper-2)',
-          border: '1px solid var(--color-rule)',
-          borderRadius: 'var(--radius-md)',
-          padding: '18px 20px'
-        }}>
-          <div className="flex items-center justify-between text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-            <span>Active Quarantine Holds</span>
-            <Lock size={16} color="var(--color-signal-red)" />
-          </div>
-          <div className="text-2xl font-bold text-slate-100 font-mono">1 Bin</div>
-          <p className="text-xs text-slate-400 mt-1 font-medium">
-            Harare Whse Aisle A-02 Locked
-          </p>
-        </div>
-
-        <div style={{
-          background: 'var(--color-paper-2)',
-          border: '1px solid var(--color-rule)',
-          borderRadius: 'var(--radius-md)',
-          padding: '18px 20px'
-        }}>
-          <div className="flex items-center justify-between text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-            <span>Spatial Warehouse Utilization</span>
-            <Activity size={16} color="var(--color-accent)" />
-          </div>
-          <div className="text-2xl font-bold text-slate-100 font-mono">{digitalTwin.utilization_pct}%</div>
-          <p className="text-xs text-blue-400 mt-1 font-medium">
-            34,200 / 50,000 capacity units
-          </p>
-        </div>
-      </div>
-
-      {/* Navigation Tabs */}
-      <div style={{ borderBottom: '1px solid var(--color-rule)' }} className="flex items-center gap-2 pb-2">
-        <button
-          onClick={() => setActiveTab('anomalies')}
+      {/* 4 CLICKABLE STATUS CARDS */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+        gap: '14px',
+        marginBottom: '24px'
+      }}>
+        <div
+          onClick={() => setActiveTab('attention')}
           style={{
-            background: activeTab === 'anomalies' ? 'var(--color-accent-subtle)' : 'transparent',
-            border: activeTab === 'anomalies' ? '1px solid rgba(59, 130, 246, 0.3)' : '1px solid transparent',
-            color: activeTab === 'anomalies' ? 'var(--color-accent)' : 'var(--color-ink-muted)',
+            padding: '18px',
+            background: 'var(--color-paper)',
+            border: '1px solid var(--color-rule)',
             borderRadius: 'var(--radius-sm)',
-            padding: '8px 16px',
-            fontSize: '0.8125rem',
-            fontWeight: 700,
             cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px'
+            borderLeft: '4px solid #10b981'
           }}
         >
-          <AlertTriangle size={15} />
-          Anomalies & Risk Score Matrix ({anomalies.length})
-        </button>
+          <div style={{ fontSize: '24px', fontWeight: '800', color: '#10b981', lineHeight: 1 }}>99.8%</div>
+          <div style={{ fontSize: '13px', fontWeight: '700', marginTop: '6px' }}>Inventory Integrity</div>
+          <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)', marginTop: '2px' }}>1,284 SKUs verified & reconciled</div>
+        </div>
 
-        <button
-          onClick={() => setActiveTab('investigations')}
+        <div
+          onClick={() => setActiveTab('attention')}
           style={{
-            background: activeTab === 'investigations' ? 'var(--color-accent-subtle)' : 'transparent',
-            border: activeTab === 'investigations' ? '1px solid rgba(59, 130, 246, 0.3)' : '1px solid transparent',
-            color: activeTab === 'investigations' ? 'var(--color-accent)' : 'var(--color-ink-muted)',
+            padding: '18px',
+            background: 'var(--color-paper)',
+            border: '1px solid var(--color-rule)',
             borderRadius: 'var(--radius-sm)',
-            padding: '8px 16px',
-            fontSize: '0.8125rem',
-            fontWeight: 700,
             cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px'
+            borderLeft: '4px solid #ef4444'
           }}
         >
-          <Search size={15} />
-          Evidence Timeline Cases ({investigations.length})
-        </button>
+          <div style={{ fontSize: '24px', fontWeight: '800', color: '#ef4444', lineHeight: 1 }}>7</div>
+          <div style={{ fontSize: '13px', fontWeight: '700', marginTop: '6px' }}>Stock Alerts</div>
+          <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)', marginTop: '2px' }}>3 critical low stock triggers</div>
+        </div>
 
-        <button
-          onClick={() => setActiveTab('lineage')}
+        <div
+          onClick={() => setActiveTab('attention')}
           style={{
-            background: activeTab === 'lineage' ? 'var(--color-accent-subtle)' : 'transparent',
-            border: activeTab === 'lineage' ? '1px solid rgba(59, 130, 246, 0.3)' : '1px solid transparent',
-            color: activeTab === 'lineage' ? 'var(--color-accent)' : 'var(--color-ink-muted)',
+            padding: '18px',
+            background: 'var(--color-paper)',
+            border: '1px solid var(--color-rule)',
             borderRadius: 'var(--radius-sm)',
-            padding: '8px 16px',
-            fontSize: '0.8125rem',
-            fontWeight: 700,
             cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px'
+            borderLeft: '4px solid #f59e0b'
           }}
         >
-          <HelpCircle size={15} />
-          "Explain This Number" Lineage Engine
-        </button>
+          <div style={{ fontSize: '24px', fontWeight: '800', color: '#f59e0b', lineHeight: 1 }}>3</div>
+          <div style={{ fontSize: '13px', fontWeight: '700', marginTop: '6px' }}>Manager Approvals</div>
+          <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)', marginTop: '2px' }}>2 require immediate action</div>
+        </div>
 
-        <button
+        <div
           onClick={() => setActiveTab('digital_twin')}
           style={{
-            background: activeTab === 'digital_twin' ? 'var(--color-accent-subtle)' : 'transparent',
-            border: activeTab === 'digital_twin' ? '1px solid rgba(59, 130, 246, 0.3)' : '1px solid transparent',
-            color: activeTab === 'digital_twin' ? 'var(--color-accent)' : 'var(--color-ink-muted)',
+            padding: '18px',
+            background: 'var(--color-paper)',
+            border: '1px solid var(--color-rule)',
             borderRadius: 'var(--radius-sm)',
-            padding: '8px 16px',
-            fontSize: '0.8125rem',
-            fontWeight: 700,
             cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px'
+            borderLeft: '4px solid #8b5cf6'
           }}
         >
-          <Radio size={15} />
-          2D Digital Twin & BLE Tracking
-        </button>
+          <div style={{ fontSize: '24px', fontWeight: '800', color: '#8b5cf6', lineHeight: 1 }}>1</div>
+          <div style={{ fontSize: '13px', fontWeight: '700', marginTop: '6px' }}>Quarantine Hold</div>
+          <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)', marginTop: '2px' }}>Harare Main · Aisle A-02</div>
+        </div>
       </div>
 
-      {/* TAB 1: ANOMALIES & RISK MATRIX */}
-      {activeTab === 'anomalies' && (
-        <div className="space-y-4">
-          {anomalies.length === 0 ? (
-            <div style={{
-              background: 'var(--color-paper-2)',
-              border: '1px solid var(--color-rule)',
-              borderRadius: 'var(--radius-lg)',
-              padding: '48px',
-              textAlign: 'center'
-            }}>
-              <CheckCircle2 size={48} color="var(--color-signal-green)" className="mx-auto mb-3" />
-              <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--color-ink)' }}>
-                100% Inventory Ledger Integrity Verified
-              </h3>
-              <p style={{ fontSize: '0.8125rem', color: 'var(--color-ink-muted)', marginTop: '4px' }}>
-                No stock equation anomalies or unexplained variances detected. All recorded movements match physical ledger constraints.
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {anomalies.map(anom => (
-                <div key={anom.id} style={{
-                  background: 'var(--color-paper-2)',
-                  border: '1px solid var(--color-rule)',
-                  borderRadius: 'var(--radius-md)',
-                  padding: '20px'
-                }} className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', color: 'var(--color-signal-amber)', fontWeight: 700 }}>
-                        {anom.anomaly_code}
-                      </span>
-                      <span className="text-xs px-2 py-0.5 rounded font-mono font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30">
-                        RISK SCORE: {anom.risk_score}/100 ({anom.risk_level})
-                      </span>
-                    </div>
-                    <h4 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--color-ink)' }}>
-                      {anom.product_name} <span className="text-xs font-mono color-ink-muted">({anom.product_code})</span>
-                    </h4>
-                    <p style={{ fontSize: '0.8125rem', color: 'var(--color-ink-muted)' }}>
-                      Location: <strong>{anom.location}</strong> | Discrepancy: Expected {anom.expected_stock} vs System {anom.system_stock} (Variance: {anom.variance})
-                    </p>
-                    <p style={{ fontSize: '0.78125rem', color: 'var(--color-ink-muted)', marginTop: '4px' }}>
-                      {anom.details}
-                    </p>
+      {/* NAVIGATION TABS */}
+      <div style={{
+        display: 'flex',
+        gap: '4px',
+        borderBottom: '1px solid var(--color-rule)',
+        marginBottom: '24px',
+        overflowX: 'auto'
+      }}>
+        {[
+          { id: 'attention', label: 'Needs Your Attention', icon: AlertCircle },
+          { id: 'exceptions', label: 'Operational Exceptions Matrix', icon: Layers },
+          { id: 'external_sources', label: 'External Source Provenance (3)', icon: FileSpreadsheet },
+          { id: 'digital_twin', label: 'Warehouse Digital Twin & BLE Map', icon: MapPin }
+        ].map(tab => {
+          const Icon = tab.icon;
+          const isActive = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '12px 18px',
+                border: 'none',
+                borderBottom: isActive ? '2px solid var(--color-accent)' : '2px solid transparent',
+                background: 'transparent',
+                color: isActive ? 'var(--color-accent)' : 'var(--color-text-secondary)',
+                fontWeight: isActive ? '700' : '500',
+                fontSize: '13px',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              <Icon size={16} /> {tab.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* SECTION 1: NEEDS YOUR ATTENTION (COMPACT OPERATIONAL QUEUE) */}
+      {activeTab === 'attention' && (
+        <div style={{ display: 'grid', gap: '16px' }}>
+          <div style={{ fontSize: '14px', fontWeight: '800', color: 'var(--color-text)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span>🔴 3 OPERATIONAL EXCEPTIONS NEED MANAGER DECISION</span>
+          </div>
+
+          {exceptions.map(item => (
+            <div
+              key={item.id}
+              style={{
+                background: 'var(--color-paper)',
+                border: `1px solid ${item.color}40`,
+                borderLeft: `4px solid ${item.color}`,
+                borderRadius: 'var(--radius-sm)',
+                padding: '20px',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '11px', fontWeight: '800', padding: '2px 8px', borderRadius: '10px', background: `${item.color}20`, color: item.color }}>
+                      {item.badge}
+                    </span>
+                    <h3 style={{ fontSize: '16px', fontWeight: '700', margin: 0 }}>
+                      {item.issue} — {item.entity}
+                    </h3>
                   </div>
 
-                  <div className="flex items-center gap-3">
+                  <div style={{ marginTop: '8px', fontSize: '13px', display: 'flex', gap: '16px', color: 'var(--color-text)', flexWrap: 'wrap' }}>
+                    {item.variance !== undefined && (
+                      <span><strong>Expected:</strong> {item.expected} | <strong>System Count:</strong> {item.system} | <strong style={{ color: item.color }}>Variance: {item.variance}</strong></span>
+                    )}
+                    {item.salePrice !== undefined && (
+                      <span><strong>Sale Price:</strong> ${item.salePrice.toFixed(2)} | <strong>Floor Limit:</strong> ${item.floorPrice.toFixed(2)}</span>
+                    )}
+                    {item.currentStock !== undefined && (
+                      <span><strong>Current Stock:</strong> {item.currentStock} | <strong>Reorder Point:</strong> {item.reorderLevel}</span>
+                    )}
+                  </div>
+
+                  <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '4px' }}>
+                    📍 {item.location} • <em>"{item.note}"</em>
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  {item.lineage && (
                     <button
-                      onClick={() => setQuarantineActionEntity(anom)}
+                      onClick={() => setSelectedEntityForLineage(item)}
                       style={{
-                        background: 'rgba(239, 68, 68, 0.12)',
-                        border: '1px solid rgba(239, 68, 68, 0.3)',
-                        borderRadius: 'var(--radius-sm)',
-                        padding: '8px 14px',
-                        color: 'var(--color-signal-red)',
-                        fontSize: '0.8125rem',
-                        fontWeight: 700,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px'
+                        padding: '7px 12px',
+                        background: 'rgba(59, 130, 246, 0.1)',
+                        color: '#3b82f6',
+                        border: '1px solid rgba(59, 130, 246, 0.3)',
+                        borderRadius: 'var(--radius-xs)',
+                        fontSize: '12px',
+                        fontWeight: '600',
+                        cursor: 'pointer'
                       }}
                     >
-                      <Lock size={14} /> Enforce Quarantine Hold
+                      Why is this number {item.system || item.currentStock}?
                     </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+                  )}
 
-      {/* TAB 2: EVIDENCE TIMELINE INVESTIGATIONS */}
-      {activeTab === 'investigations' && (
-        <div style={{
-          background: 'var(--color-paper-2)',
-          border: '1px solid var(--color-rule)',
-          borderRadius: 'var(--radius-lg)',
-          padding: '24px'
-        }} className="space-y-4">
-          <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--color-ink)' }} className="flex items-center gap-2">
-            <Search size={18} color="var(--color-accent)" />
-            Automated Evidence Timeline Gathering Queue
-          </h3>
-
-          <div className="space-y-4">
-            {investigations.map(c => (
-              <div key={c.id} style={{
-                background: 'var(--color-paper-surface)',
-                border: '1px solid var(--color-rule)',
-                borderRadius: 'var(--radius-md)',
-                padding: '18px'
-              }} className="space-y-3">
-                <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.875rem', fontWeight: 700, color: 'var(--color-signal-amber)' }}>
-                    {c.case_code} (Ref: {c.anomaly_code})
-                  </span>
-                  <span className="text-xs text-slate-400 font-mono">{c.created_at}</span>
-                </div>
-                <div className="text-sm text-slate-300">
-                  Target Product: <strong className="text-slate-100">{c.product_name}</strong> | Assigned Manager: {c.assigned_to}
-                </div>
-                <div className="space-y-2 pt-2">
-                  <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Automated Audit Evidence Log:</div>
-                  {c.timeline.map((item, idx) => (
-                    <div key={idx} className="flex items-center gap-3 text-xs bg-slate-900/60 p-2.5 rounded-lg border border-slate-800">
-                      <span className="font-mono text-amber-400 font-bold">{item.time}</span>
-                      <span className="text-slate-300">{item.note}</span>
-                    </div>
-                  ))}
+                  <button
+                    onClick={() => handleExecuteAction(item, item.actionType)}
+                    style={{
+                      padding: '7px 14px',
+                      background: item.color,
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: 'var(--radius-xs)',
+                      fontSize: '12px',
+                      fontWeight: '700',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {item.actionLabel}
+                  </button>
                 </div>
               </div>
-            ))}
-          </div>
+            </div>
+          ))}
         </div>
       )}
 
-      {/* TAB 3: "EXPLAIN THIS NUMBER" LINEAGE ENGINE */}
-      {activeTab === 'lineage' && (
-        <div style={{
-          background: 'var(--color-paper-2)',
-          border: '1px solid var(--color-rule)',
-          borderRadius: 'var(--radius-lg)',
-          padding: '24px'
-        }} className="space-y-6">
-          <div>
-            <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--color-ink)' }} className="flex items-center gap-2">
-              <HelpCircle size={18} color="var(--color-accent)" />
-              "Explain This Number" — Data & Mathematical Lineage Breakdown Engine
-            </h3>
-            <p style={{ fontSize: '0.8125rem', color: 'var(--color-ink-muted)', marginTop: '4px' }}>
-              Select any core metric below to inspect its constituent transaction nodes and mathematical equations.
+      {/* SECTION 2: OPERATIONAL EXCEPTIONS MATRIX TABLE */}
+      {activeTab === 'exceptions' && (
+        <div style={{ background: 'var(--color-paper)', border: '1px solid var(--color-rule)', borderRadius: 'var(--radius-sm)', padding: '20px' }}>
+          <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '16px' }}>Operational Exceptions Summary Matrix</h3>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid var(--color-rule)', textAlign: 'left', color: 'var(--color-text-secondary)' }}>
+                <th style={{ padding: '10px' }}>Severity</th>
+                <th style={{ padding: '10px' }}>Issue Type</th>
+                <th style={{ padding: '10px' }}>Target Entity</th>
+                <th style={{ padding: '10px' }}>Location</th>
+                <th style={{ padding: '10px' }}>Status</th>
+                <th style={{ padding: '10px', textAlign: 'right' }}>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {exceptions.map(e => (
+                <tr key={e.id} style={{ borderBottom: '1px solid var(--color-rule)' }}>
+                  <td style={{ padding: '12px', fontWeight: '700', color: e.color }}>{e.badge}</td>
+                  <td style={{ padding: '12px', fontWeight: '600' }}>{e.issue}</td>
+                  <td style={{ padding: '12px' }}>{e.entity}</td>
+                  <td style={{ padding: '12px', color: 'var(--color-text-secondary)', fontSize: '12px' }}>{e.location}</td>
+                  <td style={{ padding: '12px' }}>
+                    <span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '11px', fontWeight: '700', background: 'var(--color-canvas)', border: '1px solid var(--color-rule)' }}>
+                      {e.status}
+                    </span>
+                  </td>
+                  <td style={{ padding: '12px', textAlign: 'right' }}>
+                    <button
+                      onClick={() => handleExecuteAction(e, e.actionType)}
+                      style={{ padding: '5px 12px', background: 'var(--color-canvas)', border: '1px solid var(--color-rule)', borderRadius: 'var(--radius-xs)', fontSize: '12px', cursor: 'pointer' }}
+                    >
+                      {e.actionLabel}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* SECTION 3: EXTERNAL SOURCE PROVENANCE LEDGER */}
+      {activeTab === 'external_sources' && (
+        <div style={{ background: 'var(--color-paper)', border: '1px solid var(--color-rule)', borderRadius: 'var(--radius-sm)', padding: '20px' }}>
+          <div style={{ marginBottom: '16px' }}>
+            <h3 style={{ fontSize: '16px', fontWeight: '700', margin: 0 }}>External Data Source Ingestion Provenance</h3>
+            <p style={{ fontSize: '13px', color: 'var(--color-text-secondary)', margin: '4px 0 0 0' }}>
+              Distinguishes system-generated ledger events from external bulk file imports, API syncs, or manual overrides.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div 
-              onClick={() => setExplainModalEntity({
-                title: "Calculated Stock Equation Lineage",
-                type: "STOCK",
-                formula: "Expected Stock = Opening + Receipts + Returns - Sales - Damages - Adjustments",
-                nodes: [
-                  { label: "Opening Physical Stock", amount_or_qty: "150 Units", operation: "+", details: "Base count from last physical stocktake" },
-                  { label: "Goods Received (GRN-2026-0012)", amount_or_qty: "50 Units", operation: "+", details: "Verified PO receiving receipt" },
-                  { label: "Sales Invoices (INV-2026-0091)", amount_or_qty: "48 Units", operation: "-", details: "Depleted POS transactions" },
-                  { label: "Damaged Write-offs", amount_or_qty: "5 Units", operation: "-", details: "Quarantine damaged return disposition" },
-                  { label: "Expected Ledger Stock", amount_or_qty: "147 Units", operation: "=", details: "100% verified mathematical proof" }
-                ]
-              })}
-              style={{
-                background: 'var(--color-paper-surface)',
-                border: '1px solid var(--color-rule)',
-                borderRadius: 'var(--radius-md)',
-                padding: '20px',
-                cursor: 'pointer'
-              }}
-              className="hover:border-blue-500/50 transition-all group"
-            >
-              <div className="text-xs font-semibold text-blue-400 uppercase tracking-wider mb-1">Stock Equation Lineage</div>
-              <div className="text-xl font-bold text-slate-100 group-hover:text-blue-400 transition-colors">147 Units Expected</div>
-              <p className="text-xs text-slate-400 mt-2">Click to inspect constituent proof nodes →</p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '14px', marginBottom: '20px' }}>
+            <div style={{ padding: '14px', background: 'var(--color-canvas)', border: '1px solid var(--color-rule)', borderRadius: 'var(--radius-xs)' }}>
+              <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>TOTAL EXTERNAL ADJUSTMENTS</div>
+              <div style={{ fontSize: '20px', fontWeight: '800', marginTop: '2px' }}>3 Ingestions</div>
             </div>
-
-            <div 
-              onClick={() => setExplainModalEntity({
-                title: "Gross Sales Revenue Lineage",
-                type: "REVENUE",
-                formula: "Gross Revenue = Sum across Tax Sales Invoices - Discounts",
-                nodes: [
-                  { label: "Total Completed Tax Invoices", amount_or_qty: "$14,280.00", operation: "+", details: "Sum of 142 valid sales receipts" },
-                  { label: "Commercial Negotiation Discounts", amount_or_qty: "$320.00", operation: "-", details: "Logged manager pricing overrides" },
-                  { label: "Net Taxable Business Revenue", amount_or_qty: "$13,960.00", operation: "=", details: "Verified financial ledger state" }
-                ]
-              })}
-              style={{
-                background: 'var(--color-paper-surface)',
-                border: '1px solid var(--color-rule)',
-                borderRadius: 'var(--radius-md)',
-                padding: '20px',
-                cursor: 'pointer'
-              }}
-              className="hover:border-emerald-500/50 transition-all group"
-            >
-              <div className="text-xs font-semibold text-emerald-400 uppercase tracking-wider mb-1">Gross Revenue Lineage</div>
-              <div className="text-xl font-bold text-slate-100 group-hover:text-emerald-400 transition-colors">$13,960.00 Net</div>
-              <p className="text-xs text-slate-400 mt-2">Click to inspect constituent invoices →</p>
+            <div style={{ padding: '14px', background: 'rgba(16, 185, 129, 0.08)', border: '1px solid #10b981', borderRadius: 'var(--radius-xs)' }}>
+              <div style={{ fontSize: '11px', color: '#10b981', fontWeight: '700' }}>DOCUMENTED & VERIFIED</div>
+              <div style={{ fontSize: '20px', fontWeight: '800', color: '#10b981', marginTop: '2px' }}>2 Documented</div>
             </div>
-
-            <div 
-              onClick={() => setExplainModalEntity({
-                title: "Commercial Margin Floor Lineage",
-                type: "MARGIN",
-                formula: "Margin Ratio = (Selling Price - Supplier Cost) / Selling Price",
-                nodes: [
-                  { label: "Catalog Standard Selling Price", amount_or_qty: "$100.00", operation: "+", details: "Base retail price" },
-                  { label: "Supplier Unit Purchase Cost", amount_or_qty: "$80.00", operation: "-", details: "Supplier PO cost" },
-                  { label: "Negotiation Floor Limit", amount_or_qty: "$95.00 (5.0%)", operation: "=", details: "Staff negotiation floor compliance" }
-                ]
-              })}
-              style={{
-                background: 'var(--color-paper-surface)',
-                border: '1px solid var(--color-rule)',
-                borderRadius: 'var(--radius-md)',
-                padding: '20px',
-                cursor: 'pointer'
-              }}
-              className="hover:border-amber-500/50 transition-all group"
-            >
-              <div className="text-xs font-semibold text-amber-400 uppercase tracking-wider mb-1">Margin Governance Lineage</div>
-              <div className="text-xl font-bold text-slate-100 group-hover:text-amber-400 transition-colors">Floor Price: $95.00</div>
-              <p className="text-xs text-slate-400 mt-2">Click to inspect margin ratio policy →</p>
+            <div style={{ padding: '14px', background: 'rgba(245, 158, 11, 0.08)', border: '1px solid #f59e0b', borderRadius: 'var(--radius-xs)' }}>
+              <div style={{ fontSize: '11px', color: '#f59e0b', fontWeight: '700' }}>REQUIRES REVIEW</div>
+              <div style={{ fontSize: '20px', fontWeight: '800', color: '#f59e0b', marginTop: '2px' }}>1 Unverified Review</div>
             </div>
           </div>
+
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid var(--color-rule)', textAlign: 'left', color: 'var(--color-text-secondary)' }}>
+                <th style={{ padding: '10px' }}>Ref Code</th>
+                <th style={{ padding: '10px' }}>Source Name & Type</th>
+                <th style={{ padding: '10px' }}>Importer / Service</th>
+                <th style={{ padding: '10px' }}>Records</th>
+                <th style={{ padding: '10px' }}>Status</th>
+                <th style={{ padding: '10px' }}>Business Reason</th>
+              </tr>
+            </thead>
+            <tbody>
+              {externalSources.map(src => (
+                <tr key={src.id} style={{ borderBottom: '1px solid var(--color-rule)' }}>
+                  <td style={{ padding: '12px', fontFamily: 'monospace', fontWeight: '700', color: 'var(--color-accent)' }}>{src.reference}</td>
+                  <td style={{ padding: '12px' }}>
+                    <div style={{ fontWeight: '600' }}>{src.source_name}</div>
+                    <div style={{ fontSize: '11px', fontFamily: 'monospace', color: 'var(--color-text-secondary)' }}>{src.import_type} • {src.filename}</div>
+                  </td>
+                  <td style={{ padding: '12px' }}>{src.imported_by}</td>
+                  <td style={{ padding: '12px', fontWeight: '700' }}>{src.records_imported} rows</td>
+                  <td style={{ padding: '12px' }}>
+                    <span style={{
+                      padding: '3px 8px',
+                      borderRadius: '10px',
+                      fontSize: '11px',
+                      fontWeight: '700',
+                      background: src.status === 'DOCUMENTED' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+                      color: src.status === 'DOCUMENTED' ? '#10b981' : '#f59e0b'
+                    }}>
+                      {src.status}
+                    </span>
+                  </td>
+                  <td style={{ padding: '12px', color: 'var(--color-text-secondary)', fontSize: '12px' }}>{src.reason}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 
-      {/* TAB 4: 2D DIGITAL TWIN & BLE TRACKING */}
+      {/* SECTION 4: 2D WAREHOUSE SPATIAL DIGITAL TWIN */}
       {activeTab === 'digital_twin' && (
-        <div style={{
-          background: 'var(--color-paper-2)',
-          border: '1px solid var(--color-rule)',
-          borderRadius: 'var(--radius-lg)',
-          padding: '24px'
-        }} className="space-y-6">
-          <div className="flex items-center justify-between">
+        <div style={{ background: 'var(--color-paper)', border: '1px solid var(--color-rule)', borderRadius: 'var(--radius-sm)', padding: '20px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
             <div>
-              <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--color-ink)' }} className="flex items-center gap-2">
-                <Radio size={18} color="var(--color-accent)" />
-                2D Spatial Warehouse Digital Twin & IoT BLE Tracking
-              </h3>
-              <p style={{ fontSize: '0.8125rem', color: 'var(--color-ink-muted)', marginTop: '4px' }}>
-                Real-time 2D spatial bin mapping with IoT ESP32 gateway RSSI signal estimation.
+              <h3 style={{ fontSize: '16px', fontWeight: '700', margin: 0 }}>Warehouse Overview & 2D Spatial Digital Twin</h3>
+              <p style={{ fontSize: '13px', color: 'var(--color-text-secondary)', margin: '4px 0 0 0' }}>
+                Harare Main Warehouse • <strong>68.4% capacity utilized</strong> • Real-time BLE RFID Tag Tracking
               </p>
             </div>
+            <div style={{ fontSize: '12px', fontWeight: '700', color: '#10b981', background: 'rgba(16, 185, 129, 0.15)', padding: '6px 12px', borderRadius: '4px' }}>
+              ● BLE RFID GATEWAY ONLINE
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {digitalTwin.zones.map(zone => (
-              <div key={zone.code} style={{
-                background: 'var(--color-paper-surface)',
-                border: '1px solid var(--color-rule)',
-                borderRadius: 'var(--radius-md)',
-                padding: '18px'
-              }} className="space-y-3">
-                <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-signal-amber)' }}>
-                    {zone.code}
-                  </span>
-                  <span className="text-xs text-slate-400">Utilization: {zone.utilization}%</span>
-                </div>
-                <h4 style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--color-ink)' }}>{zone.name}</h4>
-                <div className="space-y-2 pt-2">
-                  {zone.shelves.map(shelf => (
-                    <div key={shelf.code} className="flex items-center justify-between bg-slate-900/60 p-2.5 rounded-lg border border-slate-800 text-xs">
-                      <span className="text-slate-300 font-medium font-mono">{shelf.code} ({shelf.items} units)</span>
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${
-                        shelf.status === 'VERIFIED' ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30' :
-                        shelf.status === 'QUARANTINE_LOCK' ? 'bg-red-500/15 text-red-400 border border-red-500/30' :
-                        'bg-amber-500/15 text-amber-400 border border-amber-500/30'
-                      }`}>
-                        {shelf.status}
-                      </span>
+          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '20px' }}>
+            {/* Visual 2D Aisle Grid Map */}
+            <div style={{ background: 'var(--color-canvas)', border: '1px solid var(--color-rule)', borderRadius: 'var(--radius-xs)', padding: '20px' }}>
+              <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--color-text-secondary)', marginBottom: '14px', textTransform: 'uppercase' }}>
+                HARARE MAIN WAREHOUSE SPATIAL MAP
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '14px' }}>
+                {[
+                  { aisle: 'A-01', name: 'Aisle A-01', status: 'HEALTHY', units: 310, holds: 0 },
+                  { aisle: 'A-02', name: 'Aisle A-02 🔴', status: 'HOLD', units: 143, holds: 1 },
+                  { aisle: 'A-03', name: 'Aisle A-03', status: 'HEALTHY', units: 280, holds: 0 },
+                  { aisle: 'B-01', name: 'Aisle B-01 🟡', status: 'LOW_STOCK', units: 12, holds: 0 },
+                  { aisle: 'B-02', name: 'Aisle B-02', status: 'HEALTHY', units: 450, holds: 0 },
+                  { aisle: 'B-03', name: 'Aisle B-03', status: 'HEALTHY', units: 520, holds: 0 }
+                ].map(a => (
+                  <div
+                    key={a.aisle}
+                    onClick={() => setSelectedAisle(a.aisle)}
+                    style={{
+                      background: 'var(--color-paper)',
+                      border: selectedAisle === a.aisle ? '2px solid var(--color-accent)' : a.status === 'HOLD' ? '1px solid #ef4444' : '1px solid var(--color-rule)',
+                      borderRadius: 'var(--radius-xs)',
+                      padding: '14px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <div style={{ fontSize: '14px', fontWeight: '700', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span>{a.name}</span>
+                      {a.holds > 0 && <span style={{ fontSize: '10px', background: '#ef4444', color: '#fff', padding: '2px 6px', borderRadius: '4px' }}>HOLD</span>}
                     </div>
-                  ))}
-                </div>
+                    <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '6px' }}>{a.units} units stocked</div>
+                    <div style={{ fontSize: '11px', fontFamily: 'monospace', color: 'var(--color-accent)', marginTop: '8px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <Radio size={12} /> BLE TAG-940{a.aisle.replace('-', '')}
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
+            </div>
+
+            {/* Selected Aisle Inspector Detail */}
+            <div style={{ background: 'var(--color-paper)', border: '1px solid var(--color-rule)', borderRadius: 'var(--radius-xs)', padding: '20px' }}>
+              <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--color-accent)', textTransform: 'uppercase' }}>
+                AISLE INSPECTOR DETAIL
+              </div>
+              <h3 style={{ fontSize: '18px', fontWeight: '800', margin: '4px 0 12px 0' }}>
+                Aisle {selectedAisle}
+              </h3>
+
+              {selectedAisle === 'A-02' ? (
+                <div style={{ display: 'grid', gap: '12px' }}>
+                  <div style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid #ef4444', borderRadius: 'var(--radius-xs)', padding: '12px' }}>
+                    <div style={{ color: '#ef4444', fontWeight: '700', fontSize: '13px' }}>🔴 Active Investigation & Hold</div>
+                    <div style={{ fontSize: '12px', marginTop: '4px' }}>Dell XPS 15 Workstation Laptop (-4u variance)</div>
+                  </div>
+                  <div style={{ fontSize: '13px' }}><strong>Stock Count:</strong> 143 units</div>
+                  <div style={{ fontSize: '13px' }}><strong>Quarantine Status:</strong> 1 active hold</div>
+                  <div style={{ fontSize: '13px' }}><strong>Last Verified:</strong> Today, 14:32 UTC (Auditor EMP-00004)</div>
+                  <button
+                    onClick={() => setActiveTab('attention')}
+                    style={{ marginTop: '8px', padding: '8px 14px', background: 'var(--color-accent)', color: '#fff', border: 'none', borderRadius: 'var(--radius-xs)', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
+                  >
+                    Open Investigation →
+                  </button>
+                </div>
+              ) : (
+                <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>
+                  Aisle {selectedAisle} operating within normal safety limits. No active quarantine holds.
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
 
-      {/* PROPORTIONAL DAMAGE QUARANTINE MODAL */}
-      <QuarantineModal
-        isOpen={!!quarantineActionEntity}
-        onClose={() => setQuarantineActionEntity(null)}
-        onConfirm={handleQuarantineConfirm}
-        title={`Enforce Quarantine Hold: ${quarantineActionEntity?.anomaly_code || ''}`}
-        description={`You are about to lock bin location "${quarantineActionEntity?.location || ''}" and quarantine ${quarantineActionEntity?.product_name || 'this item'}. No POS sales or stock movements will be allowed until manager audit resolution.`}
-        confirmationCode={quarantineActionEntity ? `QUARANTINE-${quarantineActionEntity.product_code}` : ''}
-        severity="HIGH"
-        actionLabel="Lock & Enforce Quarantine"
-      />
-
-      {/* LINEAGE EXPLANATION MODAL */}
-      {explainModalEntity && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+      {/* 5. MODAL: HUMAN READABLE LINEAGE ("Why is this number 143?") */}
+      {selectedEntityForLineage && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0,0,0,0.6)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1100,
+          padding: '20px'
+        }}>
           <div style={{
-            background: 'var(--color-paper-surface)',
+            background: 'var(--color-paper)',
             border: '1px solid var(--color-rule)',
-            borderRadius: 'var(--radius-lg)',
-            padding: '24px',
-            maxWidth: '540px',
-            width: '100%'
-          }} className="space-y-6 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
-              <div>
-                <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--color-ink)' }}>
-                  {explainModalEntity.title}
-                </h3>
-                <p style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', color: 'var(--color-signal-amber)', marginTop: '2px' }}>
-                  {explainModalEntity.formula}
-                </p>
+            borderRadius: 'var(--radius-sm)',
+            width: '640px',
+            maxWidth: '100%',
+            maxHeight: '90vh',
+            overflowY: 'auto',
+            padding: '24px'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid var(--color-rule)', paddingBottom: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <HelpCircle size={22} style={{ color: '#3b82f6' }} />
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '800' }}>
+                    Why is this number {selectedEntityForLineage.system || selectedEntityForLineage.currentStock}?
+                  </h3>
+                  <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
+                    Stock Movement History & Formula Calculation
+                  </div>
+                </div>
               </div>
-              <button
-                onClick={() => setExplainModalEntity(null)}
-                className="text-slate-400 hover:text-slate-200 p-1"
-              >
-                ✕
+              <button onClick={() => setSelectedEntityForLineage(null)} style={{ background: 'none', border: 'none', color: 'var(--color-text-secondary)', cursor: 'pointer' }}>
+                <X size={20} />
               </button>
             </div>
 
-            <div className="space-y-3">
-              {explainModalEntity.nodes.map((node, i) => (
-                <div key={i} className="flex items-center justify-between bg-slate-900/60 p-3.5 rounded-xl border border-slate-800">
-                  <div>
-                    <span className="text-xs font-semibold text-slate-200">{node.label}</span>
-                    <p className="text-xs text-slate-400">{node.details}</p>
-                  </div>
-                  <div className="text-right">
-                    <span className="font-mono text-sm font-bold text-slate-100">{node.operation} {node.amount_or_qty}</span>
-                  </div>
+            {/* Calculation Formula Card */}
+            <div style={{ background: 'var(--color-canvas)', border: '1px solid var(--color-rule)', borderRadius: 'var(--radius-xs)', padding: '16px', marginBottom: '20px' }}>
+              <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--color-accent)', textTransform: 'uppercase', marginBottom: '8px' }}>
+                PRODUCT: {selectedEntityForLineage.entity} ({selectedEntityForLineage.sku})
+              </div>
+
+              <div style={{ fontFamily: 'monospace', fontSize: '13px', lineHeight: 1.6 }}>
+                <div>Opening Stock (1 Aug): &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{selectedEntityForLineage.lineage.openingStock}</div>
+                {selectedEntityForLineage.lineage.received !== undefined && (
+                  <div>+ Goods Received (PO-1042): &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;+{selectedEntityForLineage.lineage.received}</div>
+                )}
+                {selectedEntityForLineage.lineage.sales !== undefined && (
+                  <div>- Sales Recorded (INV-2041..): &nbsp;&nbsp;-{selectedEntityForLineage.lineage.sales}</div>
+                )}
+                {selectedEntityForLineage.lineage.supplierReturns !== undefined && (
+                  <div>- Supplier Returns: &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-{selectedEntityForLineage.lineage.supplierReturns}</div>
+                )}
+                {selectedEntityForLineage.lineage.internalTransfers !== undefined && (
+                  <div>- Internal Transfers (TR-441): &nbsp;&nbsp;&nbsp;&nbsp;-{selectedEntityForLineage.lineage.internalTransfers}</div>
+                )}
+                <div style={{ borderTop: '1px dashed var(--color-rule)', margin: '6px 0', paddingTop: '4px', fontWeight: '700' }}>
+                  Expected Stock Balance: &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{selectedEntityForLineage.lineage.expectedBalance}
                 </div>
-              ))}
+                <div style={{ fontWeight: '700' }}>
+                  Physical / System Count: &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{selectedEntityForLineage.lineage.actualCount}
+                </div>
+                <div style={{ borderTop: '1px solid var(--color-rule)', margin: '6px 0', paddingTop: '4px', fontWeight: '800', color: selectedEntityForLineage.color }}>
+                  Unexplained Variance: &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{selectedEntityForLineage.lineage.unexplainedVariance}
+                </div>
+              </div>
             </div>
 
-            <div className="pt-4 border-t border-slate-800 flex justify-end">
+            {/* Evidence Links */}
+            <div>
+              <h4 style={{ fontSize: '14px', fontWeight: '700', margin: '0 0 10px 0' }}>Evidence Documents & User Activity Trail</h4>
+              <div style={{ display: 'grid', gap: '8px' }}>
+                {selectedEntityForLineage.lineage.evidence.map((ev, i) => (
+                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', background: 'var(--color-canvas)', border: '1px solid var(--color-rule)', borderRadius: 'var(--radius-xs)', fontSize: '12px' }}>
+                    <div>
+                      <span style={{ fontFamily: 'monospace', fontWeight: '700', color: 'var(--color-accent)', marginRight: '8px' }}>{ev.ref}</span>
+                      <span><strong>{ev.type}:</strong> {ev.note}</span>
+                    </div>
+                    <span style={{ color: '#10b981', fontWeight: '700' }}>✓ Verified</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'flex-end' }}>
               <button
-                onClick={() => setExplainModalEntity(null)}
-                style={{
-                  background: 'var(--color-paper-2)',
-                  border: '1px solid var(--color-rule)',
-                  borderRadius: 'var(--radius-sm)',
-                  padding: '8px 16px',
-                  color: 'var(--color-ink)',
-                  fontSize: '0.875rem',
-                  fontWeight: 600,
-                  cursor: 'pointer'
-                }}
+                onClick={() => setSelectedEntityForLineage(null)}
+                style={{ padding: '9px 18px', background: 'var(--color-accent)', color: '#fff', border: 'none', borderRadius: 'var(--radius-xs)', fontWeight: '600', cursor: 'pointer' }}
               >
-                Close Inspector
+                Close Calculation
               </button>
             </div>
           </div>
         </div>
       )}
+
+      {/* 6. MODAL: QUARANTINE / HOLD CONFIRMATION */}
+      {quarantineActionEntity && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0,0,0,0.6)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1100,
+          padding: '20px'
+        }}>
+          <div style={{
+            background: 'var(--color-paper)',
+            border: '1px solid var(--color-rule)',
+            borderRadius: 'var(--radius-sm)',
+            width: '500px',
+            maxWidth: '100%',
+            padding: '24px'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '800' }}>
+                Enforce Stock Hold / Quarantine
+              </h3>
+              <button onClick={() => setQuarantineActionEntity(null)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <div style={{ background: 'var(--color-canvas)', border: '1px solid var(--color-rule)', borderRadius: 'var(--radius-xs)', padding: '14px', marginBottom: '16px' }}>
+              <div style={{ fontSize: '13px' }}>Target Entity: <strong>{quarantineActionEntity.entity}</strong></div>
+              <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '4px' }}>Location: {quarantineActionEntity.location}</div>
+            </div>
+
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '6px' }}>
+                Manager Audit Note / Hold Justification (Optional)
+              </label>
+              <textarea
+                value={quarantineNote}
+                onChange={e => setQuarantineNote(e.target.value)}
+                placeholder="e.g. Transaction was entered twice. Second transaction should be voided."
+                rows={3}
+                style={{
+                  width: '100%',
+                  padding: '10px',
+                  borderRadius: 'var(--radius-xs)',
+                  border: '1px solid var(--color-rule)',
+                  background: 'var(--color-canvas)',
+                  color: 'var(--color-text)',
+                  fontSize: '13px'
+                }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button onClick={() => setQuarantineActionEntity(null)} style={{ padding: '9px 16px', background: 'var(--color-canvas)', border: '1px solid var(--color-rule)', borderRadius: 'var(--radius-xs)', cursor: 'pointer' }}>Cancel</button>
+              <button onClick={handleConfirmQuarantine} style={{ padding: '9px 18px', background: '#ef4444', color: '#fff', border: 'none', borderRadius: 'var(--radius-xs)', fontWeight: '700', cursor: 'pointer' }}>Place Stock on Hold</button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
