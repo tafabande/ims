@@ -8,7 +8,7 @@ from app.schemas import (
     ThreeWayMatchRequest, ThreeWayMatchResponse
 )
 from app.services import procurement_service
-from app.services.iam_service import require_permission
+from app.dependencies import require_permission, get_current_user
 from app.models import GoodsReceipt, SupplierReturn, SupplierInvoice
 
 router = APIRouter(prefix="/api/procurement", tags=["Procurement, GRN & Receiving"])
@@ -17,7 +17,7 @@ router = APIRouter(prefix="/api/procurement", tags=["Procurement, GRN & Receivin
 def receive_goods_against_po(
     data: GoodsReceiptCreate,
     db: Session = Depends(get_db),
-    auth_ctx: dict = Depends(require_permission("inventory:adjust")) # Staff counter or Receiving staff
+    auth_ctx: dict = Depends(require_permission("inventory:receive")) # Staff counter or Receiving staff
 ):
     """
     Step 1: Receiving staff creates Goods Receipt Note (GRN) upon physical delivery.
@@ -60,10 +60,10 @@ def list_goods_receipts(
     return query.order_by(GoodsReceipt.created_at.desc()).all()
 
 @router.post("/returns", response_model=SupplierReturnResponse, status_code=status.HTTP_201_CREATED)
-def submit_supplier_return(
+def create_supplier_return(
     data: SupplierReturnCreate,
     db: Session = Depends(get_db),
-    auth_ctx: dict = Depends(require_permission("inventory:adjust"))
+    auth_ctx: dict = Depends(require_permission("inventory:receive")) # Staff or Manager
 ):
     """
     Create a Supplier Return for rejected or damaged goods.

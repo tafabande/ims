@@ -98,14 +98,15 @@ class SessionRecord(Base):
     id = Column(String(100), primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     refresh_token_hash = Column(String(255), nullable=False)
-    device_info = Column(String(255), default="Web Browser / POS Terminal")
+    device_info = Column(String(500), default="Web Browser / POS Terminal")
     ip_address = Column(String(50), default="127.0.0.1")
-    active = Column(Boolean, default=True)
+    is_active = Column(Boolean, default=True, name="active")  # DB column is 'active', Python attr is 'is_active'
     created_at = Column(DateTime, default=datetime.utcnow)
     expires_at = Column(DateTime, nullable=False)
     revoked_at = Column(DateTime, nullable=True)
 
     user = relationship("User", back_populates="sessions")
+
 
 class FileRecord(Base):
     __tablename__ = "file_records"

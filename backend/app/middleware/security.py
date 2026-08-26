@@ -95,22 +95,37 @@ ROLE_PERMISSIONS = {
         "users:view", "users:create", "users:update", "users:disable", "users:delete", "users:reset_password", "users:assign_role",
         "organisation:manage", "warehouses:manage", "categories:manage", "audit:view"
     },
+    "ADMIN": {
+        "products:view", "products:create", "products:update", "products:delete",
+        "inventory:view", "inventory:adjust", "inventory:receive", "inventory:transfer", "inventory:read",
+        "purchases:create", "purchases:submit", "purchases:approve", "purchases:receive",
+        "pricing:view", "pricing:update", "suppliers:view", "suppliers:create", "suppliers:update",
+        "users:view", "users:create", "users:update", "users:disable", "users:delete", "users:reset_password", "users:assign_role",
+        "organisation:manage", "warehouses:manage", "categories:manage", "audit:view", "sales:create", "sales:view"
+    },
+    "MANAGER": {
+        "products:view", "products:create", "products:update", "products:delete",
+        "inventory:view", "inventory:adjust", "inventory:receive", "inventory:transfer", "inventory:read",
+        "purchases:create", "purchases:submit", "purchases:approve", "purchases:receive",
+        "pricing:view", "pricing:update", "suppliers:view", "suppliers:create", "suppliers:update",
+        "sales:create", "sales:view", "audit:view"
+    },
     "INVENTORY_MANAGER": {
         "products:view", "products:create", "products:update", "products:delete",
-        "inventory:view", "inventory:adjust", "inventory:receive", "inventory:transfer",
+        "inventory:view", "inventory:adjust", "inventory:receive", "inventory:transfer", "inventory:read",
         "purchases:create", "purchases:submit", "purchases:approve", "purchases:receive",
         "pricing:view", "pricing:update", "suppliers:view", "suppliers:create", "suppliers:update"
     },
     "WAREHOUSE_MANAGER": {
         "products:view", "products:update",
-        "inventory:view", "inventory:adjust", "inventory:receive", "inventory:transfer",
+        "inventory:view", "inventory:adjust", "inventory:receive", "inventory:transfer", "inventory:read",
         "purchases:receive", "suppliers:view"
     },
     "STAFF": {
-        "products:view", "inventory:view", "inventory:receive", "sales:create", "customers:view"
+        "products:view", "inventory:view", "inventory:receive", "inventory:read", "sales:create", "customers:view"
     },
     "AUDITOR": {
-        "products:view", "inventory:view", "sales:view", "purchases:view", "pricing:view",
+        "products:view", "inventory:view", "inventory:read", "sales:view", "purchases:view", "pricing:view",
         "customers:view", "suppliers:view", "audit:view"
     }
 }

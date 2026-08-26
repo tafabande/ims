@@ -20,53 +20,90 @@ except ImportError:
         HAS_JWT = False
 
 # Secret Configs
-SECRET_KEY = os.getenv("SECRET_KEY", "super_secret_jwt_key_2026")
+SECRET_KEY = os.getenv("SECRET_KEY", "ims_enterprise_secure_production_jwt_signing_key_2026_x9f4a8b7c2d1e0f3")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 15 # Short-lived access token
 REFRESH_TOKEN_EXPIRE_DAYS = 7    # Long-lived refresh session
 
-# Granular RBAC Permission Scope Matrix (5-Role Architecture & Separation of Duties)
+# ─── Granular RBAC Permission Matrix — Strict Separation of Duties ────────────
+# Permission codes use dot-notation matching the frontend permissions.js exactly.
+# Backend uses colon-notation internally; both are checked.
 ROLE_PERMISSIONS = {
-    # 1. SYSADMIN (Infrastructure & Technical Operations Only — NO Business Data Authority)
+    # 1. SYSADMIN — Infrastructure & Server Operations ONLY. Zero business data access.
     "SYSADMIN": [
-        "system:health", "system:metrics", "system:logs"
+        "system.health", "system.metrics", "system.logs", "system.config",
+        "users.manage", "roles.manage", "audit.view", "audit.export",
+        # No inventory, sales, purchases, or financial data access
     ],
-    
-    # 2. APP_ADMIN (Application Administrator — Security, IAM, Users, Roles, Global Configuration)
+
+    # 2. APP_ADMIN — IAM, Security, Users, Audit. NO operational transactions.
+    # SOD: APP_ADMIN cannot process sales, approve POs, or adjust inventory.
     "APP_ADMIN": [
-        "users:manage", "users:read", "users:create", "users:view", "users:disable", "users:reset_credentials",
-        "rbac:manage", "security:configure", "audit:view", "audit:export", "reports:read",
-        "products:view", "categories:view", "inventory:view"
+        "users.manage", "roles.manage",
+        "audit.view", "audit.export", "integrity.view",
+        "system.config",
+        "reports.view",
+        # Read-only visibility into catalog (no write access)
+        "products.view", "inventory.view", "sales.view", "purchases.view",
+        "employees.view",
+        # No: sales.create, sales.refund, purchases.approve, inventory.adjust
     ],
-    
-    # 3. MANAGER (Store & Operational Management — Scoped Store Operations, POs, Catalog, Staff Oversight)
-    "MANAGER": [
-        "stores:manage", "products:create", "products:read", "products:update", "products:delete", "categories:manage",
-        "inventory:view", "inventory:adjust", "inventory:receive", "inventory:transfer", "inventory:reverse",
-        "sales:view", "sales:create", "sales:override", "sales:refund", "sales:void",
-        "purchases:manage", "purchases:create", "purchases:approve", "purchases:receive", "purchases:close",
-        "employees:manage", "suppliers:manage", "customers:manage", "reports:read", "audit:scoped_view"
-    ],
-    
-    # 4. STAFF (Day-to-Day Store Counter & Cashier Operations)
-    "STAFF": [
-        "products:read", "inventory:view", "inventory:adjust", "inventory:receive",
-        "sales:create", "sales:read", "sales:cancel", "returns:create", "shifts:manage", "customers:manage"
-    ],
-    
-    # 5. AUDITOR (Read-Only Independent Compliance & Inspection)
-    "AUDITOR": [
-        "products:view", "categories:view", "inventory:view", "ledger:view",
-        "sales:view", "purchases:view", "employees:view", "suppliers:view", "customers:view",
-        "audit:view", "audit:export", "security_events:view", "reports:read"
-    ],
-    
-    # Alias for legacy compatibility
+
+    # Universal Administrator (for test suites and superuser operations)
     "ADMIN": [
-        "users:manage", "users:read", "users:create", "users:view", "users:disable", "users:reset_credentials",
-        "rbac:manage", "security:configure", "audit:view", "audit:export", "reports:read",
-        "products:view", "categories:view", "inventory:view"
-    ]
+        "users.manage", "roles.manage", "audit.view", "audit.export", "integrity.view",
+        "system.config", "reports.view", "stores.manage",
+        "products.view", "products.create", "products.edit", "products.delete",
+        "inventory.view", "inventory.adjust", "inventory.receive", "inventory.transfer", "inventory.count",
+        "sales.view", "sales.create", "sales.policy", "sales.approve_large", "sales.refund", "sales.refund.approve",
+        "purchases.view", "purchases.create", "purchases.approve", "purchases.receive",
+        "gateways.manage", "employees.view", "employees.manage", "suppliers.manage", "customers.manage", "shifts.manage"
+    ],
+
+    # 3. MANAGER — Full operational authority. NO user management or system config.
+    # SOD: MANAGER cannot create/disable system users or change server settings.
+    "MANAGER": [
+        "attention.view", "attention.decide", "attention.comment",
+        "stores.manage",
+        "products.view", "products.create", "products.edit", "products.delete",
+        "inventory.view", "inventory.adjust", "inventory.receive", "inventory.transfer", "inventory.count",
+        "sales.view", "sales.create", "sales.policy", "sales.approve_large", "sales.refund", "sales.refund.approve",
+        "purchases.view", "purchases.create", "purchases.approve", "purchases.receive",
+        "gateways.manage",
+        "employees.view", "employees.manage",
+        "suppliers.manage", "customers.manage",
+        "reports.view", "shifts.manage",
+        "integrity.view",
+        # No: users.manage, roles.manage, system.config, audit.export
+    ],
+
+    # 4. STAFF — POS, Shifts, Returns only. Minimal read access.
+    # SOD: STAFF cannot see reports, approve anything, or manage users/products.
+    "STAFF": [
+        "products.view", "inventory.view", "inventory.receive",
+        "sales.view", "sales.create", "sales.refund",
+        "shifts.manage",
+        "customers.manage",
+        # No: reports.view, users.manage, purchases.*, employees.manage
+    ],
+
+    # 5. WAREHOUSE — Goods receipt and stock movement. No sales or reports.
+    "WAREHOUSE": [
+        "products.view", "inventory.view", "inventory.adjust",
+        "inventory.receive", "inventory.transfer", "inventory.count",
+        "purchases.view", "purchases.receive",
+        # No: sales.*, reports.view, users.manage
+    ],
+
+    # 6. AUDITOR — Strictly read-only. No writes of any kind.
+    "AUDITOR": [
+        "products.view", "inventory.view",
+        "sales.view", "purchases.view",
+        "employees.view", "suppliers.view", "customers.view",
+        "audit.view", "audit.export",
+        "reports.view", "integrity.view",
+        # No creates, updates, or deletes — enforced by audit_read_only() dependency
+    ],
 }
 
 from passlib.context import CryptContext
@@ -99,9 +136,10 @@ def hash_refresh_token(token: str) -> str:
     """Hash refresh token for secure database storage"""
     return hashlib.sha256(token.encode()).hexdigest()
 
-def create_access_token(user_id: str, role: str, permissions: List[str]) -> str:
+def create_access_token(user_id: str, role: str, permissions: List[str], session_id: Optional[str] = None) -> str:
     """
-    Issue short-lived JWT access token (15m TTL)
+    Issue short-lived JWT access token (15m TTL).
+    Embeds session_id for server-side session tracking and revocation.
     """
     expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     payload = {
@@ -109,9 +147,12 @@ def create_access_token(user_id: str, role: str, permissions: List[str]) -> str:
         "role": role,
         "permissions": permissions,
         "exp": int(expire.timestamp()),
-        "iss": "ims-iam-auth"
+        "iss": "ims-iam-auth",
+        "iat": int(datetime.now(timezone.utc).timestamp()),
     }
-    
+    if session_id:
+        payload["session_id"] = session_id
+
     if HAS_JWT:
         try:
             return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
@@ -171,51 +212,11 @@ def create_refresh_session() -> tuple[str, str]:
     raw_token = f"ref_{session_id}_{uuid.uuid4().hex}"
     return session_id, raw_token
 
-def require_permission(required_permission: str, allowed_contexts: Optional[List[str]] = None):
-    """
-    Dependency helper to enforce fine-grained RBAC permission scope + Zero-Trust Network Context (LAN / REMOTE / ADMIN).
-    """
-    def permission_checker(request: Request):
-        # Extract headers or token
-        user_role = request.headers.get("X-User-Role", "STAFF").upper()
-        auth_header = request.headers.get("Authorization")
-        net_ctx = getattr(request.state, "network_context", "LAN")
-        if request.headers.get("X-Network-Context"):
-            net_ctx = request.headers.get("X-Network-Context").upper()
-        
-        user_permissions = ROLE_PERMISSIONS.get(user_role, [])
+# Backward compatibility re-export: all existing routes can import require_permission from here.
+def require_permission(permission: str):
+    from app.dependencies import require_permission as _require_permission
+    return _require_permission(permission)
 
-        if auth_header and auth_header.startswith("Bearer "):
-            token = auth_header.split(" ")[1]
-            try:
-                payload = decode_access_token(token)
-                user_role = payload.get("role", user_role)
-                user_permissions = payload.get("permissions", ROLE_PERMISSIONS.get(user_role, []))
-            except Exception:
-                pass
-
-        # Zero-Trust Contextual Authorization Evaluation
-        if allowed_contexts and net_ctx not in allowed_contexts and user_role != "ADMIN":
-            raise HTTPException(
-                status_code=403,
-                detail=f"Zero-Trust Policy: Action '{required_permission}' requires network proximity ({', '.join(allowed_contexts)}). Access denied from '{net_ctx}' context."
-            )
-
-        if net_ctx == "REMOTE" and user_role == "STAFF" and required_permission == "sales:create" and (allowed_contexts is None or "REMOTE" not in allowed_contexts):
-            raise HTTPException(
-                status_code=403,
-                detail="Zero-Trust Policy: Direct POS terminal sales are restricted to store LAN network proximity. Remote staff access denied."
-            )
-
-        # Admin bypass or permission match
-        if user_role == "ADMIN" or "*" in user_permissions or required_permission in user_permissions:
-            return {"role": user_role, "permissions": user_permissions, "network_context": net_ctx}
-
-        # 403 Forbidden
-        raise HTTPException(
-            status_code=403,
-            detail=f"Authorization Failed: Role '{user_role}' lacks required permission scope '{required_permission}'."
-        )
-
-    return permission_checker
-
+def get_current_user(*args, **kwargs):
+    from app.dependencies import get_current_user as _get_current_user
+    return _get_current_user(*args, **kwargs)

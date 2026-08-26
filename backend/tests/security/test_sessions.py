@@ -24,7 +24,7 @@ def test_login_creates_active_session():
     assert sessions_res.status_code == 200
     sessions = sessions_res.json()
     assert len(sessions) > 0
-    assert any(s["user_id"] == 1 for s in sessions)
+    assert any(s["user_id"] == int(data["user_id"]) for s in sessions)
 
 def test_revoke_session_invalidates_session():
     """

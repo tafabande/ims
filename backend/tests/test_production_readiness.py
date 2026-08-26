@@ -5,15 +5,13 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from app.main import app
-from app.database import Base, get_db
+from app.database import Base, engine, get_db
 from app.models import Product, Category, User, InventoryTransaction
 from app.services import inventory_service, iam_service
 from app.middleware.security import escape_html_string
 
 import os
 
-SQLALCHEMY_DATABASE_URL = "sqlite:///./test_readiness.db"
-engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
@@ -31,14 +29,9 @@ client = TestClient(app)
 
 @pytest.fixture(autouse=True)
 def setup_db():
+    app.dependency_overrides[get_db] = override_get_db
     Base.metadata.create_all(bind=engine)
     yield
-    Base.metadata.drop_all(bind=engine)
-    if os.path.exists("./test_readiness.db"):
-        try:
-            os.remove("./test_readiness.db")
-        except Exception:
-            pass
 
 
 
@@ -63,16 +56,20 @@ def test_cr02_mass_assignment_tampering_rejected():
     """
     CR-02 Verification: Protected server fields cannot be tampered with via HTTP client body payload.
     """
+    import uuid
+    uid = uuid.uuid4().hex[:6]
     db = TestingSessionLocal()
-    cat = Category(name="Electronics", code="ELE-001", category_code="CAT-00001")
+    cat = Category(name=f"Electronics_{uid}", code=f"ELE-{uid}", category_code=f"CAT-{uid}")
     db.add(cat)
     db.commit()
+    db.refresh(cat)
 
+    sku = f"TAMPER-{uid}"
     # Attempt to pass protected stock_quantity or reserved_quantity directly in product creation
     res = client.post(
         "/api/products/",
         json={
-            "sku": "TAMPER-001",
+            "sku": sku,
             "name": "Tamper Test Product",
             "category_id": cat.id,
             "purchase_price": 10.0,
@@ -85,23 +82,30 @@ def test_cr02_mass_assignment_tampering_rejected():
     assert res.status_code in [200, 201]
     
     # Verify server derived initial stock as 0 regardless of client input
-    prod = db.query(Product).filter(Product.sku == "TAMPER-001").first()
-    assert prod is not None
-    assert prod.stock_quantity == 0
+    db.close()
+    verify_db = TestingSessionLocal()
+    try:
+        prod = verify_db.query(Product).filter(Product.sku == sku).first()
+        assert prod is not None
+        assert prod.stock_quantity == 0
+    finally:
+        verify_db.close()
 
 
 def test_cr03_stock_concurrency_and_row_locking():
     """
     CR-03 Verification: Stock mutations execute atomically with row-level locks and record snapshots.
     """
+    import uuid
+    uid = uuid.uuid4().hex[:6]
     db = TestingSessionLocal()
-    cat = Category(name="General", code="GEN-001", category_code="CAT-00002")
+    cat = Category(name=f"General_{uid}", code=f"GEN-{uid}", category_code=f"CAT-{uid}")
     db.add(cat)
     db.commit()
 
     prod = Product(
-        sku="SYNC-001",
-        product_code="PRD-000100",
+        sku=f"SYNC-{uid}",
+        product_code=f"PRD-{uid}",
         name="Concurrent Widget",
         category_id=cat.id,
         purchase_price=15.0,
@@ -162,6 +166,7 @@ def test_cr05_csrf_header_defense_and_xss_escaping():
         json={"sku": "CSRF-001", "name": "CSRF Test"},
         headers={"X-CSRF-Token": "INVALID_TOKEN_XYZ789", "X-User-Role": "MANAGER"}
     )
+    client.cookies.clear()
     assert res.status_code == 403
 
 
@@ -181,19 +186,21 @@ def test_cr06_file_upload_type_and_size_validation():
 
 def test_cr07_idempotency_deduplication():
     """
-    CR-07 Verification: 24-Hour Idempotency-Key deduplication prevents duplicate mutations.
+    CR-07 Verification: Idempotency-Key guarantees safe mutation retry without duplicate record creation.
     """
+    import uuid
+    uid = uuid.uuid4().hex[:6]
+    idempotency_key = f"idem-key-{uid}"
     db = TestingSessionLocal()
-    cat = Category(name="Tools", code="TLS-001", category_code="CAT-00003")
+    cat = Category(name=f"Idem Cat_{uid}", code=f"IDEM-{uid}", category_code=f"CAT-IDEM-{uid}")
     db.add(cat)
     db.commit()
-
-    idempotency_key = "IDEM-KEY-9999-TEST"
+    sku = f"IDEM-{uid}"
 
     # First Request
     res1 = client.post(
         "/api/products/",
-        json={"sku": "IDEM-001", "name": "Idempotent Product", "category_id": cat.id, "purchase_price": 5.0, "selling_price": 10.0},
+        json={"sku": sku, "name": "Idempotent Product", "category_id": cat.id, "purchase_price": 5.0, "selling_price": 10.0},
         headers={"Idempotency-Key": idempotency_key, "X-User-Role": "MANAGER"}
     )
     assert res1.status_code in [200, 201]
@@ -201,7 +208,7 @@ def test_cr07_idempotency_deduplication():
     # Duplicate Request with identical Idempotency-Key
     res2 = client.post(
         "/api/products/",
-        json={"sku": "IDEM-001", "name": "Idempotent Product", "category_id": cat.id, "purchase_price": 5.0, "selling_price": 10.0},
+        json={"sku": sku, "name": "Idempotent Product", "category_id": cat.id, "purchase_price": 5.0, "selling_price": 10.0},
         headers={"Idempotency-Key": idempotency_key, "X-User-Role": "MANAGER"}
     )
     assert res2.status_code in [200, 201]
@@ -240,12 +247,14 @@ def test_cr10_sku_hierarchy_and_category_tree():
     """
     CR-10 Verification: Hierarchical parent-child category tree relationships and SKU uniqueness.
     """
+    import uuid
+    uid = uuid.uuid4().hex[:6]
     db = TestingSessionLocal()
-    parent_cat = Category(name="Electronics Main", code="ELE-MAIN", category_code="CAT-00010")
+    parent_cat = Category(name=f"Electronics Main_{uid}", code=f"ELE-MAIN-{uid}", category_code=f"CAT-00010-{uid}")
     db.add(parent_cat)
     db.commit()
 
-    child_cat = Category(name="Laptops", code="ELE-LAP", category_code="CAT-00011", parent_id=parent_cat.id)
+    child_cat = Category(name=f"Laptops_{uid}", code=f"ELE-LAP-{uid}", category_code=f"CAT-00011-{uid}", parent_id=parent_cat.id)
     db.add(child_cat)
     db.commit()
 
@@ -290,16 +299,18 @@ def test_cr14_inventory_reconciliation_variance_engine():
     """
     CR-14 Verification: Automated reconciliation engine calculates expected vs actual stock and flags variances.
     """
+    import uuid
+    uid = uuid.uuid4().hex[:6]
     from app.services import reconciliation_service
     db = TestingSessionLocal()
 
-    cat = Category(name="Hardware", code="HWD-001", category_code="CAT-00020")
+    cat = Category(name=f"Hardware_{uid}", code=f"HWD-{uid}", category_code=f"CAT-00020-{uid}")
     db.add(cat)
     db.commit()
 
     p = Product(
-        sku="RECON-001",
-        product_code="PRD-999001",
+        sku=f"RECON-{uid}",
+        product_code=f"PRD-999001-{uid}",
         name="Reconciliation Test Item",
         category_id=cat.id,
         purchase_price=10.0,
@@ -312,7 +323,8 @@ def test_cr14_inventory_reconciliation_variance_engine():
     # Run reconciliation scan
     exceptions = reconciliation_service.run_inventory_reconciliation_scan(db)
     assert len(exceptions) >= 1
-    exc = exceptions[0]
+    p_exceptions = [e for e in exceptions if e.product_id == p.id]
+    assert len(p_exceptions) >= 1
+    exc = p_exceptions[0]
     assert exc.product_id == p.id
     assert exc.exception_type == "STOCK_VARIANCE"
-

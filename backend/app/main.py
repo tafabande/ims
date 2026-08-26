@@ -1,6 +1,7 @@
 import os
 from fastapi import FastAPI, HTTPException, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from datetime import datetime, timezone
@@ -21,21 +22,28 @@ try:
 except Exception as e:
     print(f"Schema notice: {e}")
 
-app = FastAPI(
-    title="IMS Microservices & Gateway API",
-    description="Production Microservices API for IMS with Domain Model Architecture, Employee Separation, Hierarchical Categories, RequestID Correlation, Structured JSON Logging & Audit Logging.",
-    version="4.0.0"
-)
+from contextlib import asynccontextmanager
 
-@app.on_event("startup")
-def auto_seed_database_on_startup():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     try:
         seed_db()
     except Exception as e:
         print(f"Startup database seeding notice: {e}")
+    yield
+
+app = FastAPI(
+    title="IMS Microservices & Gateway API",
+    description="Production Microservices API for IMS with Domain Model Architecture, Employee Separation, Hierarchical Categories, RequestID Correlation, Structured JSON Logging & Audit Logging.",
+    version="4.0.0",
+    lifespan=lifespan
+)
 
 # 0. Request Correlation & Observability Middleware (X-Request-ID)
 app.add_middleware(RequestCorrelationMiddleware)
+
+# 0.1 Response Payload GZip Compression
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 # 1. Security Headers Middleware
 app.add_middleware(SecurityHeadersMiddleware)
@@ -98,6 +106,7 @@ app.include_router(integrity.router)
 app.include_router(import_export.router)
 app.include_router(integrations.router)
 app.include_router(imports.router)
+app.include_router(work_sessions.router)
 
 
 @app.get("/")

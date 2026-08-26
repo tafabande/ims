@@ -46,6 +46,35 @@ DEFAULT_SYSTEM_SETTINGS = [
         "data_type": "int",
         "category": "security",
         "description": "User token session timeout duration in seconds (15 mins = 900s)"
+    },
+    # IT Administration Contact (shown on login page, error screens, audit events)
+    {
+        "key": "IT_ADMIN_EMAIL",
+        "value": "admin@ims.co.zw",
+        "data_type": "string",
+        "category": "contact",
+        "description": "IT Administrator email address — displayed on login screen and audit events"
+    },
+    {
+        "key": "IT_ADMIN_NAME",
+        "value": "System Administrator",
+        "data_type": "string",
+        "category": "contact",
+        "description": "IT Administrator full name"
+    },
+    {
+        "key": "IT_ADMIN_PHONE",
+        "value": "",
+        "data_type": "string",
+        "category": "contact",
+        "description": "IT Administrator phone number (optional)"
+    },
+    {
+        "key": "ORG_NAME",
+        "value": "IMS Enterprise",
+        "data_type": "string",
+        "category": "org",
+        "description": "Organisation name displayed in the application header and reports"
     }
 ]
 
@@ -90,7 +119,18 @@ def get_setting_value(db: Session, key: str, fallback: Any = None) -> Any:
     except Exception:
         return fallback
 
-def update_setting(db: Session, key: str, new_value: str) -> SystemSetting:
+def get_setting(db: Session, key: str) -> Optional[str]:
+    """
+    Fetch the raw string value of a setting by key.
+    Returns None if the setting does not exist or has an empty value.
+    """
+    setting = db.query(SystemSetting).filter(SystemSetting.key == key).first()
+    if setting and setting.value:
+        return setting.value
+    return None
+
+
+def update_setting(db: Session, key: str, new_value: str, updated_by: Optional[str] = None) -> SystemSetting:
     statement = select(SystemSetting).where(SystemSetting.key == key)
     setting = db.exec(statement).first() if hasattr(db, "exec") else db.query(SystemSetting).filter(SystemSetting.key == key).first()
     if not setting:
@@ -101,6 +141,7 @@ def update_setting(db: Session, key: str, new_value: str) -> SystemSetting:
     db.commit()
     db.refresh(setting)
     return setting
+
 
 def list_settings(db: Session, category: Optional[str] = None) -> List[SystemSetting]:
     seed_default_settings(db)

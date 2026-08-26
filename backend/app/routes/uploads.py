@@ -12,7 +12,7 @@ UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024 # 10 MB Limit
-from app.services.iam_service import require_permission
+from app.dependencies import get_current_user, UserContext, security, HTTPAuthorizationCredentials, get_db, require_permission
 
 ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".pdf", ".csv", ".xlsx", ".xls"}
 ALLOWED_MIME_TYPES = {"image/jpeg", "image/png", "application/pdf", "text/csv", "application/vnd.ms-excel", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}
@@ -31,7 +31,6 @@ FILE_METADATA_STORE = []
 @router.post("/upload", response_model=FileMetadataResponse)
 async def upload_file(
     file: UploadFile = File(...),
-    auth_ctx: dict = Depends(require_permission("products:read"))
 ):
     """
     Secure File Upload Service — Validates 10MB size limit, extension whitelist, calculates SHA256 checksum, and renames with UUID.

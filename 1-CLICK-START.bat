@@ -7,7 +7,7 @@ cd /d "%~dp0"
 
 echo =========================================================================
 echo               ENTERPRISE INVENTORY MANAGEMENT SYSTEM (IMS)
-1-CLICK TURNKEY SYSTEM LAUNCHER
+echo                    1-CLICK TURNKEY SYSTEM LAUNCHER
 echo =========================================================================
 echo.
 echo Starting IMS Application Stack... Please wait...

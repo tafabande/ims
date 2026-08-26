@@ -11,10 +11,15 @@ class TokenResponse(BaseModel):
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
-    expires_in: int = 900 # 15 minutes in seconds
+    expires_in: int = 900  # 15 minutes in seconds
     user_id: str
+    user_code: Optional[str] = None
+    full_name: Optional[str] = None
+    email: Optional[str] = None
     role: str
     permissions: List[str]
+    session_id: Optional[str] = None
+
 
 class RefreshTokenRequest(BaseModel):
     refresh_token: str

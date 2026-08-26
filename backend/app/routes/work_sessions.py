@@ -67,7 +67,7 @@ def start_work_session(
         expected_closing=opening_float,
         variance=0.0,
         notes=notes,
-        started_at=datetime.utcnow()
+        started_at=datetime.now(timezone.utc)
     )
     db.add(session)
     db.commit()
@@ -132,7 +132,7 @@ def update_session_state(
 
     session.status = new_status
     if new_status == "PAUSED":
-        session.paused_at = datetime.utcnow()
+        session.paused_at = datetime.now(timezone.utc)
 
     db.commit()
 
@@ -186,7 +186,7 @@ def close_work_session(
     session.expected_closing = expected_closing
     session.variance = variance
     session.status = "CLOSED"
-    session.closed_at = datetime.utcnow()
+    session.closed_at = datetime.now(timezone.utc)
     if notes:
         session.notes = notes
 
@@ -241,7 +241,7 @@ def force_close_work_session(
 
     old_status = session.status.upper()
     session.status = "FORCED_CLOSED"
-    session.closed_at = datetime.utcnow()
+    session.closed_at = datetime.now(timezone.utc)
     session.notes = f"[FORCED_CLOSED BY MANAGER] Reason: {reason}"
 
     db.commit()

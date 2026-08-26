@@ -1,79 +1,102 @@
-/* Hallmark · macrostructure: 05-workbench-telemetry · genre: minimalistic-pseudo-material */
+/* =========================================================================
+   ENTERPRISE IMS — WARM & FUZZY COZY DESIGN SYSTEM
+   Modern, tactile, harmonious palette (Warm Espresso, Linen, Rich Amber & Terracotta)
+   Air-Gapped Self-Contained Zero-CDN Compliant
+   ========================================================================= */
 
 :root {
-  /* Dark Clean Canvas */
-  --color-paper: oklch(12% 0.005 250);
-  --color-paper-2: oklch(15% 0.008 250);
-  --color-paper-surface: oklch(17.5% 0.01 250);
-  --color-paper-hover: oklch(21% 0.012 250);
+  /* Dark Warm Espresso Canvas (Default Theme) */
+  --color-paper: #141210;
+  --color-paper-2: #1c1916;
+  --color-paper-surface: #24201c;
+  --color-paper-hover: #2e2823;
   
-  --color-ink: oklch(96% 0.005 250);
-  --color-ink-muted: oklch(70% 0.015 250);
-  --color-ink-dim: oklch(48% 0.018 250);
+  --color-ink: #fcfaf7;
+  --color-ink-muted: #b8ada0;
+  --color-ink-dim: #7d7367;
   
-  --color-rule: transparent;                  /* Borderless clean canvas */
-  --color-rule-strong: oklch(26% 0.015 250);
+  --color-rule: rgba(245, 158, 11, 0.1);
+  --color-rule-strong: rgba(245, 158, 11, 0.22);
   
-  /* Signal Accents — Rich Amber & Gold Palette (NO GREEN / NO PURPLE / NO BLUE) */
-  --color-accent: oklch(76% 0.18 70);         /* Warm Amber Accent */
-  --color-accent-hover: oklch(82% 0.16 70);
-  --color-accent-subtle: oklch(24% 0.06 70);
-  --color-signal-green: oklch(76% 0.18 70);   /* Primary Healthy Amber */
-  --color-signal-amber: oklch(80% 0.16 80);   /* Golden Warning */
-  --color-signal-red: oklch(62% 0.22 25);     /* Out of Stock Alert */
-  --color-signal-cyan: oklch(78% 0.14 85);    /* Warm Gold Accent */
-  --color-signal-purple: oklch(65% 0.01 250); /* Slate Neutral */
+  /* Signal Accents — Rich Amber, Honey, Terracotta & Warm Signals */
+  --color-accent: #f59e0b;              /* Warm Amber Primary */
+  --color-accent-hover: #fbbf24;        /* Golden Amber Hover */
+  --color-accent-subtle: rgba(245, 158, 11, 0.14);
+  --color-accent-glow: rgba(245, 158, 11, 0.25);
+  --color-terracotta: #ea580c;          /* Deep Cinnamon/Terracotta */
+  
+  --color-signal-green: #10b981;        /* Warm Emerald / Healthy */
+  --color-signal-green-bg: rgba(16, 185, 129, 0.14);
+  --color-signal-amber: #f59e0b;        /* Golden Warning */
+  --color-signal-amber-bg: rgba(245, 158, 11, 0.14);
+  --color-signal-red: #ef4444;          /* Warm Crimson Alert */
+  --color-signal-red-bg: rgba(239, 68, 68, 0.14);
+  --color-signal-cyan: #38bdf8;         /* Warm Sky Info */
+  --color-signal-cyan-bg: rgba(56, 189, 248, 0.14);
+  --color-signal-purple: #a8a29e;       /* Warm Slate Neutral */
+  --color-signal-purple-bg: rgba(168, 162, 158, 0.14);
 
-  /* Minimalist Elevation Depth Shadows */
-  --elevation-1: 0 1px 3px rgba(0, 0, 0, 0.2);
-  --elevation-2: 0 4px 12px rgba(0, 0, 0, 0.25);
-  --elevation-3: 0 10px 24px rgba(0, 0, 0, 0.35);
+  /* Cozy Depth Shadows with Warm Ambient Glow */
+  --elevation-1: 0 2px 8px -2px rgba(0, 0, 0, 0.4), 0 1px 3px rgba(0, 0, 0, 0.2);
+  --elevation-2: 0 8px 24px -4px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.3);
+  --elevation-3: 0 16px 40px -8px rgba(0, 0, 0, 0.6), 0 4px 12px rgba(0, 0, 0, 0.35);
+  --elevation-warm: 0 4px 20px -2px rgba(245, 158, 11, 0.18);
 
-  /* Typography Families */
-  --font-display: 'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
+  /* Modern Typography Families */
+  --font-display: 'Outfit', 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
   --font-body: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
 
-  /* Material Geometry & Radii */
-  --radius-xs: 5px;
-  --radius-sm: 7px;
-  --radius-md: 10px;
-  --radius-lg: 14px;
+  /* Material Soft Geometry & Radii */
+  --radius-xs: 6px;
+  --radius-sm: 9px;
+  --radius-md: 13px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
   --radius-full: 9999px;
 
   /* Transitions */
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
-  --duration-fast: 150ms;
-  --duration-normal: 250ms;
+  --duration-fast: 160ms;
+  --duration-normal: 260ms;
 }
 
 [data-theme="light"] {
-  /* Light Clean Canvas */
-  --color-paper: oklch(98.5% 0.003 250);
-  --color-paper-2: oklch(96.5% 0.005 250);
-  --color-paper-surface: oklch(94.5% 0.008 250);
-  --color-paper-hover: oklch(92% 0.01 250);
+  /* Light Cream & Linen Canvas */
+  --color-paper: #faf7f2;
+  --color-paper-2: #ffffff;
+  --color-paper-surface: #f3eee5;
+  --color-paper-hover: #eae3d6;
   
-  --color-ink: oklch(18% 0.02 255);
-  --color-ink-muted: oklch(42% 0.02 255);
-  --color-ink-dim: oklch(62% 0.018 255);
+  --color-ink: #1c1917;
+  --color-ink-muted: #5c544d;
+  --color-ink-dim: #998e82;
   
-  --color-rule: transparent;
-  --color-rule-strong: oklch(82% 0.01 250);
+  --color-rule: rgba(180, 140, 100, 0.16);
+  --color-rule-strong: rgba(180, 140, 100, 0.32);
   
-  --color-accent: oklch(58% 0.18 75);
-  --color-accent-hover: oklch(50% 0.18 75);
-  --color-accent-subtle: oklch(95% 0.04 75);
-  --color-signal-green: oklch(58% 0.18 75);
-  --color-signal-amber: oklch(62% 0.18 80);
-  --color-signal-red: oklch(52% 0.22 25);
-  --color-signal-cyan: oklch(60% 0.14 85);
-  --color-signal-purple: oklch(45% 0.01 250);
+  --color-accent: #d97706;              /* Warm Cinnamon/Amber */
+  --color-accent-hover: #b45309;
+  --color-accent-subtle: rgba(217, 119, 6, 0.12);
+  --color-accent-glow: rgba(217, 119, 6, 0.2);
+  --color-terracotta: #c2410c;
+  
+  --color-signal-green: #059669;
+  --color-signal-green-bg: rgba(5, 150, 105, 0.12);
+  --color-signal-amber: #d97706;
+  --color-signal-amber-bg: rgba(217, 119, 6, 0.12);
+  --color-signal-red: #dc2626;
+  --color-signal-red-bg: rgba(220, 38, 38, 0.12);
+  --color-signal-cyan: #0284c7;
+  --color-signal-cyan-bg: rgba(2, 132, 199, 0.12);
+  --color-signal-purple: #78716c;
+  --color-signal-purple-bg: rgba(120, 113, 108, 0.12);
 
-  /* Light Elevation Shadows */
-  --elevation-1: 0 1px 3px rgba(0, 0, 0, 0.05);
-  --elevation-2: 0 4px 12px rgba(0, 0, 0, 0.07);
-  --elevation-3: 0 10px 24px rgba(0, 0, 0, 0.1);
+  /* Light Warm Depth Shadows */
+  --elevation-1: 0 2px 8px -2px rgba(100, 80, 60, 0.08), 0 1px 3px rgba(0, 0, 0, 0.04);
+  --elevation-2: 0 8px 24px -4px rgba(100, 80, 60, 0.12), 0 2px 6px rgba(0, 0, 0, 0.06);
+  --elevation-3: 0 16px 40px -8px rgba(100, 80, 60, 0.16), 0 4px 12px rgba(0, 0, 0, 0.08);
+  --elevation-warm: 0 4px 20px -2px rgba(217, 119, 6, 0.14);
 }
 
 * {
@@ -88,31 +111,34 @@ body {
   color: var(--color-ink);
   min-height: 100vh;
   overflow-x: hidden;
-  line-height: 1.5;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   transition: background-color var(--duration-normal) var(--ease-out), color var(--duration-normal) var(--ease-out);
 }
 
 h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-display);
-  letter-spacing: -0.02em;
+  letter-spacing: -0.025em;
+  font-weight: 700;
 }
 
 code, pre, .font-mono {
   font-family: var(--font-mono);
 }
 
-/* Pseudo-Material Minimalist Containers — Borderless Elevation */
+/* Warm & Cozy Panels & Cards */
 .hm-panel {
   background: var(--color-paper-2);
-  border: none;
+  border: 1px solid var(--color-rule);
   border-radius: var(--radius-md);
   box-shadow: var(--elevation-1);
-  transition: box-shadow var(--duration-fast) var(--ease-out);
+  transition: all var(--duration-fast) var(--ease-out);
 }
 
 .hm-card {
   background: var(--color-paper-surface);
-  border: none;
+  border: 1px solid var(--color-rule);
   border-radius: var(--radius-md);
   box-shadow: var(--elevation-1);
   transition: all var(--duration-fast) var(--ease-out);
@@ -120,14 +146,15 @@ code, pre, .font-mono {
 
 .hm-card:hover {
   background: var(--color-paper-hover);
-  box-shadow: var(--elevation-2);
+  border-color: var(--color-rule-strong);
+  box-shadow: var(--elevation-2), var(--elevation-warm);
   transform: translateY(-2px);
 }
 
-/* Custom Scrollbars */
+/* Custom Warm Scrollbars */
 ::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
@@ -136,10 +163,14 @@ code, pre, .font-mono {
 
 ::-webkit-scrollbar-thumb {
   background: var(--color-rule-strong);
-  border-radius: 3px;
+  border-radius: 4px;
 }
 
-/* Material Tactile Buttons with Micro-Ripple Response */
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-accent);
+}
+
+/* Material Tactile Buttons */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -155,6 +186,7 @@ code, pre, .font-mono {
   box-shadow: var(--elevation-1);
   transition: all var(--duration-fast) var(--ease-out);
   white-space: nowrap;
+  user-select: none;
 }
 
 .btn:hover {
@@ -167,14 +199,23 @@ code, pre, .font-mono {
   box-shadow: var(--elevation-1);
 }
 
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
 .btn-primary {
   background: var(--color-accent);
-  color: #ffffff;
+  color: #1c1917;
+  font-weight: 700;
   border-color: var(--color-accent);
 }
 
 .btn-primary:hover {
   background: var(--color-accent-hover);
+  box-shadow: var(--elevation-2), var(--elevation-warm);
 }
 
 .btn-secondary {
@@ -185,11 +226,12 @@ code, pre, .font-mono {
 
 .btn-secondary:hover {
   background: var(--color-paper-hover);
+  border-color: var(--color-rule-strong);
 }
 
 .btn-success {
   background: var(--color-signal-green);
-  color: #000000;
+  color: #ffffff;
   font-weight: 700;
 }
 
@@ -204,7 +246,7 @@ code, pre, .font-mono {
   border-radius: var(--radius-xs);
 }
 
-/* Material Full-Pill Badges (WCAG AA High-Contrast Tones) */
+/* Warm Full-Pill Badges */
 .badge {
   display: inline-flex;
   align-items: center;
@@ -214,48 +256,48 @@ code, pre, .font-mono {
   font-size: 0.7rem;
   font-weight: 700;
   border-radius: var(--radius-full);
-  letter-spacing: 0.04em;
+  letter-spacing: 0.03em;
   text-transform: uppercase;
 }
 
 .badge-success {
-  background: rgba(16, 185, 129, 0.16);
+  background: var(--color-signal-green-bg);
   color: var(--color-signal-green);
   border: 1px solid rgba(16, 185, 129, 0.3);
 }
 
 .badge-warning {
-  background: rgba(245, 158, 11, 0.16);
+  background: var(--color-signal-amber-bg);
   color: var(--color-signal-amber);
   border: 1px solid rgba(245, 158, 11, 0.3);
 }
 
 .badge-danger {
-  background: rgba(239, 68, 68, 0.16);
+  background: var(--color-signal-red-bg);
   color: var(--color-signal-red);
   border: 1px solid rgba(239, 68, 68, 0.3);
 }
 
 .badge-info {
-  background: rgba(16, 185, 129, 0.14);
-  color: var(--color-accent);
-  border: 1px solid rgba(16, 185, 129, 0.25);
+  background: var(--color-signal-cyan-bg);
+  color: var(--color-signal-cyan);
+  border: 1px solid rgba(56, 189, 248, 0.3);
 }
 
 .badge-purple {
-  background: rgba(148, 163, 184, 0.14);
+  background: var(--color-signal-purple-bg);
   color: var(--color-ink-muted);
-  border: 1px solid rgba(148, 163, 184, 0.25);
+  border: 1px solid rgba(168, 162, 158, 0.3);
 }
 
-/* Material Floating Inputs with 2px Focus Ring */
+/* Cozy Floating Inputs with Warm Focus Ring */
 .input-field {
   width: 100%;
   padding: 9px 14px;
   font-family: inherit;
   font-size: 0.8125rem;
   background: var(--color-paper-surface);
-  border: none;
+  border: 1px solid var(--color-rule);
   border-radius: var(--radius-sm);
   color: var(--color-ink);
   outline: none;
@@ -263,28 +305,27 @@ code, pre, .font-mono {
 }
 
 .input-field:focus {
-  box-shadow: 0 0 0 3px var(--color-accent-subtle);
-  outline: 2px solid var(--color-accent);
-  outline-offset: 1px;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px var(--color-accent-subtle), var(--elevation-warm);
 }
 
 .input-label {
   display: block;
   font-family: var(--font-mono);
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.05em;
   color: var(--color-ink-muted);
   margin-bottom: 6px;
 }
 
-/* Pseudo-Material Data Tables */
+/* Warm Data Tables */
 .custom-table-container {
   width: 100%;
   overflow-x: auto;
-  border-radius: 0;
-  border: none;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-rule);
 }
 
 .custom-table {
@@ -302,13 +343,13 @@ code, pre, .font-mono {
   text-transform: uppercase;
   font-size: 0.7rem;
   letter-spacing: 0.05em;
-  padding: 11px 14px;
-  border-bottom: none;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--color-rule);
 }
 
 .custom-table td {
-  padding: 12px 14px;
-  border-bottom: none;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--color-rule);
   color: var(--color-ink);
 }
 
@@ -317,43 +358,43 @@ code, pre, .font-mono {
 }
 
 .custom-table tbody tr {
-  transition: background-color 0.15s ease;
+  transition: background-color var(--duration-fast) ease;
 }
 
 .custom-table tbody tr:hover {
   background: var(--color-paper-hover);
 }
 
-/* Modal Overlay & Material Elevation 3 Surface */
+/* Modal Overlay & Warm Floating Surface */
 .modal-overlay {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.75);
-  backdrop-filter: blur(6px);
+  background: rgba(12, 10, 8, 0.8);
+  backdrop-filter: blur(8px);
   display: flex;
   align-items: center;
-  justify: center;
+  justify-content: center;
   z-index: 100;
   padding: 20px;
-  animation: fadeIn 0.15s ease-out;
+  animation: fadeIn 0.18s var(--ease-out);
 }
 
 .modal-content {
   background: var(--color-paper-2);
-  border: 1px solid var(--color-rule);
+  border: 1px solid var(--color-rule-strong);
   border-radius: var(--radius-lg);
   width: 100%;
   max-width: 600px;
   max-height: 90vh;
   overflow-y: auto;
-  box-shadow: var(--elevation-3);
-  animation: slideUp 0.2s var(--ease-out);
+  box-shadow: var(--elevation-3), var(--elevation-warm);
+  animation: slideUp 0.22s var(--ease-out);
 }
 
-/* Toast System — Material Elevation 2 */
+/* Toast Notifications */
 .toast-container {
   position: fixed;
   bottom: 24px;
@@ -362,7 +403,7 @@ code, pre, .font-mono {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  max-width: 400px;
+  max-width: 420px;
 }
 
 .toast {
@@ -371,9 +412,9 @@ code, pre, .font-mono {
   gap: 12px;
   padding: 12px 16px;
   background: var(--color-paper-2);
-  border: 1px solid var(--color-rule);
+  border: 1px solid var(--color-rule-strong);
   border-radius: var(--radius-md);
-  box-shadow: var(--elevation-2);
+  box-shadow: var(--elevation-2), var(--elevation-warm);
   color: var(--color-ink);
   font-size: 0.8125rem;
   animation: slideInRight 0.25s var(--ease-out);
@@ -401,7 +442,7 @@ code, pre, .font-mono {
 }
 
 @keyframes slideUp {
-  from { transform: translateY(16px); opacity: 0; }
+  from { transform: translateY(18px); opacity: 0; }
   to { transform: translateY(0); opacity: 1; }
 }
 
@@ -410,14 +451,23 @@ code, pre, .font-mono {
   to { transform: translateX(0); opacity: 1; }
 }
 
-/* Low Stock Pulse Warning */
-@keyframes warningPulse {
-  0%, 100% { background: rgba(245, 158, 11, 0.05); }
-  50% { background: rgba(245, 158, 11, 0.12); }
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+/* Low Stock Amber Pulse */
+@keyframes warmPulse {
+  0%, 100% { background: rgba(245, 158, 11, 0.06); }
+  50% { background: rgba(245, 158, 11, 0.16); }
 }
 
 .warning-border-pulse {
-  animation: warningPulse 2s infinite;
+  animation: warmPulse 2s infinite ease-in-out;
 }
 
 /* Thermal Print Styles */

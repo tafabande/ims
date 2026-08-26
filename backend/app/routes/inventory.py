@@ -12,7 +12,7 @@ from app.schemas import (
 from app.services.inventory_service import process_stock_adjustment
 from app.models import InventoryTransaction
 from app.services.cache_service import delete_cache, invalidate_pattern
-from app.services.iam_service import require_permission
+from app.dependencies import require_permission
 
 router = APIRouter(prefix="/api/inventory", tags=["Inventory Operations"])
 

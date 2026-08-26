@@ -11,10 +11,6 @@ from app.models import (
 
 def seed_sample_users(db):
     """Seed initial system users for all operational roles"""
-    existing_count = db.query(User).count()
-    if existing_count > 0:
-        return
-
     users_data = [
         {"user_code": "USR-000001", "email": "admin@ims.co.zw", "full_name": "System Administrator", "role": "APP_ADMIN", "department": "IT Governance", "password": "admin123"},
         {"user_code": "USR-000002", "email": "manager@ims.co.zw", "full_name": "Store Operations Manager", "role": "MANAGER", "department": "Store Operations", "password": "manager123"},
@@ -24,9 +20,13 @@ def seed_sample_users(db):
     ]
 
     for item in users_data:
-        pwd = item.pop("password")
-        user = User(**item, hashed_password=hash_password(pwd), active=True)
-        db.add(user)
+        email = item["email"]
+        existing = db.query(User).filter(User.email == email).first()
+        if not existing:
+            data = dict(item)
+            pwd = data.pop("password")
+            user = User(**data, hashed_password=hash_password(pwd), active=True)
+            db.add(user)
     db.commit()
     print("[OK] Sample user accounts seeded for all roles.")
 
