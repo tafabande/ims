@@ -280,6 +280,7 @@ export default function App() {
                 products={products}
                 transactions={transactions}
                 sales={sales}
+                currentRole={currentRole}
                 onNavigate={setActiveTab}
               />
             )}
@@ -305,7 +306,7 @@ export default function App() {
               />
             )}
 
-            {activeTab === 'data_intake' && (
+            {(activeTab === 'data_intake' || activeTab === 'import_center') && (
               <DataIntakeView
                 currentRole={currentRole}
                 onShowToast={handleShowToast}

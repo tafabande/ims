@@ -165,27 +165,26 @@ export default function Sidebar({ activeTab, setActiveTab, currentRole, onLogout
                       gap: '10px',
                       padding: '8px 12px',
                       borderRadius: 'var(--radius-sm)',
-                      border: 'none',
+                      border: item.actionBadge > 0 ? '1px solid rgba(59, 130, 246, 0.4)' : '1px solid transparent',
                       background: isActive ? 'var(--color-paper-2)' : 'transparent',
                       color: isActive ? 'var(--color-accent)' : 'var(--color-ink-muted)',
                       fontWeight: isActive ? 700 : 500,
                       fontSize: '0.8125rem',
                       cursor: 'pointer',
                       textAlign: 'left',
-                      transition: 'all 0.15s ease'
+                      transition: 'all 0.2s ease'
                     }}
                   >
                     <Icon size={16} color={isActive ? 'var(--color-accent)' : 'currentColor'} />
                     <span style={{ flex: 1 }}>{item.label}</span>
                     {item.actionBadge > 0 && (
-                      <span style={{ fontSize: '10px', fontWeight: 800, background: 'rgba(239, 68, 68, 0.2)', color: '#ef4444', padding: '1px 6px', borderRadius: '10px' }}>
-                        🔴 {item.actionBadge}
-                      </span>
-                    )}
-                    {item.importantBadge > 0 && (
-                      <span style={{ fontSize: '10px', fontWeight: 800, background: 'rgba(245, 158, 11, 0.2)', color: '#f59e0b', padding: '1px 6px', borderRadius: '10px' }}>
-                        🟠 {item.importantBadge}
-                      </span>
+                      <span style={{
+                        width: '7px',
+                        height: '7px',
+                        borderRadius: '50%',
+                        background: 'var(--color-accent)',
+                        boxShadow: '0 0 6px var(--color-accent)'
+                      }} />
                     )}
                   </button>
                 );

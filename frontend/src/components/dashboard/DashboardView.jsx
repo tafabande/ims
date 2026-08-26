@@ -16,6 +16,7 @@ export default function DashboardView({
   products = [], 
   transactions = [], 
   sales = [], 
+  currentRole = 'MANAGER',
   onNavigate 
 }) {
   // Compute Telemetry Metrics dynamically from props
@@ -31,38 +32,34 @@ export default function DashboardView({
     {
       id: 'REF-00042',
       priority: 'critical',
-      badge: '🔴 Critical',
+      badge: 'Critical',
       title: 'Refund Approval Required',
       desc: 'Customer ABC Traders • $340.00 requested',
-      actionLabel: 'Review',
-      color: '#ef4444'
+      actionLabel: 'Review'
     },
     {
       id: 'ADJ-00041',
       priority: 'critical',
-      badge: '🔴 Critical',
+      badge: 'Critical',
       title: 'Stock Write-off Approval',
       desc: 'Harare Main • -2 units SKU-000482 write-off',
-      actionLabel: 'Review',
-      color: '#ef4444'
+      actionLabel: 'Review'
     },
     {
       id: 'PO-00431',
       priority: 'warning',
-      badge: '🟠 Warning',
+      badge: 'Warning',
       title: 'Goods Receiving Discrepancy',
       desc: 'XYZ Electronics • 96 received / 100 ordered (-4u)',
-      actionLabel: 'Investigate',
-      color: '#f59e0b'
+      actionLabel: 'Investigate'
     },
     {
       id: 'CRIT-CAT6',
       priority: 'warning',
-      badge: '🟠 Warning',
+      badge: 'Warning',
       title: 'Critical Low Stock Warning',
       desc: 'CAT6 Cable Roll 300m • 3 units remaining',
-      actionLabel: 'Reorder',
-      color: '#f59e0b'
+      actionLabel: 'Reorder'
     }
   ];
 
@@ -77,6 +74,8 @@ export default function DashboardView({
     { day: 'Sun', sales: 3600, purchases: 1400 },
   ];
 
+  const isStaff = currentRole === 'STAFF';
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       
@@ -84,21 +83,30 @@ export default function DashboardView({
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
-            <span style={{ fontSize: '0.7rem', fontFamily: 'var(--font-mono)', color: 'var(--color-signal-green)', fontWeight: 700 }}>
+            <span style={{ fontSize: '0.7rem', fontFamily: 'var(--font-mono)', color: 'var(--color-accent)', fontWeight: 700 }}>
               OPERATIONS OVERVIEW
             </span>
             <span style={{ fontSize: '0.75rem', color: 'var(--color-ink-muted)' }}>• Wednesday, 26 Aug 2026</span>
           </div>
-          <h2 style={{ fontSize: '1.5rem', fontWeight: 800, margin: 0 }}>Executive Operations & Control Dashboard</h2>
+          <h2 style={{ fontSize: '1.5rem', fontWeight: 800, margin: 0 }}>
+            {isStaff ? 'Staff Point of Sale & Store Overview' : 'Executive Operations & Control Dashboard'}
+          </h2>
         </div>
 
         <div style={{ display: 'flex', gap: '10px' }}>
           <button className="btn btn-primary" onClick={() => onNavigate('sales')}>
             <ShoppingCart size={15} /> Launch POS Terminal
           </button>
-          <button className="btn btn-secondary" onClick={() => onNavigate('purchases')}>
-            <ShoppingBag size={15} /> Receive Goods
-          </button>
+
+          {isStaff ? (
+            <button className="btn btn-secondary" onClick={() => onNavigate('shifts')}>
+              <ShoppingBag size={15} /> Shift & Cash Till
+            </button>
+          ) : (
+            <button className="btn btn-secondary" onClick={() => onNavigate('purchases')}>
+              <ShoppingBag size={15} /> Receive Goods
+            </button>
+          )}
         </div>
       </div>
 

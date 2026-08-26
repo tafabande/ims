@@ -300,11 +300,11 @@ export default function AttentionCenterView({ onShowToast, onNavigate }) {
         overflowX: 'auto'
       }}>
         {[
-          { id: 'ACTION_REQUIRED', label: 'Requires Action', badge: actionRequiredCount, color: '#ef4444', icon: AlertCircle },
-          { id: 'IMPORTANT', label: 'Important Events', badge: importantCount, color: '#f59e0b', icon: AlertTriangle },
-          { id: 'INFORMATIONAL', label: 'Informational', badge: informationalCount, color: '#3b82f6', icon: Info },
-          { id: 'RESOLVED', label: 'Resolved / History', badge: resolvedCount, color: '#10b981', icon: CheckCircle2 },
-          { id: 'SETTINGS', label: 'Notification Settings', badge: 0, color: 'var(--color-accent)', icon: Settings }
+          { id: 'ACTION_REQUIRED', label: 'Requires Action', badge: actionRequiredCount, icon: AlertCircle },
+          { id: 'IMPORTANT', label: 'Important Events', badge: importantCount, icon: AlertTriangle },
+          { id: 'INFORMATIONAL', label: 'Informational', badge: informationalCount, icon: Info },
+          { id: 'RESOLVED', label: 'Resolved / History', badge: resolvedCount, icon: CheckCircle2 },
+          { id: 'SETTINGS', label: 'Notification Settings', badge: 0, icon: Settings }
         ].map(tab => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -318,28 +318,26 @@ export default function AttentionCenterView({ onShowToast, onNavigate }) {
                 gap: '8px',
                 padding: '12px 18px',
                 border: 'none',
-                borderBottom: isActive ? `2px solid ${tab.color}` : '2px solid transparent',
+                borderBottom: isActive ? '2px solid var(--color-accent)' : '2px solid transparent',
                 background: 'transparent',
-                color: isActive ? tab.color : 'var(--color-text-secondary)',
+                color: isActive ? 'var(--color-accent)' : 'var(--color-text-secondary)',
                 fontWeight: isActive ? '700' : '500',
                 fontSize: '13px',
                 cursor: 'pointer',
-                whiteSpace: 'nowrap'
+                whiteSpace: 'nowrap',
+                transition: 'all 0.2s ease'
               }}
             >
-              <Icon size={16} />
+              <Icon size={16} color={isActive ? 'var(--color-accent)' : 'currentColor'} />
               <span>{tab.label}</span>
-              {tab.badge > 0 && (
+              {tab.badge > 0 && !isActive && (
                 <span style={{
-                  padding: '2px 8px',
-                  borderRadius: '12px',
-                  fontSize: '11px',
-                  fontWeight: '800',
-                  background: `${tab.color}20`,
-                  color: tab.color
-                }}>
-                  {tab.badge}
-                </span>
+                  width: '6px',
+                  height: '6px',
+                  borderRadius: '50%',
+                  background: 'var(--color-accent)',
+                  boxShadow: '0 0 6px var(--color-accent)'
+                }} />
               )}
             </button>
           );

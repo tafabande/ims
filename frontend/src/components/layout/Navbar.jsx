@@ -58,32 +58,30 @@ export default function Navbar({
       {/* Right Controls */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
         {/* Low Stock Alert Bell */}
-        <button 
-          onClick={onNavigateToLowStock}
-          style={{
-            background: 'var(--color-paper-2)',
-            border: 'none',
-            borderRadius: 'var(--radius-sm)',
-            padding: '6px 12px',
-            color: 'var(--color-ink)',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            fontSize: '0.8125rem',
-            fontWeight: 600
-          }}
-          title="View Low Stock Alerts"
-        >
-          <Bell size={16} color={lowStockCount > 0 ? 'var(--color-signal-amber)' : 'var(--color-ink-muted)'} />
-          {lowStockCount > 0 ? (
+        {lowStockCount > 0 && (
+          <button 
+            onClick={onNavigateToLowStock}
+            style={{
+              background: 'var(--color-paper-2)',
+              border: 'none',
+              borderRadius: 'var(--radius-sm)',
+              padding: '6px 12px',
+              color: 'var(--color-ink)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              fontSize: '0.8125rem',
+              fontWeight: 600
+            }}
+            title="View Low Stock Alerts"
+          >
+            <Bell size={16} color="var(--color-accent)" />
             <span className="badge badge-warning" style={{ padding: '1px 6px', borderRadius: '4px' }}>
               {lowStockCount} LOW
             </span>
-          ) : (
-            <span style={{ color: 'var(--color-signal-green)', fontSize: '0.7rem', fontFamily: 'var(--font-mono)' }}>HEALTHY</span>
-          )}
-        </button>
+          </button>
+        )}
 
         {/* Theme Toggle */}
         <button
@@ -92,7 +90,7 @@ export default function Navbar({
             background: 'var(--color-paper-2)',
             border: 'none',
             borderRadius: 'var(--radius-sm)',
-            padding: '7px',
+            padding: '7px 10px',
             color: 'var(--color-ink)',
             cursor: 'pointer',
             display: 'flex',
@@ -100,30 +98,8 @@ export default function Navbar({
           }}
           title={`Switch to ${theme === 'dark' ? 'Light' : 'Dark'} Mode`}
         >
-          {theme === 'dark' ? <Sun size={16} color="var(--color-signal-amber)" /> : <Moon size={16} color="var(--color-accent)" />}
+          {theme === 'dark' ? <Sun size={16} color="var(--color-ink-muted)" /> : <Moon size={16} color="var(--color-accent)" />}
         </button>
-
-        {/* Authenticated Server Role Badge */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '6px',
-          background: 'var(--color-accent-subtle)',
-          borderRadius: 'var(--radius-sm)',
-          padding: '5px 10px',
-          border: '1px solid rgba(59, 130, 246, 0.2)'
-        }}>
-          <ShieldCheck size={14} color="var(--color-accent)" />
-          <span style={{
-            color: 'var(--color-accent)',
-            fontWeight: 700,
-            fontSize: '0.75rem',
-            fontFamily: 'var(--font-mono)',
-            letterSpacing: '0.5px'
-          }}>
-            ROLE: {currentRole ? currentRole.toUpperCase() : 'USER'}
-          </span>
-        </div>
 
 
         {/* Logout Button */}
