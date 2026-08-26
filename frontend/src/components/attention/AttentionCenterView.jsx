@@ -486,13 +486,33 @@ export default function AttentionCenterView({ onShowToast, currentRole = 'MANAGE
                   <MessageSquare size={14} /> Attach Note
                 </button>
 
-                {item.type === 'APPROVAL' && isManager && item.lifecycle !== 'RESOLVED' && (
-                  <button
-                    onClick={() => setDecisionModalEntity({ item, decision: 'APPROVE' })}
-                    style={{ padding: '7px 14px', background: 'var(--color-accent)', color: '#fff', border: 'none', borderRadius: 'var(--radius-xs)', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
-                  >
-                    Review & Authorize
-                  </button>
+                {item.type === 'APPROVAL' && (
+                  isManager ? (
+                    <>
+                      <button
+                        onClick={() => setDecisionModalEntity({ item, decision: 'APPROVE' })}
+                        style={{ padding: '7px 14px', background: 'var(--color-accent)', color: '#fff', border: 'none', borderRadius: 'var(--radius-xs)', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
+                      >
+                        Approve
+                      </button>
+                      <button
+                        onClick={() => setDecisionModalEntity({ item, decision: 'REJECT' })}
+                        style={{ padding: '7px 14px', background: 'rgba(239, 68, 68, 0.12)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: 'var(--radius-xs)', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
+                      >
+                        Reject
+                      </button>
+                      <button
+                        onClick={() => setDecisionModalEntity({ item, decision: 'REQUEST_CHANGES' })}
+                        style={{ padding: '7px 14px', background: 'var(--color-canvas)', color: 'var(--color-text)', border: '1px solid var(--color-rule)', borderRadius: 'var(--radius-xs)', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
+                      >
+                        Request Changes
+                      </button>
+                    </>
+                  ) : (
+                    <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)', fontStyle: 'italic', padding: '6px' }}>
+                      (View Only Mode — Manager Decision Required)
+                    </span>
+                  )
                 )}
 
                 {item.type === 'ALERT' && (

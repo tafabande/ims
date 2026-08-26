@@ -287,6 +287,7 @@ export default function App() {
 
             {activeTab === 'attention' && (
               <AttentionCenterView
+                currentRole={currentRole}
                 onShowToast={handleShowToast}
                 onNavigate={setActiveTab}
               />

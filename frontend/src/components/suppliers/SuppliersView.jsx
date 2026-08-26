@@ -1,7 +1,12 @@
 import React, { useState } from 'react';
 import { Truck, Plus, Mail, Phone, MapPin, X } from 'lucide-react';
 
-export default function SuppliersView({ suppliers, onAddSupplier, currentRole, onShowToast }) {
+export default function SuppliersView({ 
+  suppliers = [], 
+  onAddSupplier = () => {}, 
+  currentRole = 'MANAGER', 
+  onShowToast 
+}) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({
     name: '',

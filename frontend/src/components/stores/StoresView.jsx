@@ -1,8 +1,42 @@
 import React, { useState } from 'react';
 import { Store, Warehouse, Plus, Building2, MapPin, Phone, Mail, CheckCircle2, Clock } from 'lucide-react';
 
-export default function StoresView({ onShowToast, currentRole }) {
-  const [stores, setStores] = useState([]);
+export default function StoresView({ onShowToast, currentRole = 'MANAGER' }) {
+  const [stores, setStores] = useState([
+    {
+      id: 1,
+      store_code: 'STR-HRE-01',
+      name: 'Harare Main Flagship Store',
+      address: '102 Sam Nujoma Street, Harare CBD',
+      phone: '+263 242 700112',
+      email: 'harare.main@ims-retail.co.zw',
+      operating_hours: '08:00 - 18:00',
+      status: 'ACTIVE',
+      warehouses: [
+        { id: 101, warehouse_code: 'WH-HRE-MAIN', name: 'Harare Central Warehouse (Aisle A-01..B-03)' }
+      ],
+      registers: [
+        { id: 201, register_code: 'POS-HRE-01', name: 'Till 01 Main Counter', status: 'ACTIVE' },
+        { id: 202, register_code: 'POS-HRE-02', name: 'Till 02 Express Checkout', status: 'CLOSED' }
+      ]
+    },
+    {
+      id: 2,
+      store_code: 'STR-BYO-02',
+      name: 'Bulawayo Commercial Branch #02',
+      address: '45 Jason Moyo Street, Bulawayo',
+      phone: '+263 292 884019',
+      email: 'bulawayo@ims-retail.co.zw',
+      operating_hours: '08:00 - 17:30',
+      status: 'ACTIVE',
+      warehouses: [
+        { id: 102, warehouse_code: 'WH-BYO-01', name: 'Bulawayo Regional Warehouse' }
+      ],
+      registers: [
+        { id: 203, register_code: 'POS-BYO-01', name: 'Till 01 Main', status: 'ACTIVE' }
+      ]
+    }
+  ]);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({
@@ -13,6 +47,8 @@ export default function StoresView({ onShowToast, currentRole }) {
     email: '',
     operating_hours: '08:00 - 18:00'
   });
+
+  const canManageStores = ['MANAGER', 'APP_ADMIN', 'SYSADMIN', 'ADMIN'].includes((currentRole || '').toUpperCase());
 
   const handleCreateStore = (e) => {
     e.preventDefault();
@@ -40,7 +76,7 @@ export default function StoresView({ onShowToast, currentRole }) {
             Physical store branches, warehouse allocations, and POS register terminals.
           </p>
         </div>
-        {currentRole === 'MANAGER' && (
+        {canManageStores && (
           <button
             onClick={() => setIsModalOpen(true)}
             style={{
