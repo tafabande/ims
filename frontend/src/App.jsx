@@ -370,8 +370,11 @@ export default function App() {
             {activeTab === 'inventory' && (
               <InventoryView
                 products={products}
-                categories={categories}
-                onStockMovement={handleStockAdjustment}
+                transactions={transactions}
+                onAdjustStock={handleStockAdjustment}
+                onExportCSV={(data, filename) => handleShowToast('info', 'Export Started', `Downloading ${filename}`)}
+                onShowToast={handleShowToast}
+                currentRole={currentRole}
               />
             )}
 

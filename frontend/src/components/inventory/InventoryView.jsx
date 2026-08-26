@@ -15,19 +15,19 @@ import {
   Calculator
 } from 'lucide-react';
 
-export default function InventoryView({ products, transactions, onAdjustStock, onExportCSV, onShowToast, currentRole }) {
+export default function InventoryView({ products = [], transactions = [], onAdjustStock, onExportCSV, onShowToast, currentRole }) {
   const [activeTab, setActiveTab] = useState('levels');
   const [searchTerm, setSearchTerm] = useState('');
   const [isAdjustModalOpen, setIsAdjustModalOpen] = useState(false);
 
   // Form State
-  const [selectedProductId, setSelectedProductId] = useState(products[0]?.id || '');
+  const [selectedProductId, setSelectedProductId] = useState(products?.[0]?.id || '');
   const [adjustmentType, setAdjustmentType] = useState('IN'); // IN or OUT
   const [reasonCategory, setReasonCategory] = useState('CORRECTION');
   const [quantity, setQuantity] = useState(1);
   const [notes, setNotes] = useState('');
 
-  const targetProduct = products.find(p => p.id === Number(selectedProductId)) || products[0];
+  const targetProduct = products?.find(p => p.id === Number(selectedProductId)) || products?.[0];
   const currentStock = targetProduct?.stock_quantity || 0;
   const qtyDelta = adjustmentType === 'IN' ? Number(quantity || 0) : -Number(quantity || 0);
   const projectedStock = currentStock + qtyDelta;
@@ -44,7 +44,7 @@ export default function InventoryView({ products, transactions, onAdjustStock, o
     const qtyNumber = adjustmentType === 'IN' ? Number(quantity) : -Number(quantity);
     const fullNotes = `[${reasonCategory}] ${notes || 'Manual stock adjustment'}`;
 
-    onAdjustStock(Number(selectedProductId), qtyNumber, 'ADJUSTMENT', fullNotes);
+    if (onAdjustStock) onAdjustStock(Number(selectedProductId), qtyNumber, 'ADJUSTMENT', fullNotes);
     setIsAdjustModalOpen(false);
     setQuantity(1);
     setNotes('');
@@ -52,9 +52,9 @@ export default function InventoryView({ products, transactions, onAdjustStock, o
   };
 
   // Metrics
-  const totalStockUnits = products.reduce((acc, p) => acc + p.stock_quantity, 0);
-  const lowStockProducts = products.filter(p => p.stock_quantity <= p.reorder_level && p.stock_quantity > 0);
-  const outOfStockProducts = products.filter(p => p.stock_quantity === 0);
+  const totalStockUnits = products?.reduce((acc, p) => acc + (p.stock_quantity || 0), 0) || 0;
+  const lowStockProducts = products?.filter(p => p.stock_quantity <= p.reorder_level && p.stock_quantity > 0) || [];
+  const outOfStockProducts = products?.filter(p => p.stock_quantity === 0) || [];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -119,7 +119,7 @@ export default function InventoryView({ products, transactions, onAdjustStock, o
             className={`btn ${activeTab === 'history' ? 'btn-primary' : 'btn-secondary'}`}
             style={{ fontSize: '0.8125rem' }}
           >
-            <History size={15} /> Immutable Transaction History ({transactions.length})
+            <History size={15} /> Immutable Transaction History ({transactions?.length || 0})
           </button>
         </div>
 
