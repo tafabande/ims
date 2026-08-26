@@ -22,7 +22,7 @@ import {
   FileSpreadsheet,
   TrendingUp
 } from 'lucide-react';
-
+import { can } from '../../utils/permissions';
 
 export default function Sidebar({ activeTab, setActiveTab, currentRole, onLogout }) {
   const navSections = [
@@ -34,14 +34,7 @@ export default function Sidebar({ activeTab, setActiveTab, currentRole, onLogout
       ]
     },
     {
-      title: 'DATA MANAGEMENT',
-      items: [
-        { id: 'data_intake', label: 'Data Intake & Import Center', shortcut: '', icon: Layers, roles: ['APP_ADMIN', 'SYSADMIN', 'MANAGER', 'STAFF', 'AUDITOR', 'ADMIN'] }
-      ]
-    },
-    {
       title: 'STORE OPERATIONS',
-
       items: [
         { id: 'stores', label: 'Store & Branch Management', shortcut: '', icon: Building2, roles: ['MANAGER', 'APP_ADMIN'] },
         { id: 'shifts', label: 'Shift & Cash Till', shortcut: '', icon: Clock, roles: ['STAFF'] },
@@ -76,11 +69,10 @@ export default function Sidebar({ activeTab, setActiveTab, currentRole, onLogout
         { id: 'planning', label: 'Planning & Forecasting', shortcut: '', icon: TrendingUp, roles: ['MANAGER', 'APP_ADMIN', 'AUDITOR', 'ADMIN'] }
       ]
     },
-
     {
       title: 'DATA & INTEGRATIONS',
       items: [
-        { id: 'import_center', label: 'Import Center & APIs', shortcut: '', icon: FileSpreadsheet, roles: ['APP_ADMIN', 'ADMIN', 'MANAGER', 'AUDITOR'] }
+        { id: 'data_intake', label: 'Data Intake & Import Center', shortcut: '', icon: FileSpreadsheet, roles: ['APP_ADMIN', 'SYSADMIN', 'MANAGER', 'STAFF', 'AUDITOR', 'ADMIN'] }
       ]
     },
     {
@@ -92,6 +84,8 @@ export default function Sidebar({ activeTab, setActiveTab, currentRole, onLogout
     }
   ];
 
+  const userRole = (currentRole || 'MANAGER').toUpperCase();
+
   return (
     <aside style={{
       width: '245px',
@@ -99,122 +93,92 @@ export default function Sidebar({ activeTab, setActiveTab, currentRole, onLogout
       borderRight: '1px solid var(--color-rule)',
       display: 'flex',
       flexDirection: 'column',
-      minHeight: 'calc(100vh - 60px)',
-      padding: '16px 12px'
+      height: 'calc(100vh - 60px)',
+      position: 'sticky',
+      top: '60px',
+      userSelect: 'none',
+      zIndex: 40
     }}>
-      {/* Brand Header */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '10px',
-        padding: '4px 8px 16px 8px',
-        borderBottom: '1px solid var(--color-rule)',
-        marginBottom: '14px'
-      }}>
-        <div style={{
-          width: '32px',
-          height: '32px',
-          borderRadius: 'var(--radius-xs)',
-          background: 'var(--color-accent)',
-          display: 'flex',
-          alignItems: 'center',
-          justify: 'center',
-          color: '#ffffff'
-        }}>
-          <Box size={18} />
-        </div>
-        <div>
-          <h1 style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--color-ink)', letterSpacing: '-0.02em' }}>
-            Enterprise IMS
-          </h1>
-          <span style={{ fontSize: '0.65rem', fontFamily: 'var(--font-mono)', color: 'var(--color-ink-dim)' }}>
-            v2.4 • Store Management
-          </span>
-        </div>
-      </div>
-
       {/* Navigation Sections */}
-      <nav style={{ display: 'flex', flexDirection: 'column', gap: '16px', flex: 1, overflowY: 'auto' }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '16px 12px' }}>
         {navSections.map((section, idx) => {
-          const visibleItems = section.items.filter(item => item.roles.includes(currentRole));
+          const visibleItems = section.items.filter(item => 
+            !item.roles || item.roles.includes(userRole)
+          );
+
           if (visibleItems.length === 0) return null;
 
           return (
-            <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+            <div key={idx} style={{ marginBottom: '20px' }}>
               <div style={{
-                fontSize: '0.65rem',
+                fontSize: '0.6875rem',
                 fontFamily: 'var(--font-mono)',
-                color: 'var(--color-ink-dim)',
-                letterSpacing: '0.05em',
-                padding: '0 12px 4px 12px',
-                fontWeight: 700
+                fontWeight: 700,
+                color: 'var(--color-ink-muted)',
+                letterSpacing: '0.5px',
+                padding: '0 8px 6px 8px',
+                textTransform: 'uppercase'
               }}>
                 {section.title}
               </div>
-              {visibleItems.map((item) => {
-                const isActive = activeTab === item.id;
-                const Icon = item.icon;
 
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => setActiveTab(item.id)}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '10px',
-                      padding: '8px 12px',
-                      borderRadius: 'var(--radius-sm)',
-                      border: item.actionBadge > 0 ? '1px solid rgba(59, 130, 246, 0.4)' : '1px solid transparent',
-                      background: isActive ? 'var(--color-paper-2)' : 'transparent',
-                      color: isActive ? 'var(--color-accent)' : 'var(--color-ink-muted)',
-                      fontWeight: isActive ? 700 : 500,
-                      fontSize: '0.8125rem',
-                      cursor: 'pointer',
-                      textAlign: 'left',
-                      transition: 'all 0.2s ease'
-                    }}
-                  >
-                    <Icon size={16} color={isActive ? 'var(--color-accent)' : 'currentColor'} />
-                    <span style={{ flex: 1 }}>{item.label}</span>
-                    {item.actionBadge > 0 && (
-                      <span style={{
-                        width: '7px',
-                        height: '7px',
-                        borderRadius: '50%',
-                        background: 'var(--color-accent)',
-                        boxShadow: '0 0 6px var(--color-accent)'
-                      }} />
-                    )}
-                  </button>
-                );
-              })}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                {visibleItems.map(item => {
+                  const Icon = item.icon;
+                  const isActive = activeTab === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => setActiveTab(item.id)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px',
+                        padding: '8px 12px',
+                        borderRadius: 'var(--radius-sm)',
+                        border: item.actionBadge > 0 ? '1px solid rgba(59, 130, 246, 0.4)' : '1px solid transparent',
+                        background: isActive ? 'var(--color-paper-2)' : 'transparent',
+                        color: isActive ? 'var(--color-accent)' : 'var(--color-ink-muted)',
+                        fontWeight: isActive ? 700 : 500,
+                        fontSize: '0.8125rem',
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        transition: 'all 0.2s ease'
+                      }}
+                    >
+                      <Icon size={16} color={isActive ? 'var(--color-accent)' : 'currentColor'} />
+                      <span style={{ flex: 1 }}>{item.label}</span>
+                      {item.actionBadge > 0 && (
+                        <span style={{
+                          width: '7px',
+                          height: '7px',
+                          borderRadius: '50%',
+                          background: 'var(--color-accent)',
+                          boxShadow: '0 0 6px var(--color-accent)'
+                        }} />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           );
         })}
-      </nav>
+      </div>
 
-      {/* Sidebar Footer Logout Button */}
-      <button
-        onClick={onLogout}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '10px',
-          width: '100%',
-          padding: '10px 12px',
-          marginTop: '16px',
-          fontSize: '0.8125rem',
-          fontWeight: 700,
-          color: 'var(--color-signal-red)',
-          background: 'rgba(239, 68, 68, 0.1)',
-          border: '1px solid rgba(239, 68, 68, 0.2)',
-          borderRadius: 'var(--radius-sm)',
-          cursor: 'pointer'
-        }}
-      >
-        <LogOut size={16} /> Sign Out of System
-      </button>
+      {/* Footer Role Context */}
+      <div style={{
+        padding: '14px 16px',
+        borderTop: '1px solid var(--color-rule)',
+        background: 'var(--color-paper-2)'
+      }}>
+        <div style={{ fontSize: '0.75rem', fontWeight: 700 }}>
+          Role: {userRole}
+        </div>
+        <div style={{ fontSize: '0.6875rem', color: 'var(--color-ink-muted)' }}>
+          System Standard RBAC
+        </div>
+      </div>
     </aside>
   );
 }

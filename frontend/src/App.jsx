@@ -306,7 +306,7 @@ export default function App() {
               />
             )}
 
-            {(activeTab === 'data_intake' || activeTab === 'import_center') && (
+            {activeTab === 'data_intake' && (
               <DataIntakeView
                 currentRole={currentRole}
                 onShowToast={handleShowToast}
