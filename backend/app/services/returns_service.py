@@ -78,7 +78,7 @@ def process_return_order(db: Session, return_data, user_name: str = "System Oper
         db.add(ret_item)
 
         # Inventory Ledger Disposition Routing: RESTOCK vs DAMAGED / SCRAPPED / NO_RETURN
-        if item.restockable and not return_data.is_damaged:
+        if item.restockable:
             # RESTOCK Disposition: Re-enter available usable inventory (+quantity)
             process_stock_adjustment(
                 db=db,

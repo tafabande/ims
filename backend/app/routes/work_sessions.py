@@ -13,8 +13,8 @@ router = APIRouter(prefix="/work-sessions", tags=["Operational Work Sessions"])
 VALID_TRANSITIONS = {
     "SCHEDULED": ["OPEN", "CANCELLED"],
     "OPEN": ["ACTIVE", "ABANDONED"],
-    "ACTIVE": ["PAUSED", "CLOSING", "CLOSED", "SUSPENDED", "ABANDONED", "FORCED_CLOSED"],
-    "PAUSED": ["ACTIVE", "CLOSING", "CLOSED", "SUSPENDED", "ABANDONED", "FORCED_CLOSED"],
+    "ACTIVE": ["PAUSED", "CLOSING", "SUSPENDED", "ABANDONED", "FORCED_CLOSED"],
+    "PAUSED": ["ACTIVE", "CLOSING", "SUSPENDED", "ABANDONED", "FORCED_CLOSED"],
     "CLOSING": ["CLOSED", "ACTIVE", "FORCED_CLOSED"],
     "CLOSED": [],
     "SUSPENDED": ["ACTIVE", "CLOSED", "FORCED_CLOSED"],
@@ -176,7 +176,7 @@ def close_work_session(
         raise HTTPException(status_code=403, detail="Forbidden: You do not own this operational work session.")
 
     old_status = session.status.upper()
-    if "CLOSED" not in VALID_TRANSITIONS.get(old_status, []):
+    if old_status not in ["ACTIVE", "PAUSED", "CLOSING", "SUSPENDED", "ABANDONED"]:
         raise HTTPException(status_code=400, detail=f"Cannot close session from state '{old_status}'.")
 
     expected_closing = session.opening_float + session.total_sales_amount - session.total_refunds_amount
