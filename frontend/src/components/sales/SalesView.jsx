@@ -34,6 +34,13 @@ export default function SalesView({
   const [activeInvoice, setActiveInvoice] = useState(null);
   const [validationError, setValidationError] = useState('');
 
+  // Manager Surcharge Setup State
+  const [ecoSurchargePct, setEcoSurchargePct] = useState(2.5); // EcoCash 2.5% surcharge
+  const [cardSurchargePct, setCardSurchargePct] = useState(1.5); // Card 1.5% surcharge
+  const [showSurchargeModal, setShowSurchargeModal] = useState(false);
+
+  const isManager = can(currentRole, 'attention.decide');
+
   const filteredProducts = products.filter(p => 
     p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
     p.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -94,7 +101,9 @@ export default function SalesView({
 
   const subtotal = cart.reduce((acc, item) => acc + (item.quantity * item.unit_price), 0);
   const tax = subtotal * 0.10; // 10% tax
-  const grandTotal = subtotal + tax;
+  const surchargePct = paymentMethod === 'EcoCash Mobile Money' ? ecoSurchargePct : (paymentMethod === 'Credit Card' || paymentMethod === 'Debit Card') ? cardSurchargePct : 0;
+  const surchargeAmount = (subtotal + tax) * (surchargePct / 100);
+  const grandTotal = subtotal + tax + surchargeAmount;
 
   const handleCheckout = () => {
     if (cart.length === 0) return;
@@ -311,8 +320,8 @@ export default function SalesView({
 
               <div>
                 <label className="input-label">Payment Method</label>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px' }}>
-                  {['Cash', 'Credit Card', 'EFTPOS / QR'].map(method => (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '6px' }}>
+                  {['Cash', 'EcoCash Mobile Money', 'Credit Card', 'Debit Card'].map(method => (
                     <button
                       key={method}
                       type="button"
