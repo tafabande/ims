@@ -111,7 +111,7 @@ function normalizeError(status, data, requestId) {
 // Single-flight refresh promise to prevent multiple simultaneous refresh calls
 let refreshPromise = null;
 
-async function attemptTokenRefresh() {
+export async function attemptTokenRefresh() {
   if (refreshPromise) return refreshPromise;
 
   refreshPromise = (async () => {
@@ -137,6 +137,7 @@ async function attemptTokenRefresh() {
 
       const data = await response.json();
       updateStoredToken(data.access_token);
+      window.dispatchEvent(new CustomEvent('ims:auth:token-refreshed', { detail: { token: data.access_token } }));
       return data.access_token;
     } catch {
       clearAllStorage();

@@ -10,14 +10,16 @@ def test_cors_options_preflight_request():
     OPTIONS preflight request from trusted origin returns Access-Control-Allow-Origin header.
     """
     response = client.options(
-        "/api/products/",
+        "/products?low_stock=true&limit=1",
         headers={
             "Origin": "http://localhost:5173",
-            "Access-Control-Request-Method": "GET"
+            "Access-Control-Request-Method": "GET",
+            "Access-Control-Request-Headers": "authorization,content-type,x-request-id,x-requested-with"
         }
     )
     assert response.status_code == 200
-    assert "access-control-allow-origin" in response.headers
+    assert response.headers.get("access-control-allow-origin") == "http://localhost:5173"
+
 
 def test_idempotency_key_header_propagation():
     """

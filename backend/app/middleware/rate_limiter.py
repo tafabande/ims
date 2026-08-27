@@ -26,8 +26,8 @@ class DistributedRateLimiterMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         path = request.url.path
         
-        # Bypass health and docs endpoints
-        if path in ["/health", "/", "/docs", "/openapi.json"]:
+        # Bypass health, docs, and CORS OPTIONS preflight requests
+        if request.method == "OPTIONS" or path in ["/health", "/", "/docs", "/openapi.json"]:
             return await call_next(request)
 
         client_ip = request.client.host if request.client else "127.0.0.1"

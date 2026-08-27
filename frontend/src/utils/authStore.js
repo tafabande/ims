@@ -194,36 +194,29 @@ export function AuthProvider({ children }) {
     dispatch({ type: 'LOGOUT' });
   }, []);
 
+  // Listen for single-flight token refresh events from apiClient
+  useEffect(() => {
+    const handleTokenRefreshed = (e) => {
+      if (e.detail?.token) {
+        dispatch({ type: 'TOKEN_REFRESHED', payload: { token: e.detail.token } });
+      }
+    };
+    window.addEventListener('ims:auth:token-refreshed', handleTokenRefreshed);
+    return () => window.removeEventListener('ims:auth:token-refreshed', handleTokenRefreshed);
+  }, []);
+
   /**
-   * Refresh access token using stored refresh token
+   * Refresh access token using single-flight coalesced attemptTokenRefresh from apiClient
    * Returns new access token string, or null if refresh fails (triggers logout)
    */
   const refreshAccessToken = useCallback(async () => {
-    const storedRefreshToken = sessionStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
-    if (!storedRefreshToken) {
+    const newToken = await attemptTokenRefresh();
+    if (newToken) {
+      dispatch({ type: 'TOKEN_REFRESHED', payload: { token: newToken } });
+    } else {
       await logout();
-      return null;
     }
-
-    try {
-      const response = await fetch(`${API_BASE}/auth/refresh`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refresh_token: storedRefreshToken }),
-      });
-
-      if (!response.ok) {
-        await logout();
-        return null;
-      }
-
-      const data = await response.json();
-      dispatch({ type: 'TOKEN_REFRESHED', payload: { token: data.access_token } });
-      return data.access_token;
-    } catch {
-      await logout();
-      return null;
-    }
+    return newToken;
   }, [logout]);
 
   const clearError = useCallback(() => dispatch({ type: 'CLEAR_ERROR' }), []);
