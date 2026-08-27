@@ -1,16 +1,15 @@
 import secrets
 import json
 from datetime import datetime, timezone
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Tuple
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, Security, Depends, status
 from fastapi.security.api_key import APIKeyHeader
-from passlib.context import CryptContext
 
 from app.models import IntegrationAccount, IntegrationApiKey, IntegrationActivityLog, Product, Category, Employee, Customer, Supplier, Sale, SaleItem, Purchase, PurchaseItem
 from app.database import get_db
+from app.services.iam_service import hash_password, verify_password
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 API_KEY_HEADER = APIKeyHeader(name="X-API-Key", auto_error=False)
 
 
@@ -26,7 +25,7 @@ def generate_integration_account(
     """
     account_id = f"INT-2026-{secrets.token_hex(4).upper()}"
     raw_secret = f"ims_live_{secrets.token_urlsafe(32)}"
-    key_hash = pwd_context.hash(raw_secret)
+    key_hash = hash_password(raw_secret)
     prefix = raw_secret[:12]
 
     account = IntegrationAccount(
@@ -66,7 +65,7 @@ def generate_api_key_for_account(db: Session, account_id: str, key_name: str):
         raise HTTPException(status_code=404, detail=f"Integration Account '{account_id}' not found.")
 
     raw_secret = f"ims_live_{secrets.token_urlsafe(32)}"
-    key_hash = pwd_context.hash(raw_secret)
+    key_hash = hash_password(raw_secret)
     prefix = raw_secret[:12]
 
     key_record = IntegrationApiKey(
@@ -100,7 +99,7 @@ def verify_integration_api_key(db: Session, api_key: str, required_scope: Option
 
     matched_key = None
     for k in candidate_keys:
-        if pwd_context.verify(api_key, k.api_key_hash):
+        if verify_password(api_key, k.api_key_hash):
             matched_key = k
             break
 

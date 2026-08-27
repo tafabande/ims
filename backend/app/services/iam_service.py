@@ -126,26 +126,68 @@ ROLE_PERMISSIONS = {
     ],
 }
 
-from passlib.context import CryptContext
+try:
+    import bcrypt
+    HAS_BCRYPT = True
+except ImportError:
+    HAS_BCRYPT = False
 
-pwd_context = CryptContext(schemes=["bcrypt", "pbkdf2_sha256"], deprecated="auto")
+try:
+    from passlib.context import CryptContext
+    pwd_context = CryptContext(schemes=["bcrypt", "pbkdf2_sha256"], deprecated="auto")
+except Exception:
+    pwd_context = None
 
 def hash_password(password: str) -> str:
     """
     Production-grade password hashing primitive using bcrypt (OWASP & Chaa production recommendation).
+    Safely truncates at 72 bytes to avoid bcrypt backend crashes on passwords > 72 bytes.
     """
-    return pwd_context.hash(password)
+    if not password:
+        password = ""
+    pwd_bytes = password.encode('utf-8')[:72]
+    if HAS_BCRYPT:
+        salt = bcrypt.gensalt()
+        return bcrypt.hashpw(pwd_bytes, salt).decode('utf-8')
+    if pwd_context is not None:
+        try:
+            return pwd_context.hash(password[:72])
+        except Exception:
+            pass
+    # Fallback to PBKDF2-HMAC-SHA256
+    salt = os.urandom(16)
+    derived = hashlib.pbkdf2_hmac('sha256', pwd_bytes, salt, 100_000)
+    return f"$pbkdf2-sha256$100000${base64.b64encode(salt).decode('utf-8')}${base64.b64encode(derived).decode('utf-8')}"
 
 get_password_hash = hash_password
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verify raw password against stored hash using passlib constant-time comparison with fallback for legacy hashes"""
+    """Verify raw password against stored hash using constant-time comparison with fallback for legacy hashes"""
+    if not plain_password or not hashed_password:
+        return False
+    pwd_bytes = plain_password.encode('utf-8')[:72]
     try:
-        if pwd_context.identify(hashed_password):
-            return pwd_context.verify(plain_password, hashed_password)
+        if hashed_password.startswith(("$2a$", "$2b$", "$2y$")):
+            if HAS_BCRYPT:
+                return bcrypt.checkpw(pwd_bytes, hashed_password.encode('utf-8'))
+        if pwd_context is not None and pwd_context.identify(hashed_password):
+            return pwd_context.verify(plain_password[:72], hashed_password)
     except Exception:
         pass
-    
+
+    # Check for custom PBKDF2 format
+    if hashed_password.startswith("$pbkdf2-sha256$"):
+        try:
+            parts = hashed_password.split("$")
+            if len(parts) >= 5:
+                iterations = int(parts[2])
+                salt = base64.b64decode(parts[3])
+                expected = base64.b64decode(parts[4])
+                derived = hashlib.pbkdf2_hmac('sha256', pwd_bytes, salt, iterations)
+                return hmac.compare_digest(derived, expected)
+        except Exception:
+            pass
+
     # Fallback for legacy PBKDF2 hex strings
     _salt_value = os.getenv("PASSWORD_SALT", "" if _IS_PRODUCTION else "local_dev_only_not_for_production")
     if _IS_PRODUCTION and (not _salt_value or _salt_value in {"ims_secure_salt_2026", "local_dev_only_not_for_production", "CHANGE_ME_GENERATE_WITH_python_secrets_token_hex_32", ""}):

@@ -64,14 +64,14 @@ def login(credentials: LoginRequest, request: Request, db: Session = Depends(get
         # Auto-provision standard test roles for clean/isolated test fixtures
         if bare_name in ["admin", "sysadmin", "system", "manager", "staff", "warehouse", "auditor"]:
             role_map = {
-                "admin": "APP_ADMIN",
+                "admin": "ADMIN",
                 "sysadmin": "SYSADMIN",
                 "manager": "MANAGER",
                 "staff": "STAFF",
                 "warehouse": "WAREHOUSE",
                 "auditor": "AUDITOR"
             }
-            role_to_set = role_map.get(bare_name, "APP_ADMIN")
+            role_to_set = role_map.get(bare_name, "ADMIN")
             try:
                 import uuid as py_uuid
                 unique_suffix = py_uuid.uuid4().hex[:6]
