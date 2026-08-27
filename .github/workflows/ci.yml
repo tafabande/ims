@@ -43,7 +43,7 @@ jobs:
 
       - name: Backend Dependency Audit
         run: |
-          pip-audit -r backend/requirements.txt || true
+          pip-audit -r backend/requirements.txt
 
       - name: Run Backend Pytest Suite
         run: |
