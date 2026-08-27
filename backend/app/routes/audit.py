@@ -1,5 +1,10 @@
-from fastapi import APIRouter
+import uuid
+from datetime import UTC, datetime
+
+from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel
+
+from app.dependencies import UserContext, get_current_user, require_permission
 
 router = APIRouter(prefix="/audit", tags=["Security Audit Log Service"])
 
@@ -12,6 +17,12 @@ class AuditEvent(BaseModel):
     status: str
     details: str
     timestamp: str
+
+
+class CreateAuditEventRequest(BaseModel):
+    action: str
+    status: str = "SUCCESS"
+    details: str
 
 
 AUDIT_LOG_STORE: list[dict] = [
@@ -46,17 +57,30 @@ AUDIT_LOG_STORE: list[dict] = [
 
 
 @router.get("/logs", response_model=list[AuditEvent])
-def get_audit_logs():
+def get_audit_logs(auth_ctx: UserContext = Depends(require_permission("audit:view"))):
     """
-    Append-Only Security Audit Log Service — Retrieve immutable security audit trail
+    Append-Only Security Audit Log Service — Retrieve immutable security audit trail (Requires audit:view permission).
     """
     return AUDIT_LOG_STORE
 
 
 @router.post("/event")
-def record_audit_event(event: AuditEvent):
+def record_audit_event(
+    event_in: CreateAuditEventRequest,
+    request: Request,
+    current_user: UserContext = Depends(get_current_user),
+):
     """
-    Record new immutable audit log event
+    Record new immutable audit log event with server-verified attribution.
     """
-    AUDIT_LOG_STORE.insert(0, event.dict())
-    return {"status": "recorded", "event_id": event.id}
+    event_record = {
+        "id": f"LOG-{uuid.uuid4().hex[:6].upper()}",
+        "user": current_user.full_name,
+        "action": event_in.action,
+        "ip": request.client.host if request.client else "127.0.0.1",
+        "status": event_in.status,
+        "details": event_in.details,
+        "timestamp": datetime.now(UTC).isoformat(),
+    }
+    AUDIT_LOG_STORE.insert(0, event_record)
+    return {"status": "recorded", "event_id": event_record["id"]}

@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.dependencies import UserContext, get_current_user, require_permission
 from app.models import Promotion
 from app.schemas import PromotionCreate, PromotionResponse
 
@@ -9,7 +10,11 @@ router = APIRouter(prefix="/api/promotions", tags=["Discounts & Promotions"])
 
 
 @router.post("", response_model=PromotionResponse, status_code=status.HTTP_201_CREATED)
-def create_promotion(promo_data: PromotionCreate, db: Session = Depends(get_db)):
+def create_promotion(
+    promo_data: PromotionCreate,
+    db: Session = Depends(get_db),
+    auth_ctx: UserContext = Depends(require_permission("sales:policy")),
+):
     existing = db.query(Promotion).filter(Promotion.promo_code == promo_data.promo_code).first()
     if existing:
         raise HTTPException(
@@ -36,7 +41,12 @@ def create_promotion(promo_data: PromotionCreate, db: Session = Depends(get_db))
 
 
 @router.post("/{promo_id}/approve", response_model=PromotionResponse)
-def approve_promotion(promo_id: int, approved_by_emp_id: int, db: Session = Depends(get_db)):
+def approve_promotion(
+    promo_id: int,
+    approved_by_emp_id: int,
+    db: Session = Depends(get_db),
+    auth_ctx: UserContext = Depends(require_permission("sales:policy")),
+):
     promo = db.query(Promotion).filter(Promotion.id == promo_id).first()
     if not promo:
         raise HTTPException(status_code=404, detail="Promotion not found")
@@ -49,5 +59,8 @@ def approve_promotion(promo_id: int, approved_by_emp_id: int, db: Session = Depe
 
 
 @router.get("", response_model=list[PromotionResponse])
-def list_promotions(db: Session = Depends(get_db)):
+def list_promotions(
+    db: Session = Depends(get_db),
+    auth_ctx: UserContext = Depends(get_current_user),
+):
     return db.query(Promotion).order_by(Promotion.id.desc()).all()

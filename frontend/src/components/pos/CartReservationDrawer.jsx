@@ -14,11 +14,12 @@ export default function CartReservationDrawer({
   const [paymentMethod, setPaymentMethod] = useState('CASH');
   const [remainingSeconds, setRemainingSeconds] = useState(cartData?.ttl_remaining_seconds || 900);
   const [submitting, setSubmitting] = useState(false);
+  const [prevCartId, setPrevCartId] = useState(cartData?.id);
 
-  useEffect(() => {
-    if (!cartData) return;
+  if (cartData && cartData.id !== prevCartId) {
+    setPrevCartId(cartData.id);
     setRemainingSeconds(cartData.ttl_remaining_seconds || 900);
-  }, [cartData]);
+  }
 
   // Live countdown timer
   useEffect(() => {
@@ -35,7 +36,7 @@ export default function CartReservationDrawer({
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [isOpen, remainingSeconds]);
+  }, [isOpen, remainingSeconds, onShowToast]);
 
   if (!isOpen || !cartData) return null;
 

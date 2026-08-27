@@ -54,6 +54,7 @@ def test_inter_store_stock_transfer():
             "notes": "Emergency stock rebalance",
             "items": [{"product_id": prod_id, "quantity": 10}],
         },
+        headers={"X-User-Role": "MANAGER"},
     )
     assert res.status_code == 201
     transfer = res.json()

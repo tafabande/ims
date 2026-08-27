@@ -17,6 +17,8 @@ def test_work_session_lifecycle_and_float_reconciliation():
     db.commit()
     db.close()
 
+    auth_headers = {"X-User-Role": "STAFF", "X-User-Id": "1"}
+
     # 1. Start Work Session
     start_resp = client.post(
         "/work-sessions/start",
@@ -25,8 +27,8 @@ def test_work_session_lifecycle_and_float_reconciliation():
             "location_name": "Harare Store #01",
             "device_id": "POS-03",
             "opening_float": 500.0,
-            "user_id": 1,
         },
+        headers=auth_headers,
     )
     assert start_resp.status_code == 200
     data = start_resp.json()
@@ -36,20 +38,28 @@ def test_work_session_lifecycle_and_float_reconciliation():
     assert data["session"]["opening_float"] == 500.0
 
     # 2. Pause Session
-    pause_resp = client.put(f"/work-sessions/{session_id}/state", params={"status": "PAUSED"})
+    pause_resp = client.put(
+        f"/work-sessions/{session_id}/state",
+        params={"status": "PAUSED"},
+        headers=auth_headers,
+    )
     assert pause_resp.status_code == 200
     assert pause_resp.json()["new_status"] == "PAUSED"
 
     # 3. Resume Session
-    resume_resp = client.put(f"/work-sessions/{session_id}/state", params={"status": "ACTIVE"})
+    resume_resp = client.put(
+        f"/work-sessions/{session_id}/state",
+        params={"status": "ACTIVE"},
+        headers=auth_headers,
+    )
     assert resume_resp.status_code == 200
     assert resume_resp.json()["new_status"] == "ACTIVE"
 
     # 4. Close Session & Calculate Variance (-$30.00 Shortage)
-    # Opening: 500.00, Sales: 0.00, Refunds: 0.00 -> Expected: 500.00. Actual Counted: 470.00 -> Variance: -30.00
     close_resp = client.post(
         f"/work-sessions/{session_id}/close",
         params={"actual_counted_cash": 470.0, "notes": "Cash shortage -$30.00"},
+        headers=auth_headers,
     )
     assert close_resp.status_code == 200
     reconciliation = close_resp.json()["reconciliation"]
@@ -59,7 +69,10 @@ def test_work_session_lifecycle_and_float_reconciliation():
     assert reconciliation["variance_status"] == "SHORTAGE"
 
     # 5. Fetch Session Event Timeline
-    timeline_resp = client.get(f"/work-sessions/{session_id}/timeline")
+    timeline_resp = client.get(
+        f"/work-sessions/{session_id}/timeline",
+        headers=auth_headers,
+    )
     assert timeline_resp.status_code == 200
     events = timeline_resp.json()["timeline"]
     assert len(events) >= 4

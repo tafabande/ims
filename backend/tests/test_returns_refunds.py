@@ -80,6 +80,7 @@ def test_pos_return_restock_and_damage_writeoff():
                 },
             ],
         },
+        headers={"X-User-Role": "MANAGER"},
     )
     assert res.status_code == 201
     ret_order = res.json()

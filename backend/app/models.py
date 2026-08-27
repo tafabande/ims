@@ -27,6 +27,10 @@ class User(Base):
     role = Column(String(50), nullable=False, default="STAFF")  # ADMIN, MANAGER, STAFF
     department = Column(String(100), nullable=True)
     active = Column(Boolean, default=True)  # Soft deletion flag
+    activation_otp_hash = Column(String(255), nullable=True)
+    activation_otp_expires_at = Column(DateTime, nullable=True)
+    activation_otp_attempts = Column(Integer, default=0)
+    activation_nonce = Column(String(255), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     sessions = relationship("SessionRecord", back_populates="user")

@@ -33,6 +33,7 @@ def test_store_creation_and_auto_warehouse():
             "phone": "+1 555-0999",
             "status": "ACTIVE",
         },
+        headers={"X-User-Role": "ADMIN"},
     )
     assert res.status_code == 201
     store = res.json()
@@ -40,7 +41,7 @@ def test_store_creation_and_auto_warehouse():
     store_id = store["id"]
 
     # Verify auto-created warehouse
-    wh_res = client.get(f"/api/stores/{store_id}/warehouses")
+    wh_res = client.get(f"/api/stores/{store_id}/warehouses", headers={"X-User-Role": "ADMIN"})
     assert wh_res.status_code == 200
     warehouses = wh_res.json()
     assert len(warehouses) >= 1
@@ -84,6 +85,7 @@ def test_shift_open_close_cash_variance():
             "register_id": reg_id,
             "opening_cash": 200.0,
         },
+        headers={"X-User-Role": "MANAGER"},
     )
     assert open_res.status_code == 201
     shift = open_res.json()
@@ -95,6 +97,7 @@ def test_shift_open_close_cash_variance():
     close_res = client.post(
         f"/api/shifts/{shift_id}/close",
         json={"actual_cash": 195.0, "supervisor_id": emp_id},
+        headers={"X-User-Role": "MANAGER"},
     )
     assert close_res.status_code == 200
     closed_shift = close_res.json()

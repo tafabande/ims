@@ -66,6 +66,7 @@ def test_stocktake_session_and_manager_approval():
                 }
             ],
         },
+        headers={"X-User-Role": "MANAGER"},
     )
     assert create_res.status_code == 201
     stk = create_res.json()
@@ -74,7 +75,10 @@ def test_stocktake_session_and_manager_approval():
     stk_id = stk["id"]
 
     # Manager Approves Stocktake
-    approve_res = client.post(f"/api/stocktakes/{stk_id}/approve?approved_by_emp_id={emp_id}")
+    approve_res = client.post(
+        f"/api/stocktakes/{stk_id}/approve?approved_by_emp_id={emp_id}",
+        headers={"X-User-Role": "MANAGER"},
+    )
     assert approve_res.status_code == 200
     approved_stk = approve_res.json()
     assert approved_stk["status"] == "APPROVED"

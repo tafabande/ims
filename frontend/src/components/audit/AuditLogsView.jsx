@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { 
   ShieldAlert, 
   Terminal, 
@@ -17,14 +17,14 @@ import {
   GitCommit
 } from 'lucide-react';
 
+const AUDIT_EVENTS = [];
+
 export default function AuditLogsView({ transactions, onShowToast }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('ALL');
   const [viewMode, setViewMode] = useState('timeline'); // 'timeline' or 'table'
 
-  const auditEvents = [];
-
-  const filteredLogs = auditEvents.filter(evt => {
+  const filteredLogs = AUDIT_EVENTS.filter(evt => {
     const matchesSearch = 
       evt.user.toLowerCase().includes(searchTerm.toLowerCase()) ||
       evt.action.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -36,13 +36,13 @@ export default function AuditLogsView({ transactions, onShowToast }) {
     return matchesSearch && matchesStatus;
   });
 
-  const successCount = auditEvents.filter(e => e.status === 'SUCCESS').length;
-  const warnCount = auditEvents.filter(e => e.status === 'WARN').length;
-  const uniqueIps = new Set(auditEvents.map(e => e.ip)).size;
+  const successCount = AUDIT_EVENTS.filter(e => e.status === 'SUCCESS').length;
+  const warnCount = AUDIT_EVENTS.filter(e => e.status === 'WARN').length;
+  const uniqueIps = new Set(AUDIT_EVENTS.map(e => e.ip)).size;
 
   const exportAuditCSV = () => {
     const headers = ["Event ID", "Operator", "Role", "Action", "IP Address", "Status", "Details", "Before/After Change", "Timestamp"];
-    const rows = auditEvents.map(evt => [
+    const rows = AUDIT_EVENTS.map(evt => [
       evt.id,
       `"${evt.user}"`,
       evt.role,
@@ -57,7 +57,7 @@ export default function AuditLogsView({ transactions, onShowToast }) {
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `ims_security_audit_logs_${Date.now()}.csv`);
+    link.setAttribute("download", "ims_security_audit_logs.csv");
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);

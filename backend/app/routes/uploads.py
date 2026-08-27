@@ -1,12 +1,12 @@
 import hashlib
 import os
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel
 
-from app.dependencies import require_permission
+from app.dependencies import UserContext, require_permission
 
 router = APIRouter(prefix="/api/uploads", tags=["File Upload Security"])
 
@@ -21,6 +21,7 @@ ALLOWED_MIME_TYPES = {
     "image/png",
     "application/pdf",
     "text/csv",
+    "text/plain",
     "application/vnd.ms-excel",
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 }
@@ -34,20 +35,45 @@ class FileMetadataResponse(BaseModel):
     size_bytes: int
     sha256: str
     uploaded_at: str
+    uploaded_by: str | None = None
 
 
-FILE_METADATA_STORE = []
+FILE_METADATA_STORE: list[dict] = []
+
+
+def _validate_magic_bytes(ext: str, contents: bytes) -> bool:
+    """Inspect binary file signatures to prevent disguised executables"""
+    if ext in [".png"]:
+        return contents.startswith(b"\x89PNG\r\n\x1a\n") or contents.startswith(b"\x89PNG")
+    if ext in [".jpg", ".jpeg"]:
+        return contents.startswith(b"\xff\xd8\xff")
+    if ext in [".pdf"]:
+        return contents.startswith(b"%PDF-")
+    if ext in [".xlsx"]:
+        return contents.startswith(b"PK\x03\x04")
+    if ext in [".csv", ".xls", ".txt"]:
+        try:
+            contents[:1024].decode("utf-8", errors="ignore")
+            return True
+        except Exception:
+            return False
+    return True
 
 
 @router.post("/upload", response_model=FileMetadataResponse)
 async def upload_file(
     file: UploadFile = File(...),
+    auth_ctx: UserContext = Depends(require_permission("products:read")),
 ):
     """
-    Secure File Upload Service — Validates 10MB size limit, extension whitelist, calculates SHA256 checksum, and renames with UUID.
+    Secure File Upload Service:
+    - Authenticated endpoint with permission verification
+    - 10MB size limit enforcement
+    - Whitelisted extension and MIME type validation
+    - Magic byte header inspection
+    - SHA256 integrity calculation and UUID file isolation
     """
-    # 1. Validate Extension
-    filename = file.filename or "file.bin"
+    filename = os.path.basename(file.filename or "file.bin")
     _, ext = os.path.splitext(filename.lower())
     if ext not in ALLOWED_EXTENSIONS:
         raise HTTPException(
@@ -55,7 +81,6 @@ async def upload_file(
             detail=f"Security Rejection: File extension '{ext}' not allowed. Allowed formats: {', '.join(ALLOWED_EXTENSIONS)}",
         )
 
-    # 2. Read File Bytes & Validate Size Limit
     contents = await file.read()
     file_size = len(contents)
     if file_size > MAX_FILE_SIZE_BYTES:
@@ -64,15 +89,17 @@ async def upload_file(
             detail=f"Security Rejection: File size ({round(file_size / 1024 / 1024, 2)} MB) exceeds maximum allowed limit of 10 MB.",
         )
 
-    # 3. Calculate SHA256 Hash
-    sha256_hash = hashlib.sha256(contents).hexdigest()
+    if not _validate_magic_bytes(ext, contents):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Security Rejection: File signature does not match declared extension '{ext}'.",
+        )
 
-    # 4. Generate Server-Side UUID Storage Key
+    sha256_hash = hashlib.sha256(contents).hexdigest()
     file_id = f"FILE-{uuid.uuid4().hex[:8].upper()}"
     storage_key = f"{uuid.uuid4().hex}{ext}"
     file_path = os.path.join(UPLOAD_DIR, storage_key)
 
-    # Save to disk
     with open(file_path, "wb") as f:
         f.write(contents)
 
@@ -83,7 +110,8 @@ async def upload_file(
         "mime_type": file.content_type or "application/octet-stream",
         "size_bytes": file_size,
         "sha256": sha256_hash,
-        "uploaded_at": datetime.utcnow().isoformat(),
+        "uploaded_at": datetime.now(UTC).isoformat(),
+        "uploaded_by": auth_ctx.user_code,
     }
     FILE_METADATA_STORE.insert(0, metadata)
 
@@ -91,7 +119,7 @@ async def upload_file(
 
 
 @router.get("/list", response_model=list[FileMetadataResponse])
-def list_uploaded_files(auth_ctx: dict = Depends(require_permission("products:read"))):
+def list_uploaded_files(auth_ctx: UserContext = Depends(require_permission("products:read"))):
     """
     List all uploaded files and security metadata
     """

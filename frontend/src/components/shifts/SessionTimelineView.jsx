@@ -17,13 +17,12 @@ import {
 } from 'lucide-react';
 
 export default function SessionTimelineView({ sessionId, sessionCode, onShowToast }) {
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [timelineData, setTimelineData] = useState(null);
 
   useEffect(() => {
     // Simulated or Live API fetch for Session Event Audit Timeline
-    setLoading(true);
-    setTimeout(() => {
+    const timer = setTimeout(() => {
       setTimelineData({
         session_id: sessionId || 1,
         session_code: sessionCode || 'WS-2026-0826-0041',
@@ -48,6 +47,7 @@ export default function SessionTimelineView({ sessionId, sessionCode, onShowToas
       });
       setLoading(false);
     }, 400);
+    return () => clearTimeout(timer);
   }, [sessionId, sessionCode]);
 
   if (loading) {

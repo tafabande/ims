@@ -2,11 +2,12 @@ import json
 import uuid
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import SessionEvent, User, WorkSession
+from app.dependencies import UserContext, get_current_user, require_permission
+from app.models import SessionEvent, WorkSession
 
 router = APIRouter(prefix="/work-sessions", tags=["Operational Work Sessions"])
 
@@ -30,13 +31,15 @@ def start_work_session(
     device_id: str = "POS-01",
     opening_float: float = 200.0,
     notes: str | None = None,
-    user_id: int = 1,
+    current_user: UserContext = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """
     Start a new operational work session (Layer B).
     Enforces no duplicate active sessions per user per device.
     """
+    user_id = current_user.id
+
     # Check if active session already exists for user
     existing = (
         db.query(WorkSession)
@@ -52,21 +55,7 @@ def start_work_session(
             detail=f"User already has an active work session ({existing.session_code} - {existing.status}). Close it before starting a new one.",
         )
 
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        user = User(
-            id=user_id,
-            email=f"user_{user_id}@ims.local",
-            user_code=f"USR-{user_id:04d}",
-            full_name=f"Operator {user_id}",
-            role="STAFF",
-            hashed_password="mock_password",
-            active=True,
-        )
-        db.add(user)
-        db.flush()
-    role = user.role if user else "STAFF"
-
+    role = current_user.role
     now_str = datetime.now(UTC).strftime("%Y%m%d")
     short_uuid = str(uuid.uuid4())[:4].upper()
     session_code = f"WS-{now_str}-{short_uuid}"
@@ -127,8 +116,7 @@ def start_work_session(
 def update_session_state(
     session_id: int,
     status: str,  # ACTIVE, PAUSED, CLOSING, SUSPENDED, ABANDONED
-    x_user_id: int | None = Header(None),
-    x_user_role: str | None = Header(None),
+    current_user: UserContext = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """
@@ -139,7 +127,8 @@ def update_session_state(
         raise HTTPException(status_code=404, detail="Work session not found")
 
     # Enforce Server-Side Session Ownership
-    if x_user_id and session.user_id != x_user_id and x_user_role not in ["APP_ADMIN", "MANAGER", "STORE_MANAGER"]:
+    is_admin_or_mgr = current_user.role in ["APP_ADMIN", "MANAGER", "ADMIN", "STORE_MANAGER"]
+    if session.user_id != current_user.id and not is_admin_or_mgr:
         raise HTTPException(
             status_code=403,
             detail="Forbidden: You do not own this operational work session.",
@@ -192,8 +181,7 @@ def close_work_session(
     session_id: int,
     actual_counted_cash: float,
     notes: str | None = None,
-    x_user_id: int | None = Header(None),
-    x_user_role: str | None = Header(None),
+    current_user: UserContext = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """
@@ -204,7 +192,8 @@ def close_work_session(
         raise HTTPException(status_code=404, detail="Work session not found")
 
     # Enforce Server-Side Session Ownership
-    if x_user_id and session.user_id != x_user_id and x_user_role not in ["APP_ADMIN", "MANAGER", "STORE_MANAGER"]:
+    is_admin_or_mgr = current_user.role in ["APP_ADMIN", "MANAGER", "ADMIN", "STORE_MANAGER"]
+    if session.user_id != current_user.id and not is_admin_or_mgr:
         raise HTTPException(
             status_code=403,
             detail="Forbidden: You do not own this operational work session.",
@@ -265,12 +254,12 @@ def close_work_session(
 def force_close_work_session(
     session_id: int,
     reason: str,
-    x_user_role: str | None = Header(None),
+    auth_ctx: UserContext = Depends(require_permission("shifts:manage")),
     db: Session = Depends(get_db),
 ):
     """
     Managerial Emergency Override: Force close an abandoned, unresponsive, or suspended work session.
-    Requires MANAGER or APP_ADMIN role.
+    Requires MANAGER or ADMIN permission.
     """
     session = db.query(WorkSession).filter(WorkSession.id == session_id).first()
     if not session:
@@ -279,7 +268,7 @@ def force_close_work_session(
     old_status = session.status.upper()
     session.status = "FORCED_CLOSED"
     session.closed_at = datetime.now(UTC)
-    session.notes = f"[FORCED_CLOSED BY MANAGER] Reason: {reason}"
+    session.notes = f"[FORCED_CLOSED BY {auth_ctx.user_code}] Reason: {reason}"
 
     db.commit()
 
@@ -288,7 +277,7 @@ def force_close_work_session(
         event_type="FORCED_CLOSED_BY_MANAGER",
         entity_type="WorkSession",
         entity_id=session.session_code,
-        metadata_json=json.dumps({"old_status": old_status, "reason": reason}),
+        metadata_json=json.dumps({"old_status": old_status, "reason": reason, "closed_by": auth_ctx.user_code}),
     )
     db.add(force_event)
     db.commit()
@@ -302,14 +291,17 @@ def force_close_work_session(
 
 
 @router.get("/active")
-def get_active_session(user_id: int = 1, db: Session = Depends(get_db)):
+def get_active_session(
+    current_user: UserContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """
     Retrieve active work session for current operator.
     """
     session = (
         db.query(WorkSession)
         .filter(
-            WorkSession.user_id == user_id,
+            WorkSession.user_id == current_user.id,
             WorkSession.status.in_(["ACTIVE", "PAUSED", "OPEN", "CLOSING"]),
         )
         .order_by(WorkSession.id.desc())
@@ -338,13 +330,25 @@ def get_active_session(user_id: int = 1, db: Session = Depends(get_db)):
 
 
 @router.get("/{session_id}/timeline")
-def get_session_timeline(session_id: int, db: Session = Depends(get_db)):
+def get_session_timeline(
+    session_id: int,
+    current_user: UserContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """
     Retrieve immutable audit event timeline for a given work session.
     """
     session = db.query(WorkSession).filter(WorkSession.id == session_id).first()
     if not session:
         raise HTTPException(status_code=404, detail="Work session not found")
+
+    is_authorized = (
+        session.user_id == current_user.id
+        or current_user.role in ["APP_ADMIN", "MANAGER", "ADMIN", "AUDITOR"]
+        or "audit:view" in current_user.permissions
+    )
+    if not is_authorized:
+        raise HTTPException(status_code=403, detail="Forbidden: You cannot view this session timeline.")
 
     events = (
         db.query(SessionEvent)

@@ -116,12 +116,12 @@ export default function CustomersView({ customers = [], onAddCustomer, onShowToa
                   </td>
                 </tr>
               ) : (
-                filteredCustomers.map(c => {
+                filteredCustomers.map((c, idx) => {
                   const ordersCount = c.total_orders ?? c.orders_count ?? 0;
                   const spentTotal = Number(c.total_spent ?? c.spent_total ?? 0);
 
                   return (
-                    <tr key={c.id || Math.random()} style={{ borderBottom: '1px solid var(--color-rule)' }}>
+                    <tr key={c.id ?? `cust-${idx}`} style={{ borderBottom: '1px solid var(--color-rule)' }}>
                       <td style={{ padding: '12px 16px', fontWeight: 700, color: 'var(--color-ink)' }}>
                         {c.name || 'Unnamed Client'}
                       </td>

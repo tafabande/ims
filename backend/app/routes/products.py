@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.dependencies import UserContext, require_permission
 from app.models import Category, Product
 from app.schemas import (
     CategoryCreate,
@@ -56,7 +57,11 @@ def get_category_tree(db: Session = Depends(get_db)):
 
 
 @router.post("/categories", response_model=CategoryResponse, status_code=status.HTTP_201_CREATED)
-def create_category(cat_in: CategoryCreate, db: Session = Depends(get_db)):
+def create_category(
+    cat_in: CategoryCreate,
+    db: Session = Depends(get_db),
+    auth_ctx: UserContext = Depends(require_permission("products:create")),
+):
     """
     Create a new Category or Subcategory (if parent_id provided).
     Auto-generates human-readable category_code CAT-XXXXXX.
@@ -84,7 +89,11 @@ def create_category(cat_in: CategoryCreate, db: Session = Depends(get_db)):
 
 
 @router.delete("/categories/{category_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_category(category_id: int, db: Session = Depends(get_db)):
+def delete_category(
+    category_id: int,
+    db: Session = Depends(get_db),
+    auth_ctx: UserContext = Depends(require_permission("products:delete")),
+):
     """
     Referential Protection on Deletion:
     Prevents deletion if products are assigned to this category. Returns 400 Bad Request.
@@ -153,7 +162,11 @@ def get_products(skip: int = 0, limit: int = 100, db: Session = Depends(get_db))
 
 
 @router.post("/", response_model=ProductResponse, status_code=status.HTTP_201_CREATED)
-def create_product(product_in: ProductCreate, db: Session = Depends(get_db)):
+def create_product(
+    product_in: ProductCreate,
+    db: Session = Depends(get_db),
+    auth_ctx: UserContext = Depends(require_permission("products:create")),
+):
     """
     Write to PostgreSQL source of truth -> Commit -> Deliberately invalidate Redis product cache.
     Auto-generates product_code PRD-XXXXXX.
@@ -215,7 +228,12 @@ def get_product_by_id(product_id: int, db: Session = Depends(get_db)):
 
 
 @router.put("/{product_id}", response_model=ProductResponse)
-def update_product(product_id: int, product_in: ProductUpdate, db: Session = Depends(get_db)):
+def update_product(
+    product_id: int,
+    product_in: ProductUpdate,
+    db: Session = Depends(get_db),
+    auth_ctx: UserContext = Depends(require_permission("products:edit")),
+):
     """
     Update PostgreSQL source of truth -> Commit -> Invalidate single product and list cache
     """
@@ -237,7 +255,11 @@ def update_product(product_id: int, product_in: ProductUpdate, db: Session = Dep
 
 
 @router.delete("/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_product(product_id: int, db: Session = Depends(get_db)):
+def delete_product(
+    product_id: int,
+    db: Session = Depends(get_db),
+    auth_ctx: UserContext = Depends(require_permission("products:delete")),
+):
     """
     Archive Product Lifecycle: Soft-deletes product (active = False) to preserve historical sales, POs, and transaction ledger integrity.
     """

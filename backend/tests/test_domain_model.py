@@ -79,6 +79,7 @@ def test_hierarchical_categories_and_tree():
             "code": code_parent,
             "description": "Main tech category",
         },
+        headers={"X-User-Role": "ADMIN"},
     )
     assert res_p.status_code == 201
     parent_id = res_p.json()["id"]
@@ -92,6 +93,7 @@ def test_hierarchical_categories_and_tree():
             "description": "Laptops subcategory",
             "parent_id": parent_id,
         },
+        headers={"X-User-Role": "ADMIN"},
     )
     assert res_c.status_code == 201
 
@@ -132,6 +134,6 @@ def test_category_referential_protection_on_deletion():
     db.close()
 
     # Attempt deletion of category with assigned product
-    res_del = client.delete(f"/api/products/categories/{cat_id}")
+    res_del = client.delete(f"/api/products/categories/{cat_id}", headers={"X-User-Role": "ADMIN"})
     assert res_del.status_code == 400
     assert "products are currently assigned to it" in res_del.json()["detail"]

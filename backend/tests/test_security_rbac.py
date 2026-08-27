@@ -62,4 +62,4 @@ def test_unauthenticated_access_rejection():
     Verify protected endpoints reject unauthenticated access correctly
     """
     response = client.get("/auth/sessions")
-    assert response.status_code == 200  # Public session inspection endpoint
+    assert response.status_code == 401  # Protected session inspection endpoint requires authentication

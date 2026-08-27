@@ -78,6 +78,17 @@ export default function App() {
   const [isSessionCloseModalOpen, setIsSessionCloseModalOpen] = useState(false);
   const [lowStockCount, setLowStockCount] = useState(0);
 
+  // Global Toast Helper
+  const handleShowToast = useCallback((type, title, message) => {
+    const id = Date.now() + Math.random();
+    setToasts((prev) => [...prev, { id, type, title, message }]);
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, 4500);
+  }, []);
+
+  const handleDismissToast = (id) => setToasts((prev) => prev.filter((t) => t.id !== id));
+
   // Listen for forced logout events emitted by apiClient on 401
   useEffect(() => {
     const handleForceLogout = () => {
@@ -86,7 +97,7 @@ export default function App() {
     };
     window.addEventListener('ims:auth:logout', handleForceLogout);
     return () => window.removeEventListener('ims:auth:logout', handleForceLogout);
-  }, [logout]);
+  }, [logout, handleShowToast]);
 
   // Apply Theme
   useEffect(() => {
@@ -119,18 +130,7 @@ export default function App() {
       return;
     }
     setActiveTab(tab);
-  }, [user]);
-
-  // Global Toast Helper
-  const handleShowToast = (type, title, message) => {
-    const id = Date.now() + Math.random();
-    setToasts((prev) => [...prev, { id, type, title, message }]);
-    setTimeout(() => {
-      setToasts((prev) => prev.filter((t) => t.id !== id));
-    }, 4500);
-  };
-
-  const handleDismissToast = (id) => setToasts((prev) => prev.filter((t) => t.id !== id));
+  }, [user, handleShowToast]);
 
   const toggleTheme = () => {
     setTheme((prev) => {

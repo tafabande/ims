@@ -66,7 +66,7 @@ export default function ReceiptModal({ sale, onClose, onShowToast }) {
             {/* Meta details */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '16px', fontSize: '0.75rem' }}>
               <div>
-                <span style={{ color: '#64748b' }}>Date:</span> <strong>{new Date(sale.timestamp || Date.now()).toLocaleString()}</strong>
+                <span style={{ color: '#64748b' }}>Date:</span> <strong>{sale.timestamp ? new Date(sale.timestamp).toLocaleString() : 'N/A'}</strong>
               </div>
               <div style={{ textAlign: 'right' }}>
                 <span style={{ color: '#64748b' }}>Customer:</span> <strong>{sale.customer_name || 'Walk-in Customer'}</strong>
