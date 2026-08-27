@@ -3,7 +3,7 @@ Centralized FastAPI Dependencies for IMS
 =========================================
 All protected routes use get_current_user() to extract and validate
 the authenticated user from the JWT. Role and permissions ALWAYS come
-from the JWT — never from client-supplied headers.
+from the database and server-side role matrix — never from client-supplied headers.
 
 Separation of Duties is enforced here at the dependency level.
 """
@@ -25,7 +25,7 @@ security = HTTPBearer(auto_error=False)
 @dataclass
 class UserContext:
     """
-    Represents the authenticated user context derived from the JWT.
+    Represents the authenticated user context derived from the JWT and validated against the database.
     This is the ONLY authoritative source of user identity and permissions.
     """
 
@@ -60,88 +60,60 @@ def get_current_user(
     """
     Primary authentication dependency.
 
-    Flow:
-    1. If Bearer JWT is provided, decode and validate against the database.
-    2. Fallback: If X-User-Role header is provided (for test suites and LAN automation),
-       derive UserContext with corresponding server-side permissions.
-    3. If neither is provided, reject with 401 Unauthorized.
+    Strictly requires a valid Bearer JWT. Header-based identity overrides
+    (e.g., X-User-Role / X-User-Id) are strictly rejected.
     """
-    net_ctx = request.headers.get("X-Network-Context", "LAN").upper()
-
-    if credentials and credentials.credentials:
-        token = credentials.credentials
-        try:
-            payload = iam_service.decode_access_token(token)
-        except HTTPException:
-            raise
-        except Exception as err:
-            raise HTTPException(status_code=401, detail="Invalid or expired authentication token.") from err
-
-        user_id = payload.get("sub")
-        token_role = payload.get("role", "STAFF")
-        token_permissions = payload.get("permissions", [])
-
-        if not user_id:
-            raise HTTPException(status_code=401, detail="Malformed token: missing subject claim.")
-
-        # Verify user exists and is active in the database
-        try:
-            user_id_int = int(user_id)
-        except (ValueError, TypeError) as err:
-            raise HTTPException(status_code=401, detail="Invalid token subject.") from err
-
-        db_user = db.query(User).filter(User.id == user_id_int, User.active == True).first()
-        if not db_user:
-            raise HTTPException(
-                status_code=401,
-                detail="User account not found or has been deactivated. Please contact your administrator.",
-            )
-
-        if not token_permissions:
-            token_permissions = iam_service.ROLE_PERMISSIONS.get(token_role, [])
-
-        return UserContext(
-            id=db_user.id,
-            user_code=db_user.user_code or f"USR-{db_user.id:06d}",
-            full_name=db_user.full_name,
-            email=db_user.email,
-            role=token_role,
-            permissions=token_permissions,
-            session_id=payload.get("session_id"),
-            network_context=net_ctx,
+    if not credentials or not credentials.credentials:
+        raise HTTPException(
+            status_code=401,
+            detail="Authentication required. Please provide a valid Bearer token.",
         )
 
-    # Fallback to X-User-Role header (for test execution & automation harnesses)
-    x_user_role = request.headers.get("X-User-Role") or request.headers.get("x-user-role")
-    if x_user_role:
-        role_upper = x_user_role.upper()
-        x_user_id = request.headers.get("X-User-Id") or request.headers.get("x-user-id") or "1"
-        try:
-            u_id = int(x_user_id)
-        except Exception:
-            u_id = 1
+    token = credentials.credentials
+    try:
+        payload = iam_service.decode_access_token(token)
+    except HTTPException:
+        raise
+    except Exception as err:
+        raise HTTPException(status_code=401, detail="Invalid or expired authentication token.") from err
 
-        db_user = db.query(User).filter(User.id == u_id).first() if db else None
-        user_name = db_user.full_name if db_user else f"{role_upper} Operator"
-        user_email = db_user.email if db_user else f"{role_upper.lower()}@ims.local"
-        user_code = db_user.user_code if (db_user and db_user.user_code) else f"USR-{u_id:06d}"
+    user_id = payload.get("sub")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Malformed token: missing subject claim.")
 
-        permissions = iam_service.ROLE_PERMISSIONS.get(role_upper, iam_service.ROLE_PERMISSIONS.get("STAFF", []))
+    # Verify user exists and is active in the database
+    try:
+        user_id_int = int(user_id)
+    except (ValueError, TypeError) as err:
+        raise HTTPException(status_code=401, detail="Invalid token subject.") from err
 
-        return UserContext(
-            id=u_id,
-            user_code=user_code,
-            full_name=user_name,
-            email=user_email,
-            role=role_upper,
-            permissions=permissions,
-            session_id="test-session-id",
-            network_context=net_ctx,
+    db_user = db.query(User).filter(User.id == user_id_int, User.active == True).first()
+    if not db_user:
+        raise HTTPException(
+            status_code=401,
+            detail="User account not found or has been deactivated. Please contact your administrator.",
         )
 
-    raise HTTPException(
-        status_code=401,
-        detail="Authentication required. Please provide a valid Bearer token.",
+    # Server-current role and permissions loaded dynamically from DB user and server matrix
+    current_role = (db_user.role or "STAFF").upper()
+    current_permissions = iam_service.ROLE_PERMISSIONS.get(current_role, [])
+
+    # Derive Zero-Trust Network Context from request state or trusted IP determination
+    net_ctx = getattr(request.state, "network_context", None)
+    if not net_ctx:
+        from app.middleware.security import determine_network_context
+
+        net_ctx = determine_network_context(request)
+
+    return UserContext(
+        id=db_user.id,
+        user_code=db_user.user_code or f"USR-{db_user.id:06d}",
+        full_name=db_user.full_name,
+        email=db_user.email,
+        role=current_role,
+        permissions=current_permissions,
+        session_id=payload.get("session_id"),
+        network_context=net_ctx,
     )
 
 
@@ -154,7 +126,7 @@ def require_permission(permission: str):
 
     def _check(request: Request, user: UserContext = Depends(get_current_user)) -> UserContext:
         # Zero-Trust Network Context Enforcement for Staff POS Sales
-        req_net_ctx = request.headers.get("X-Network-Context", user.network_context).upper()
+        req_net_ctx = user.network_context.upper()
         path = request.url.path.rstrip("/").lower()
         if req_net_ctx == "REMOTE" and user.role == "STAFF" and ("/sales" in path or "/pos" in path):
             raise HTTPException(
@@ -164,32 +136,23 @@ def require_permission(permission: str):
 
         # Normalize required permission and user permissions
         req_dot = permission.replace(":", ".")
-        req_colon = permission.replace(".", ":")
         user_perms_dot = {p.replace(":", ".") for p in user.permissions}
-        user_perms_colon = {p.replace(".", ":") for p in user.permissions}
 
-        # Check exact matches or macro permission mappings
+        # Check explicit permission match
         has_perm = (
-            permission in user.permissions
-            or req_dot in user_perms_dot
-            or req_colon in user_perms_colon
+            (permission in user.permissions)
+            or (req_dot in user_perms_dot)
             or (
-                req_dot.startswith("users.")
-                and ("users.manage" in user_perms_dot or "users:manage" in user_perms_colon)
-            )
-            or (
-                req_dot.startswith("roles.")
-                and ("roles.manage" in user_perms_dot or "roles:manage" in user_perms_colon)
-            )
-            or (req_dot.startswith("audit.") and ("audit.view" in user_perms_dot or "audit:view" in user_perms_colon))
-            or (req_dot in ["sales.read", "sales.view"] and "sales.view" in user_perms_dot)
-            or (req_dot in ["inventory.read", "inventory.view"] and "inventory.view" in user_perms_dot)
-            or (
-                req_dot in ["inventory.receive"]
-                and ("inventory.receive" in user_perms_dot or "inventory.adjust" in user_perms_dot)
+                req_dot in ["sales.create", "sales.refund"]
+                and (
+                    "sales.manage" in user_perms_dot
+                    or "sales.create" in user_perms_dot
+                    or "sales:create" in user.permissions
+                )
             )
             or (req_dot in ["inventory.adjust"] and "inventory.adjust" in user_perms_dot)
             or (req_dot in ["products.read", "products.view"] and "products.view" in user_perms_dot)
+            or (req_dot in ["inventory.read", "inventory.view"] and "inventory.view" in user_perms_dot)
             or (
                 req_dot in ["reports.read", "reports.view"]
                 and (
@@ -218,7 +181,8 @@ def require_permission(permission: str):
                     or user.role in ["APP_ADMIN", "SYSADMIN", "MANAGER"]
                 )
             )
-            or (user.role in ["APP_ADMIN", "SYSADMIN"] and (req_dot.startswith(("users.", "system."))))
+            or (req_dot.startswith("users.") and "users.manage" in user_perms_dot)
+            or (user.role in ["ADMIN", "APP_ADMIN", "SYSADMIN"] and (req_dot.startswith(("users.", "system."))))
         )
 
         if not has_perm:
@@ -240,7 +204,7 @@ def require_any_permission(*permissions: str):
     """
 
     def _check(request: Request, user: UserContext = Depends(get_current_user)) -> UserContext:
-        req_net_ctx = request.headers.get("X-Network-Context", user.network_context).upper()
+        req_net_ctx = user.network_context.upper()
         path = request.url.path.rstrip("/").lower()
         if req_net_ctx == "REMOTE" and user.role == "STAFF" and ("/sales" in path or "/pos" in path):
             raise HTTPException(

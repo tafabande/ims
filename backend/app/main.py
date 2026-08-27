@@ -1,4 +1,5 @@
 import os
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 
 from fastapi import Depends, FastAPI, HTTPException
@@ -49,23 +50,28 @@ from app.routes import (
     work_sessions,
 )
 from app.services.cache_service import get_cache_stats
-from seed import seed_db
 
-# Create DB tables automatically
-try:
-    Base.metadata.create_all(bind=engine, checkfirst=True)
-except Exception as e:
-    print(f"Schema notice: {e}")
+_ENVIRONMENT = os.getenv("ENVIRONMENT", "development").lower()
+_IS_PRODUCTION = _ENVIRONMENT == "production"
 
-from contextlib import asynccontextmanager
+# Create DB tables automatically in local development/test only
+if not _IS_PRODUCTION and os.getenv("AUTO_CREATE_TABLES", "false").lower() == "true":
+    try:
+        Base.metadata.create_all(bind=engine, checkfirst=True)
+    except Exception as e:
+        print(f"Schema notice: {e}")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    try:
-        seed_db()
-    except Exception as e:
-        print(f"Startup database seeding notice: {e}")
+    # NEVER seed sample users or predictable default credentials in production
+    if not _IS_PRODUCTION and os.getenv("AUTO_SEED", "false").lower() == "true":
+        try:
+            from seed import seed_db
+
+            seed_db()
+        except Exception as e:
+            print(f"Startup database seeding notice: {e}")
     yield
 
 

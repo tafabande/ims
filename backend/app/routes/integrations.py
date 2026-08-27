@@ -1,3 +1,5 @@
+import json
+
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
@@ -49,13 +51,22 @@ def list_integration_accounts(
     accounts = db.query(IntegrationAccount).all()
     resps = []
     for a in accounts:
+        try:
+            parsed_scopes = json.loads(a.scopes_json or "[]")
+            if isinstance(parsed_scopes, list):
+                valid_scopes = [str(s) for s in parsed_scopes if isinstance(s, (str, int))]
+            else:
+                valid_scopes = []
+        except Exception:
+            valid_scopes = []
+
         item = IntegrationAccountResponse(
             id=a.id,
             account_id=a.account_id,
             name=a.name,
             description=a.description,
             status=a.status,
-            scopes=eval(a.scopes_json or "[]"),
+            scopes=valid_scopes,
             created_at=a.created_at,
             expires_at=a.expires_at,
         )

@@ -1,3 +1,5 @@
+import os
+
 from app.database import Base, SessionLocal, engine
 from app.models import (
     Category,
@@ -12,6 +14,10 @@ from app.models import (
 from app.services.iam_service import hash_password
 from app.services.payment_service import seed_default_payment_methods
 from app.services.settings_service import seed_default_settings
+
+_ENVIRONMENT = os.getenv("ENVIRONMENT", "development").lower()
+if _ENVIRONMENT == "production":
+    raise RuntimeError("FATAL: Sample database seeding is strictly prohibited in production.")
 
 
 def seed_sample_users(db):
