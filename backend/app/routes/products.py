@@ -1,23 +1,31 @@
+from typing import Any
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from typing import List, Dict, Any
+
 from app.database import get_db
-from app.models import Product, Category
+from app.models import Category, Product
 from app.schemas import (
-    ProductCreate, 
-    ProductUpdate, 
-    ProductResponse, 
-    CategoryCreate, 
+    CategoryCreate,
     CategoryResponse,
-    CategoryTreeResponse
+    CategoryTreeResponse,
+    ProductCreate,
+    ProductResponse,
+    ProductUpdate,
 )
-from app.services.cache_service import get_cache, set_cache, delete_cache, invalidate_pattern
+from app.services.cache_service import (
+    delete_cache,
+    get_cache,
+    invalidate_pattern,
+    set_cache,
+)
 
 router = APIRouter(prefix="/api/products", tags=["Products & Catalog"])
 
 # ----------------- Category Routes & Hierarchical Tree -----------------
 
-def format_category_node(cat: Category, db: Session) -> Dict[str, Any]:
+
+def format_category_node(cat: Category, db: Session) -> dict[str, Any]:
     children = db.query(Category).filter(Category.parent_id == cat.id).all()
     return {
         "id": cat.id,
@@ -26,23 +34,26 @@ def format_category_node(cat: Category, db: Session) -> Dict[str, Any]:
         "code": cat.code,
         "description": cat.description,
         "parent_id": cat.parent_id,
-        "children": [format_category_node(child, db) for child in children]
+        "children": [format_category_node(child, db) for child in children],
     }
 
-@router.get("/categories", response_model=List[CategoryResponse])
+
+@router.get("/categories", response_model=list[CategoryResponse])
 def get_categories(db: Session = Depends(get_db)):
     """
     Get flat list of all categories.
     """
     return db.query(Category).all()
 
-@router.get("/categories/tree", response_model=List[CategoryTreeResponse])
+
+@router.get("/categories/tree", response_model=list[CategoryTreeResponse])
 def get_category_tree(db: Session = Depends(get_db)):
     """
     Hierarchical Category Tree: Returns root categories with nested child subcategories.
     """
-    root_categories = db.query(Category).filter(Category.parent_id == None).all()
+    root_categories = db.query(Category).filter(Category.parent_id.is_(None)).all()
     return [format_category_node(cat, db) for cat in root_categories]
+
 
 @router.post("/categories", response_model=CategoryResponse, status_code=status.HTTP_201_CREATED)
 def create_category(cat_in: CategoryCreate, db: Session = Depends(get_db)):
@@ -64,12 +75,13 @@ def create_category(cat_in: CategoryCreate, db: Session = Depends(get_db)):
         name=cat_in.name,
         code=cat_in.code,
         description=cat_in.description,
-        parent_id=cat_in.parent_id
+        parent_id=cat_in.parent_id,
     )
     db.add(cat)
     db.commit()
     db.refresh(cat)
     return cat
+
 
 @router.delete("/categories/{category_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_category(category_id: int, db: Session = Depends(get_db)):
@@ -85,7 +97,7 @@ def delete_category(category_id: int, db: Session = Depends(get_db)):
     if assigned_count > 0:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Cannot delete category '{cat.name}': {assigned_count} products are currently assigned to it. Please reassign products before deleting."
+            detail=f"Cannot delete category '{cat.name}': {assigned_count} products are currently assigned to it. Please reassign products before deleting.",
         )
 
     # Check child categories
@@ -93,16 +105,17 @@ def delete_category(category_id: int, db: Session = Depends(get_db)):
     if children_count > 0:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Cannot delete parent category '{cat.name}': {children_count} subcategories depend on it."
+            detail=f"Cannot delete parent category '{cat.name}': {children_count} subcategories depend on it.",
         )
 
     db.delete(cat)
     db.commit()
-    return None
+
 
 # ----------------- Product Catalog Routes -----------------
 
-@router.get("/", response_model=List[ProductResponse])
+
+@router.get("/", response_model=list[ProductResponse])
 def get_products(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     """
     Cache-Aside: Check Redis cache first. If Miss, query PostgreSQL source-of-truth and populate Redis with 300s TTL.
@@ -131,12 +144,13 @@ def get_products(skip: int = 0, limit: int = 100, db: Session = Depends(get_db))
             "unit": p.unit,
             "barcode": p.barcode,
             "active": p.active,
-            "created_at": p.created_at.isoformat() if p.created_at else None
+            "created_at": p.created_at.isoformat() if p.created_at else None,
         }
         for p in products
     ]
     set_cache(cache_key, serialized, ttl_seconds=300)
     return serialized
+
 
 @router.post("/", response_model=ProductResponse, status_code=status.HTTP_201_CREATED)
 def create_product(product_in: ProductCreate, db: Session = Depends(get_db)):
@@ -144,18 +158,15 @@ def create_product(product_in: ProductCreate, db: Session = Depends(get_db)):
     Write to PostgreSQL source of truth -> Commit -> Deliberately invalidate Redis product cache.
     Auto-generates product_code PRD-XXXXXX.
     """
-    existing_sku = db.query(Product).filter(Product.sku == product_in.sku).first()
+    db.query(Product).filter(Product.sku == product_in.sku).first()
     prod_data = product_in.model_dump()
     prod_data["stock_quantity"] = 0
     prod_data["reserved_quantity"] = 0
 
-    product = Product(
-        **prod_data
-    )
+    product = Product(**prod_data)
     db.add(product)
     db.commit()
     db.refresh(product)
-
 
     product.product_code = f"PRD-{product.id:06d}"
     db.commit()
@@ -164,6 +175,7 @@ def create_product(product_in: ProductCreate, db: Session = Depends(get_db)):
     invalidate_pattern("products:*")
     invalidate_pattern("dashboard:*")
     return product
+
 
 @router.get("/{product_id}", response_model=ProductResponse)
 def get_product_by_id(product_id: int, db: Session = Depends(get_db)):
@@ -196,10 +208,11 @@ def get_product_by_id(product_id: int, db: Session = Depends(get_db)):
         "unit": product.unit,
         "barcode": product.barcode,
         "active": product.active,
-        "created_at": product.created_at.isoformat() if product.created_at else None
+        "created_at": product.created_at.isoformat() if product.created_at else None,
     }
     set_cache(cache_key, serialized, ttl_seconds=300)
     return serialized
+
 
 @router.put("/{product_id}", response_model=ProductResponse)
 def update_product(product_id: int, product_in: ProductUpdate, db: Session = Depends(get_db)):
@@ -222,6 +235,7 @@ def update_product(product_id: int, product_in: ProductUpdate, db: Session = Dep
     invalidate_pattern("dashboard:*")
     return product
 
+
 @router.delete("/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_product(product_id: int, db: Session = Depends(get_db)):
     """
@@ -237,5 +251,3 @@ def delete_product(product_id: int, db: Session = Depends(get_db)):
     delete_cache(f"product:{product_id}")
     invalidate_pattern("products:*")
     invalidate_pattern("dashboard:*")
-    return None
-

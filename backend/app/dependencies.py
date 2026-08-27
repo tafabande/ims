@@ -8,15 +8,16 @@ from the JWT — never from client-supplied headers.
 Separation of Duties is enforced here at the dependency level.
 """
 
-from fastapi import Depends, HTTPException, Request
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from sqlalchemy.orm import Session
-from typing import Optional, List
 from dataclasses import dataclass
+from typing import Any
+
+from fastapi import Depends, HTTPException, Request
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import User
-import app.services.iam_service as iam_service
+from app.services import iam_service
 
 security = HTTPBearer(auto_error=False)
 
@@ -27,13 +28,14 @@ class UserContext:
     Represents the authenticated user context derived from the JWT.
     This is the ONLY authoritative source of user identity and permissions.
     """
+
     id: int
     user_code: str
     full_name: str
     email: str
     role: str
-    permissions: List[str]
-    session_id: Optional[str] = None
+    permissions: list[str]
+    session_id: str | None = None
     network_context: str = "LAN"
 
     def get(self, key: str, default: Any = None) -> Any:
@@ -52,7 +54,7 @@ class UserContext:
 
 def get_current_user(
     request: Request,
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+    credentials: HTTPAuthorizationCredentials | None = Depends(security),
     db: Session = Depends(get_db),
 ) -> UserContext:
     """
@@ -72,8 +74,8 @@ def get_current_user(
             payload = iam_service.decode_access_token(token)
         except HTTPException:
             raise
-        except Exception:
-            raise HTTPException(status_code=401, detail="Invalid or expired authentication token.")
+        except Exception as err:
+            raise HTTPException(status_code=401, detail="Invalid or expired authentication token.") from err
 
         user_id = payload.get("sub")
         token_role = payload.get("role", "STAFF")
@@ -85,8 +87,8 @@ def get_current_user(
         # Verify user exists and is active in the database
         try:
             user_id_int = int(user_id)
-        except (ValueError, TypeError):
-            raise HTTPException(status_code=401, detail="Invalid token subject.")
+        except (ValueError, TypeError) as err:
+            raise HTTPException(status_code=401, detail="Invalid token subject.") from err
 
         db_user = db.query(User).filter(User.id == user_id_int, User.active == True).first()
         if not db_user:
@@ -149,6 +151,7 @@ def require_permission(permission: str):
     Supports both dot-notation ('inventory.view') and colon-notation ('inventory:view').
     Also enforces Zero-Trust network constraints on sensitive operational actions.
     """
+
     def _check(request: Request, user: UserContext = Depends(get_current_user)) -> UserContext:
         # Zero-Trust Network Context Enforcement for Staff POS Sales
         req_net_ctx = request.headers.get("X-Network-Context", user.network_context).upper()
@@ -167,22 +170,55 @@ def require_permission(permission: str):
 
         # Check exact matches or macro permission mappings
         has_perm = (
-            permission in user.permissions or
-            req_dot in user_perms_dot or
-            req_colon in user_perms_colon or
-            (req_dot.startswith("users.") and ("users.manage" in user_perms_dot or "users:manage" in user_perms_colon)) or
-            (req_dot.startswith("roles.") and ("roles.manage" in user_perms_dot or "roles:manage" in user_perms_colon)) or
-            (req_dot.startswith("audit.") and ("audit.view" in user_perms_dot or "audit:view" in user_perms_colon)) or
-            (req_dot in ["sales.read", "sales.view"] and "sales.view" in user_perms_dot) or
-            (req_dot in ["inventory.read", "inventory.view"] and "inventory.view" in user_perms_dot) or
-            (req_dot in ["inventory.receive"] and ("inventory.receive" in user_perms_dot or "inventory.adjust" in user_perms_dot)) or
-            (req_dot in ["inventory.adjust"] and "inventory.adjust" in user_perms_dot) or
-            (req_dot in ["products.read", "products.view"] and "products.view" in user_perms_dot) or
-            (req_dot in ["reports.read", "reports.view"] and ("reports.view" in user_perms_dot or "reports.read" in user_perms_dot or user.role in ["MANAGER", "APP_ADMIN", "SYSADMIN"])) or
-            (req_dot.startswith("purchases.") and ("purchases.view" in user_perms_dot or "purchases.approve" in user_perms_dot or user.role in ["MANAGER", "APP_ADMIN", "SYSADMIN"])) or
-            (req_dot.startswith("stores.") and ("system.config" in user_perms_dot or "stores.manage" in user_perms_dot)) or
-            (req_dot.startswith("system.") and ("system.config" in user_perms_dot or "stores.manage" in user_perms_dot or user.role in ["APP_ADMIN", "SYSADMIN", "MANAGER"])) or
-            (user.role in ["APP_ADMIN", "SYSADMIN"] and (req_dot.startswith("users.") or req_dot.startswith("system.")))
+            permission in user.permissions
+            or req_dot in user_perms_dot
+            or req_colon in user_perms_colon
+            or (
+                req_dot.startswith("users.")
+                and ("users.manage" in user_perms_dot or "users:manage" in user_perms_colon)
+            )
+            or (
+                req_dot.startswith("roles.")
+                and ("roles.manage" in user_perms_dot or "roles:manage" in user_perms_colon)
+            )
+            or (req_dot.startswith("audit.") and ("audit.view" in user_perms_dot or "audit:view" in user_perms_colon))
+            or (req_dot in ["sales.read", "sales.view"] and "sales.view" in user_perms_dot)
+            or (req_dot in ["inventory.read", "inventory.view"] and "inventory.view" in user_perms_dot)
+            or (
+                req_dot in ["inventory.receive"]
+                and ("inventory.receive" in user_perms_dot or "inventory.adjust" in user_perms_dot)
+            )
+            or (req_dot in ["inventory.adjust"] and "inventory.adjust" in user_perms_dot)
+            or (req_dot in ["products.read", "products.view"] and "products.view" in user_perms_dot)
+            or (
+                req_dot in ["reports.read", "reports.view"]
+                and (
+                    "reports.view" in user_perms_dot
+                    or "reports.read" in user_perms_dot
+                    or user.role in ["MANAGER", "APP_ADMIN", "SYSADMIN"]
+                )
+            )
+            or (
+                req_dot.startswith("purchases.")
+                and (
+                    "purchases.view" in user_perms_dot
+                    or "purchases.approve" in user_perms_dot
+                    or user.role in ["MANAGER", "APP_ADMIN", "SYSADMIN"]
+                )
+            )
+            or (
+                req_dot.startswith("stores.")
+                and ("system.config" in user_perms_dot or "stores.manage" in user_perms_dot)
+            )
+            or (
+                req_dot.startswith("system.")
+                and (
+                    "system.config" in user_perms_dot
+                    or "stores.manage" in user_perms_dot
+                    or user.role in ["APP_ADMIN", "SYSADMIN", "MANAGER"]
+                )
+            )
+            or (user.role in ["APP_ADMIN", "SYSADMIN"] and (req_dot.startswith(("users.", "system."))))
         )
 
         if not has_perm:
@@ -194,6 +230,7 @@ def require_permission(permission: str):
                 ),
             )
         return user
+
     return _check
 
 
@@ -201,6 +238,7 @@ def require_any_permission(*permissions: str):
     """
     Dependency factory that passes if the user has ANY of the listed permissions.
     """
+
     def _check(request: Request, user: UserContext = Depends(get_current_user)) -> UserContext:
         req_net_ctx = request.headers.get("X-Network-Context", user.network_context).upper()
         path = request.url.path.rstrip("/").lower()
@@ -211,10 +249,7 @@ def require_any_permission(*permissions: str):
             )
 
         user_perms_dot = {p.replace(":", ".") for p in user.permissions}
-        has_any = any(
-            (p in user.permissions or p.replace(":", ".") in user_perms_dot)
-            for p in permissions
-        )
+        has_any = any((p in user.permissions or p.replace(":", ".") in user_perms_dot) for p in permissions)
 
         if not has_any:
             raise HTTPException(
@@ -224,6 +259,7 @@ def require_any_permission(*permissions: str):
                 ),
             )
         return user
+
     return _check
 
 
@@ -231,6 +267,7 @@ def require_role(*roles: str):
     """
     Dependency factory that enforces an exact role match.
     """
+
     def _check(user: UserContext = Depends(get_current_user)) -> UserContext:
         allowed_roles = [r.upper() for r in roles]
         user_role = user.role.upper()
@@ -246,6 +283,7 @@ def require_role(*roles: str):
                 ),
             )
         return user
+
     return _check
 
 

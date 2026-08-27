@@ -1,18 +1,16 @@
-import pytest
 from fastapi.testclient import TestClient
+
 from app.main import app
 
 client = TestClient(app)
+
 
 def test_login_creates_active_session():
     """
     Session Security Test:
     Valid login credentials issue Access + Refresh tokens and create an active session record.
     """
-    response = client.post(
-        "/auth/login",
-        json={"username": "admin", "password": "adminpassword"}
-    )
+    response = client.post("/auth/login", json={"username": "admin", "password": "adminpassword"})
     assert response.status_code == 200
     data = response.json()
     assert "access_token" in data
@@ -25,6 +23,7 @@ def test_login_creates_active_session():
     sessions = sessions_res.json()
     assert len(sessions) > 0
     assert any(s["user_id"] == int(data["user_id"]) for s in sessions)
+
 
 def test_revoke_session_invalidates_session():
     """
@@ -44,14 +43,12 @@ def test_revoke_session_invalidates_session():
     revoked = next(s for s in updated_sessions if s["session_id"] == target_id)
     assert revoked["active"] is False
 
+
 def test_invalid_login_credentials_rejected():
     """
     Authentication Failure Test:
     Invalid password returns HTTP 401 Unauthorized.
     """
-    response = client.post(
-        "/auth/login",
-        json={"username": "admin", "password": "wrong_password"}
-    )
+    response = client.post("/auth/login", json={"username": "admin", "password": "wrong_password"})
     assert response.status_code == 401
     assert "Authentication Failed" in response.json()["detail"]

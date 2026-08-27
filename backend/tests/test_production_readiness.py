@@ -1,16 +1,14 @@
-import pytest
 import io
+
+import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from app.main import app
 from app.database import Base, engine, get_db
-from app.models import Product, Category, User, InventoryTransaction
-from app.services import inventory_service, iam_service
+from app.main import app
 from app.middleware.security import escape_html_string
-
-import os
+from app.models import Category, InventoryTransaction, Product
+from app.services import iam_service, inventory_service
 
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
@@ -34,7 +32,6 @@ def setup_db():
     yield
 
 
-
 def test_cr01_broken_access_control_and_tenant_isolation():
     """
     CR-01 Verification: Unauthenticated or out-of-scope requests must be rejected at the server level.
@@ -47,7 +44,7 @@ def test_cr01_broken_access_control_and_tenant_isolation():
     res_staff = client.post(
         "/api/users",
         json={"email": "hacker@test.com", "full_name": "Attacker", "role": "ADMIN"},
-        headers={"X-User-Role": "STAFF"}
+        headers={"X-User-Role": "STAFF"},
     )
     assert res_staff.status_code == 403
 
@@ -57,6 +54,7 @@ def test_cr02_mass_assignment_tampering_rejected():
     CR-02 Verification: Protected server fields cannot be tampered with via HTTP client body payload.
     """
     import uuid
+
     uid = uuid.uuid4().hex[:6]
     db = TestingSessionLocal()
     cat = Category(name=f"Electronics_{uid}", code=f"ELE-{uid}", category_code=f"CAT-{uid}")
@@ -74,13 +72,13 @@ def test_cr02_mass_assignment_tampering_rejected():
             "category_id": cat.id,
             "purchase_price": 10.0,
             "selling_price": 20.0,
-            "stock_quantity": 99999, # Client trying to inject 99,999 free stock
-            "reserved_quantity": 500
+            "stock_quantity": 99999,  # Client trying to inject 99,999 free stock
+            "reserved_quantity": 500,
         },
-        headers={"X-User-Role": "MANAGER"}
+        headers={"X-User-Role": "MANAGER"},
     )
     assert res.status_code in [200, 201]
-    
+
     # Verify server derived initial stock as 0 regardless of client input
     db.close()
     verify_db = TestingSessionLocal()
@@ -97,6 +95,7 @@ def test_cr03_stock_concurrency_and_row_locking():
     CR-03 Verification: Stock mutations execute atomically with row-level locks and record snapshots.
     """
     import uuid
+
     uid = uuid.uuid4().hex[:6]
     db = TestingSessionLocal()
     cat = Category(name=f"General_{uid}", code=f"GEN-{uid}", category_code=f"CAT-{uid}")
@@ -110,7 +109,7 @@ def test_cr03_stock_concurrency_and_row_locking():
         category_id=cat.id,
         purchase_price=15.0,
         selling_price=30.0,
-        stock_quantity=100
+        stock_quantity=100,
     )
     db.add(prod)
     db.commit()
@@ -124,7 +123,7 @@ def test_cr03_stock_concurrency_and_row_locking():
         tx_type="SALE",
         reference="INV-1001",
         user_name="Cashier_Alice",
-        notes="Point of sale dispatch"
+        notes="Point of sale dispatch",
     )
     db.commit()
 
@@ -164,7 +163,7 @@ def test_cr05_csrf_header_defense_and_xss_escaping():
     res = client.post(
         "/api/products/",
         json={"sku": "CSRF-001", "name": "CSRF Test"},
-        headers={"X-CSRF-Token": "INVALID_TOKEN_XYZ789", "X-User-Role": "MANAGER"}
+        headers={"X-CSRF-Token": "INVALID_TOKEN_XYZ789", "X-User-Role": "MANAGER"},
     )
     client.cookies.clear()
     assert res.status_code == 403
@@ -178,7 +177,7 @@ def test_cr06_file_upload_type_and_size_validation():
     res = client.post(
         "/api/uploads/upload",
         files={"file": ("malicious.exe", fake_exe, "application/octet-stream")},
-        headers={"X-User-Role": "MANAGER"}
+        headers={"X-User-Role": "MANAGER"},
     )
     assert res.status_code == 400
     assert "not allowed" in res.json()["detail"]
@@ -189,6 +188,7 @@ def test_cr07_idempotency_deduplication():
     CR-07 Verification: Idempotency-Key guarantees safe mutation retry without duplicate record creation.
     """
     import uuid
+
     uid = uuid.uuid4().hex[:6]
     idempotency_key = f"idem-key-{uid}"
     db = TestingSessionLocal()
@@ -200,16 +200,28 @@ def test_cr07_idempotency_deduplication():
     # First Request
     res1 = client.post(
         "/api/products/",
-        json={"sku": sku, "name": "Idempotent Product", "category_id": cat.id, "purchase_price": 5.0, "selling_price": 10.0},
-        headers={"Idempotency-Key": idempotency_key, "X-User-Role": "MANAGER"}
+        json={
+            "sku": sku,
+            "name": "Idempotent Product",
+            "category_id": cat.id,
+            "purchase_price": 5.0,
+            "selling_price": 10.0,
+        },
+        headers={"Idempotency-Key": idempotency_key, "X-User-Role": "MANAGER"},
     )
     assert res1.status_code in [200, 201]
 
     # Duplicate Request with identical Idempotency-Key
     res2 = client.post(
         "/api/products/",
-        json={"sku": sku, "name": "Idempotent Product", "category_id": cat.id, "purchase_price": 5.0, "selling_price": 10.0},
-        headers={"Idempotency-Key": idempotency_key, "X-User-Role": "MANAGER"}
+        json={
+            "sku": sku,
+            "name": "Idempotent Product",
+            "category_id": cat.id,
+            "purchase_price": 5.0,
+            "selling_price": 10.0,
+        },
+        headers={"Idempotency-Key": idempotency_key, "X-User-Role": "MANAGER"},
     )
     assert res2.status_code in [200, 201]
 
@@ -231,7 +243,6 @@ def test_cr08_observability_and_health_telemetry():
     assert "X-Request-ID" in res_release.headers
 
 
-
 def test_cr09_performance_indexing_and_pagination():
     """
     CR-09 Verification: Products list endpoint supports server-side pagination with fast response times.
@@ -241,19 +252,28 @@ def test_cr09_performance_indexing_and_pagination():
     assert isinstance(res.json(), list)
 
 
-
 def test_cr10_sku_hierarchy_and_category_tree():
     """
     CR-10 Verification: Hierarchical parent-child category tree relationships and SKU uniqueness.
     """
     import uuid
+
     uid = uuid.uuid4().hex[:6]
     db = TestingSessionLocal()
-    parent_cat = Category(name=f"Electronics Main_{uid}", code=f"ELE-MAIN-{uid}", category_code=f"CAT-00010-{uid}")
+    parent_cat = Category(
+        name=f"Electronics Main_{uid}",
+        code=f"ELE-MAIN-{uid}",
+        category_code=f"CAT-00010-{uid}",
+    )
     db.add(parent_cat)
     db.commit()
 
-    child_cat = Category(name=f"Laptops_{uid}", code=f"ELE-LAP-{uid}", category_code=f"CAT-00011-{uid}", parent_id=parent_cat.id)
+    child_cat = Category(
+        name=f"Laptops_{uid}",
+        code=f"ELE-LAP-{uid}",
+        category_code=f"CAT-00011-{uid}",
+        parent_id=parent_cat.id,
+    )
     db.add(child_cat)
     db.commit()
 
@@ -295,8 +315,10 @@ def test_cr14_inventory_reconciliation_variance_engine():
     CR-14 Verification: Automated reconciliation engine calculates expected vs actual stock and flags variances.
     """
     import uuid
+
     uid = uuid.uuid4().hex[:6]
     from app.services import reconciliation_service
+
     db = TestingSessionLocal()
 
     cat = Category(name=f"Hardware_{uid}", code=f"HWD-{uid}", category_code=f"CAT-00020-{uid}")
@@ -310,7 +332,7 @@ def test_cr14_inventory_reconciliation_variance_engine():
         category_id=cat.id,
         purchase_price=10.0,
         selling_price=20.0,
-        stock_quantity=100
+        stock_quantity=100,
     )
     db.add(p)
     db.commit()

@@ -1,6 +1,6 @@
-import os
 import json
-import time
+import os
+
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
@@ -8,20 +8,29 @@ from starlette.responses import JSONResponse
 # Attempt to connect to Redis with bounded connection timeout
 try:
     import redis
+
     redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
-    redis_client = redis.Redis.from_url(redis_url, decode_responses=True, socket_connect_timeout=0.2, socket_timeout=0.2)
+    redis_client = redis.Redis.from_url(
+        redis_url, decode_responses=True, socket_connect_timeout=0.2, socket_timeout=0.2
+    )
     redis_client.ping()
 except Exception:
     redis_client = None
 
-IDEMPOTENCY_TTL_SECONDS = 86400 # 24 hours retention
+IDEMPOTENCY_TTL_SECONDS = 86400  # 24 hours retention
 MEMORY_IDEMPOTENCY_STORE = {}
+
 
 class IdempotencyMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         # Only process state-modifying requests that specify Idempotency-Key
         idempotency_key = request.headers.get("Idempotency-Key")
-        if not idempotency_key or request.method not in ["POST", "PUT", "PATCH", "DELETE"]:
+        if not idempotency_key or request.method not in [
+            "POST",
+            "PUT",
+            "PATCH",
+            "DELETE",
+        ]:
             return await call_next(request)
 
         cache_key = f"idempotency:{idempotency_key}"
@@ -38,8 +47,8 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                         headers={
                             "X-Idempotency-Hit": "true",
                             "X-Idempotency-Key": idempotency_key,
-                            "X-Cache-Lookup": "IDEMPOTENT_REPLAY"
-                        }
+                            "X-Cache-Lookup": "IDEMPOTENT_REPLAY",
+                        },
                     )
             except Exception:
                 pass
@@ -53,8 +62,8 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                 headers={
                     "X-Idempotency-Hit": "true",
                     "X-Idempotency-Key": idempotency_key,
-                    "X-Cache-Lookup": "IDEMPOTENT_REPLAY"
-                }
+                    "X-Cache-Lookup": "IDEMPOTENT_REPLAY",
+                },
             )
 
         # Execute downstream request
@@ -82,11 +91,15 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
 
                 cache_payload = {
                     "status_code": response.status_code,
-                    "content": payload
+                    "content": payload,
                 }
                 if redis_client:
                     try:
-                        redis_client.set(cache_key, json.dumps(cache_payload), ex=IDEMPOTENCY_TTL_SECONDS)
+                        redis_client.set(
+                            cache_key,
+                            json.dumps(cache_payload),
+                            ex=IDEMPOTENCY_TTL_SECONDS,
+                        )
                     except Exception:
                         pass
                 MEMORY_IDEMPOTENCY_STORE[cache_key] = cache_payload
@@ -95,7 +108,7 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                     content=body_bytes,
                     status_code=response.status_code,
                     headers=dict(response.headers),
-                    media_type=response.media_type
+                    media_type=response.media_type,
                 )
             except Exception:
                 pass
@@ -107,4 +120,5 @@ def iterate_in_threadpool(iterable):
     async def _iterator():
         for item in iterable:
             yield item
+
     return _iterator()

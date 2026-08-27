@@ -1,12 +1,14 @@
-import pytest
 import uuid
+
 from fastapi.testclient import TestClient
-from app.main import app
-from app.database import engine, get_db
-from app.models import Store, Category, Product
 from sqlalchemy.orm import sessionmaker
 
+from app.database import engine, get_db
+from app.main import app
+from app.models import Category, Product, Store
+
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
 
 def override_get_db():
     try:
@@ -15,8 +17,10 @@ def override_get_db():
     finally:
         db.close()
 
+
 app.dependency_overrides[get_db] = override_get_db
 client = TestClient(app)
+
 
 def test_inter_store_stock_transfer():
     db = TestingSessionLocal()
@@ -33,7 +37,7 @@ def test_inter_store_stock_transfer():
         category_id=cat.id,
         purchase_price=500.0,
         selling_price=800.0,
-        stock_quantity=50
+        stock_quantity=50,
     )
     db.add(prod)
     db.commit()
@@ -42,14 +46,15 @@ def test_inter_store_stock_transfer():
     db.close()
 
     # Create Transfer 10 units from s1 to s2
-    res = client.post("/api/transfers", json={
-        "source_store_id": s1_id,
-        "destination_store_id": s2_id,
-        "notes": "Emergency stock rebalance",
-        "items": [
-            {"product_id": prod_id, "quantity": 10}
-        ]
-    })
+    res = client.post(
+        "/api/transfers",
+        json={
+            "source_store_id": s1_id,
+            "destination_store_id": s2_id,
+            "notes": "Emergency stock rebalance",
+            "items": [{"product_id": prod_id, "quantity": 10}],
+        },
+    )
     assert res.status_code == 201
     transfer = res.json()
     assert transfer["status"] == "COMPLETED"

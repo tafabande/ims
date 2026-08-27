@@ -1,10 +1,11 @@
-import pytest
 from fastapi.testclient import TestClient
+
+from app.database import SessionLocal
 from app.main import app
-from app.database import Base, engine, SessionLocal
-from app.models import Category, Product, InventoryTransaction
+from app.models import Category, InventoryTransaction, Product
 
 client = TestClient(app)
+
 
 def test_pessimistic_row_locking_concurrency_benchmark():
     """
@@ -19,6 +20,7 @@ def test_pessimistic_row_locking_concurrency_benchmark():
     """
     db = SessionLocal()
     import uuid
+
     cat_code = f"CONCUR-CAT-{uuid.uuid4().hex[:6]}"
     cat = Category(name="Electronics Concurrency", code=cat_code)
     db.add(cat)
@@ -31,8 +33,8 @@ def test_pessimistic_row_locking_concurrency_benchmark():
         category_id=cat.id,
         purchase_price=10.0,
         selling_price=20.0,
-        stock_quantity=10, # Initial stock: 10 units
-        reserved_quantity=0
+        stock_quantity=10,  # Initial stock: 10 units
+        reserved_quantity=0,
     )
     db.add(prod)
     db.commit()
@@ -47,9 +49,12 @@ def test_pessimistic_row_locking_concurrency_benchmark():
             json={
                 "customer_id": 1,
                 "payment_method": "Cash",
-                "items": [{"product_id": prod_id, "quantity": 1}]
+                "items": [{"product_id": prod_id, "quantity": 1}],
             },
-            headers={"X-User-Role": "STAFF", "Idempotency-Key": f"IDEM-RACE-SALE-{idx}"}
+            headers={
+                "X-User-Role": "STAFF",
+                "Idempotency-Key": f"IDEM-RACE-SALE-{idx}",
+            },
         )
         return response.status_code
 

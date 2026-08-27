@@ -1,15 +1,17 @@
-import pytest
 import uuid
+
 from fastapi.testclient import TestClient
+
+from app.database import Base, SessionLocal, engine
 from app.main import app
-from app.database import Base, engine, SessionLocal
-from app.models import UserDevice, UserSession, User
 from app.services import device_trust_service
 
 client = TestClient(app)
 
+
 def setup_module(module):
     Base.metadata.create_all(bind=engine)
+
 
 def test_device_trust_and_session_security_lifecycle():
     """
@@ -29,9 +31,9 @@ def test_device_trust_and_session_security_lifecycle():
             "device_name": f"Store Manager Workstation - Harare WH {unique_fp}",
             "fingerprint_raw": raw_fp,
             "ip_address": "197.221.240.12",
-            "user_agent": "Chrome/128.0 (Windows NT 10.0)"
+            "user_agent": "Chrome/128.0 (Windows NT 10.0)",
         },
-        headers={"X-User-Role": "MANAGER"}
+        headers={"X-User-Role": "MANAGER"},
     )
     assert reg_res.status_code == 201
     dev_data = reg_res.json()
@@ -48,7 +50,7 @@ def test_device_trust_and_session_security_lifecycle():
         raw_token=f"jwt_token_{uuid.uuid4().hex}",
         ip_address="197.221.240.12",
         user_agent="Chrome/128.0 (Windows NT 10.0)",
-        location_summary="Harare Main Hub"
+        location_summary="Harare Main Hub",
     )
     session_id_str = session.session_id
     db.close()
@@ -60,9 +62,9 @@ def test_device_trust_and_session_security_lifecycle():
             "session_id": session_id_str,
             "action_name": "VIEW_INVENTORY",
             "fingerprint_raw": raw_fp,
-            "ip_address": "197.221.240.12"
+            "ip_address": "197.221.240.12",
         },
-        headers={"X-User-Role": "STAFF"}
+        headers={"X-User-Role": "STAFF"},
     )
     assert risk_low_res.status_code == 200
     low_data = risk_low_res.json()
@@ -76,9 +78,9 @@ def test_device_trust_and_session_security_lifecycle():
             "session_id": session_id_str,
             "action_name": "DELETE_PRODUCT",
             "fingerprint_raw": raw_fp,
-            "ip_address": "197.221.240.12"
+            "ip_address": "197.221.240.12",
         },
-        headers={"X-User-Role": "MANAGER"}
+        headers={"X-User-Role": "MANAGER"},
     )
     assert risk_high_res.status_code == 200
     high_data = risk_high_res.json()
@@ -93,9 +95,9 @@ def test_device_trust_and_session_security_lifecycle():
             "session_id": session_id_str,
             "action_name": "VIEW_INVENTORY",
             "fingerprint_raw": spoofed_fp,
-            "ip_address": "45.12.89.4"
+            "ip_address": "45.12.89.4",
         },
-        headers={"X-User-Role": "STAFF"}
+        headers={"X-User-Role": "STAFF"},
     )
     assert risk_spoof_res.status_code == 200
     spoof_data = risk_spoof_res.json()
@@ -103,17 +105,14 @@ def test_device_trust_and_session_security_lifecycle():
     assert any("mismatch" in r.lower() for r in spoof_data["reasons"])
 
     # 6. Manager Revokes Active Session
-    revoke_ses_res = client.post(
-        f"/api/sessions/{session_id_str}/revoke",
-        headers={"X-User-Role": "MANAGER"}
-    )
+    revoke_ses_res = client.post(f"/api/sessions/{session_id_str}/revoke", headers={"X-User-Role": "MANAGER"})
     assert revoke_ses_res.status_code == 200
     assert revoke_ses_res.json()["is_revoked"] is True
 
     # 7. Manager Revokes Device -> Automatically revokes linked device & sessions
     revoke_dev_res = client.post(
         f"/api/sessions/devices/{device_id_str}/revoke",
-        headers={"X-User-Role": "MANAGER"}
+        headers={"X-User-Role": "MANAGER"},
     )
     assert revoke_dev_res.status_code == 200
     assert revoke_dev_res.json()["is_revoked"] is True

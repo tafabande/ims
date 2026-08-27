@@ -1,38 +1,40 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from typing import List
+
 from app.database import get_db
-from app.schemas import (
-    InventoryAdjustmentRequest, 
-    StockReceiveRequest, 
-    StockDamageRequest, 
-    StockReturnRequest,
-    InventoryTransactionResponse
-)
-from app.services.inventory_service import process_stock_adjustment
-from app.models import InventoryTransaction
-from app.services.cache_service import delete_cache, invalidate_pattern
 from app.dependencies import require_permission
+from app.models import InventoryTransaction
+from app.schemas import (
+    InventoryAdjustmentRequest,
+    InventoryTransactionResponse,
+    StockDamageRequest,
+    StockReceiveRequest,
+    StockReturnRequest,
+)
+from app.services.cache_service import delete_cache, invalidate_pattern
+from app.services.inventory_service import process_stock_adjustment
 
 router = APIRouter(prefix="/api/inventory", tags=["Inventory Operations"])
 
-@router.get("/transactions", response_model=List[InventoryTransactionResponse])
+
+@router.get("/transactions", response_model=list[InventoryTransactionResponse])
 def get_inventory_transactions(
-    skip: int = 0, 
-    limit: int = 100, 
+    skip: int = 0,
+    limit: int = 100,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(require_permission("inventory:read"))
+    current_user: dict = Depends(require_permission("inventory:read")),
 ):
     """
     Get audit list of inventory transactions with quantity_before and quantity_after snapshots.
     """
     return db.query(InventoryTransaction).order_by(InventoryTransaction.id.desc()).offset(skip).limit(limit).all()
 
+
 @router.post("/adjust")
 def adjust_stock(
-    req: InventoryAdjustmentRequest, 
+    req: InventoryAdjustmentRequest,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(require_permission("inventory:adjust"))
+    current_user: dict = Depends(require_permission("inventory:adjust")),
 ):
     """
     Atomic Stock Adjustment Endpoint using pessimistic row-level locking.
@@ -45,7 +47,7 @@ def adjust_stock(
         reference=req.reference or "MANUAL-ADJUST",
         user_name=req.user_name or current_user.get("sub", "System Operator"),
         notes=req.notes,
-        reason_category=req.reason_category or "CORRECTION"
+        reason_category=req.reason_category or "CORRECTION",
     )
     res_id = updated_product.id
     res_stock = updated_product.stock_quantity
@@ -55,17 +57,14 @@ def adjust_stock(
     invalidate_pattern("products:*")
     invalidate_pattern("dashboard:*")
 
-    return {
-        "status": "success",
-        "product_id": res_id,
-        "new_stock_quantity": res_stock
-    }
+    return {"status": "success", "product_id": res_id, "new_stock_quantity": res_stock}
+
 
 @router.post("/receive")
 def receive_stock(
-    req: StockReceiveRequest, 
+    req: StockReceiveRequest,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(require_permission("inventory:adjust"))
+    current_user: dict = Depends(require_permission("inventory:adjust")),
 ):
     """
     Explicit business operation: Receive stock from supplier/purchase order.
@@ -78,7 +77,7 @@ def receive_stock(
         reference=req.po_number or "RCV-STOCK",
         user_name="Supplier Inbound",
         notes=req.notes or "Stock received from supplier",
-        reason_category="STOCK_RECEIVE"
+        reason_category="STOCK_RECEIVE",
     )
     res_id = updated_product.id
     res_stock = updated_product.stock_quantity
@@ -87,17 +86,14 @@ def receive_stock(
     delete_cache(f"product:{req.product_id}")
     invalidate_pattern("products:*")
 
-    return {
-        "status": "success",
-        "product_id": res_id,
-        "new_stock_quantity": res_stock
-    }
+    return {"status": "success", "product_id": res_id, "new_stock_quantity": res_stock}
+
 
 @router.post("/damage")
 def record_damaged_stock(
-    req: StockDamageRequest, 
+    req: StockDamageRequest,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(require_permission("inventory:adjust"))
+    current_user: dict = Depends(require_permission("inventory:adjust")),
 ):
     """
     Explicit business operation: Record damaged stock write-off.
@@ -110,7 +106,7 @@ def record_damaged_stock(
         reference="DAMAGE-WO",
         user_name="Warehouse Operator",
         notes=req.notes,
-        reason_category="DAMAGED"
+        reason_category="DAMAGED",
     )
     res_id = updated_product.id
     res_stock = updated_product.stock_quantity
@@ -119,17 +115,14 @@ def record_damaged_stock(
     delete_cache(f"product:{req.product_id}")
     invalidate_pattern("products:*")
 
-    return {
-        "status": "success",
-        "product_id": res_id,
-        "new_stock_quantity": res_stock
-    }
+    return {"status": "success", "product_id": res_id, "new_stock_quantity": res_stock}
+
 
 @router.post("/return")
 def process_customer_return(
-    req: StockReturnRequest, 
+    req: StockReturnRequest,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(require_permission("inventory:read"))
+    current_user: dict = Depends(require_permission("inventory:read")),
 ):
     """
     Explicit business operation: Process customer return.
@@ -142,7 +135,7 @@ def process_customer_return(
         reference=f"RET-CUST-{req.customer_id or 'GENERIC'}",
         user_name="POS Operator",
         notes=req.notes or "Customer return",
-        reason_category="RETURNED"
+        reason_category="RETURNED",
     )
     res_id = updated_product.id
     res_stock = updated_product.stock_quantity
@@ -151,8 +144,4 @@ def process_customer_return(
     delete_cache(f"product:{req.product_id}")
     invalidate_pattern("products:*")
 
-    return {
-        "status": "success",
-        "product_id": res_id,
-        "new_stock_quantity": res_stock
-    }
+    return {"status": "success", "product_id": res_id, "new_stock_quantity": res_stock}

@@ -1,16 +1,18 @@
+import datetime
 import html
-from fastapi import Request, HTTPException, Depends
-from starlette.middleware.base import BaseHTTPMiddleware
-
+import logging
 import os
+
+from fastapi import HTTPException, Request
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import JSONResponse
 
 _ENVIRONMENT = os.getenv("ENVIRONMENT", "development").lower()
 _IS_PRODUCTION = _ENVIRONMENT == "production"
 
 # Only trust X-Forwarded-For from these IPs (configure via env for your proxy layer)
-TRUSTED_PROXY_IPS = set(
-    filter(None, os.getenv("TRUSTED_PROXY_IPS", "127.0.0.1,::1").split(","))
-)
+TRUSTED_PROXY_IPS = set(filter(None, os.getenv("TRUSTED_PROXY_IPS", "127.0.0.1,::1").split(",")))
+
 
 def determine_network_context(request: Request) -> str:
     """
@@ -36,15 +38,15 @@ def determine_network_context(request: Request) -> str:
         client_ip = peer_ip
 
     # 2. LAN IP range detection (127.0.0.1, 10.x, 192.168.x, 172.16-31.x)
-    if client_ip in ["127.0.0.1", "::1", "testclient", "localhost"] or \
-       client_ip.startswith("192.168.") or \
-       client_ip.startswith("10.") or \
-       any(client_ip.startswith(f"172.{b}.") for b in range(16, 32)):
+    if (
+        client_ip in ["127.0.0.1", "::1", "testclient", "localhost"]
+        or client_ip.startswith(("192.168.", "10."))
+        or any(client_ip.startswith(f"172.{b}.") for b in range(16, 32))
+    ):
         return "LAN"
 
     return "REMOTE"
 
-from starlette.responses import JSONResponse
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
@@ -58,7 +60,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             if csrf_cookie and csrf_header and csrf_cookie != csrf_header:
                 return JSONResponse(
                     status_code=403,
-                    content={"detail": "CSRF Token Mismatch. State-changing request blocked."}
+                    content={"detail": "CSRF Token Mismatch. State-changing request blocked."},
                 )
 
         response = await call_next(request)
@@ -80,13 +82,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             "font-src 'self' data:; "
             "connect-src 'self';"
         )
-        response.headers["Permissions-Policy"] = (
-            "camera=(), "
-            "microphone=(), "
-            "geolocation=(), "
-            "payment=(), "
-            "usb=()"
-        )
+        response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
 
         # Prevent browser/proxy caching for sensitive API endpoints
@@ -97,55 +93,139 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         return response
 
 
-import logging
-import datetime
-
 logger = logging.getLogger("security.audit")
 
 # Enterprise RBAC & ABAC Role Permission Matrix
 ROLE_PERMISSIONS = {
     "SYSADMIN": {
-        "system:deploy", "system:backup", "system:restore", "system:configure", "system:logs"
+        "system:deploy",
+        "system:backup",
+        "system:restore",
+        "system:configure",
+        "system:logs",
         # Explicitly NO business domain permissions (products, inventory, sales, purchases, pricing)
     },
     "APP_ADMIN": {
-        "users:view", "users:create", "users:update", "users:disable", "users:delete", "users:reset_password", "users:assign_role",
-        "organisation:manage", "warehouses:manage", "categories:manage", "audit:view"
+        "users:view",
+        "users:create",
+        "users:update",
+        "users:disable",
+        "users:delete",
+        "users:reset_password",
+        "users:assign_role",
+        "organisation:manage",
+        "warehouses:manage",
+        "categories:manage",
+        "audit:view",
     },
     "ADMIN": {
-        "products:view", "products:create", "products:update", "products:delete",
-        "inventory:view", "inventory:adjust", "inventory:receive", "inventory:transfer", "inventory:read",
-        "purchases:create", "purchases:submit", "purchases:approve", "purchases:receive",
-        "pricing:view", "pricing:update", "suppliers:view", "suppliers:create", "suppliers:update",
-        "users:view", "users:create", "users:update", "users:disable", "users:delete", "users:reset_password", "users:assign_role",
-        "organisation:manage", "warehouses:manage", "categories:manage", "audit:view", "sales:create", "sales:view"
+        "products:view",
+        "products:create",
+        "products:update",
+        "products:delete",
+        "inventory:view",
+        "inventory:adjust",
+        "inventory:receive",
+        "inventory:transfer",
+        "inventory:read",
+        "purchases:create",
+        "purchases:submit",
+        "purchases:approve",
+        "purchases:receive",
+        "pricing:view",
+        "pricing:update",
+        "suppliers:view",
+        "suppliers:create",
+        "suppliers:update",
+        "users:view",
+        "users:create",
+        "users:update",
+        "users:disable",
+        "users:delete",
+        "users:reset_password",
+        "users:assign_role",
+        "organisation:manage",
+        "warehouses:manage",
+        "categories:manage",
+        "audit:view",
+        "sales:create",
+        "sales:view",
     },
     "MANAGER": {
-        "products:view", "products:create", "products:update", "products:delete",
-        "inventory:view", "inventory:adjust", "inventory:receive", "inventory:transfer", "inventory:read",
-        "purchases:create", "purchases:submit", "purchases:approve", "purchases:receive",
-        "pricing:view", "pricing:update", "suppliers:view", "suppliers:create", "suppliers:update",
-        "sales:create", "sales:view", "audit:view"
+        "products:view",
+        "products:create",
+        "products:update",
+        "products:delete",
+        "inventory:view",
+        "inventory:adjust",
+        "inventory:receive",
+        "inventory:transfer",
+        "inventory:read",
+        "purchases:create",
+        "purchases:submit",
+        "purchases:approve",
+        "purchases:receive",
+        "pricing:view",
+        "pricing:update",
+        "suppliers:view",
+        "suppliers:create",
+        "suppliers:update",
+        "sales:create",
+        "sales:view",
+        "audit:view",
     },
     "INVENTORY_MANAGER": {
-        "products:view", "products:create", "products:update", "products:delete",
-        "inventory:view", "inventory:adjust", "inventory:receive", "inventory:transfer", "inventory:read",
-        "purchases:create", "purchases:submit", "purchases:approve", "purchases:receive",
-        "pricing:view", "pricing:update", "suppliers:view", "suppliers:create", "suppliers:update"
+        "products:view",
+        "products:create",
+        "products:update",
+        "products:delete",
+        "inventory:view",
+        "inventory:adjust",
+        "inventory:receive",
+        "inventory:transfer",
+        "inventory:read",
+        "purchases:create",
+        "purchases:submit",
+        "purchases:approve",
+        "purchases:receive",
+        "pricing:view",
+        "pricing:update",
+        "suppliers:view",
+        "suppliers:create",
+        "suppliers:update",
     },
     "WAREHOUSE_MANAGER": {
-        "products:view", "products:update",
-        "inventory:view", "inventory:adjust", "inventory:receive", "inventory:transfer", "inventory:read",
-        "purchases:receive", "suppliers:view"
+        "products:view",
+        "products:update",
+        "inventory:view",
+        "inventory:adjust",
+        "inventory:receive",
+        "inventory:transfer",
+        "inventory:read",
+        "purchases:receive",
+        "suppliers:view",
     },
     "STAFF": {
-        "products:view", "inventory:view", "inventory:receive", "inventory:read", "sales:create", "customers:view"
+        "products:view",
+        "inventory:view",
+        "inventory:receive",
+        "inventory:read",
+        "sales:create",
+        "customers:view",
     },
     "AUDITOR": {
-        "products:view", "inventory:view", "inventory:read", "sales:view", "purchases:view", "pricing:view",
-        "customers:view", "suppliers:view", "audit:view"
-    }
+        "products:view",
+        "inventory:view",
+        "inventory:read",
+        "sales:view",
+        "purchases:view",
+        "pricing:view",
+        "customers:view",
+        "suppliers:view",
+        "audit:view",
+    },
 }
+
 
 def require_permission(required_permission: str):
     """
@@ -153,6 +233,7 @@ def require_permission(required_permission: str):
     Evaluates permission strictly from authenticated server session with Separation of Duties.
     Emits structured security denial audit event on HTTP 403.
     """
+
     def permission_checker(request: Request):
         user = getattr(request.state, "user", None)
         user_role = user.role.upper() if user and hasattr(user, "role") else "STAFF"
@@ -166,7 +247,7 @@ def require_permission(required_permission: str):
         if required_permission not in user_permissions:
             request_id = request.headers.get("X-Request-ID", "req-unknown")
             user_id = getattr(user, "id", "USR-ANONYMOUS")
-            
+
             # Emit structured security audit log
             audit_event = {
                 "event": "authorization_denied",
@@ -176,7 +257,7 @@ def require_permission(required_permission: str):
                 "resource": request.url.path,
                 "reason": "permission_denied",
                 "request_id": request_id,
-                "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat()
+                "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
             }
             logger.warning(f"[SECURITY_AUDIT] Authorization Denied: {audit_event}")
 
@@ -185,35 +266,38 @@ def require_permission(required_permission: str):
                 detail={
                     "code": "PERMISSION_DENIED",
                     "message": f"Role '{user_role}' lacks required permission '{required_permission}'.",
-                    "request_id": request_id
-                }
+                    "request_id": request_id,
+                },
             )
         return user_role
+
     return permission_checker
+
 
 def verify_role_access(required_roles: list):
     """
     Server-side Role Authorization Dependency:
     Evaluates role permissions strictly from authenticated server session, ignoring client-controlled headers.
     """
+
     def role_checker(request: Request):
         # Obtain server-authenticated user from request state or session
         user = getattr(request.state, "user", None)
         user_role = user.role.upper() if user and hasattr(user, "role") else "STAFF"
-        
+
         # Fallback to header ONLY in explicit non-production test environments
         if not _IS_PRODUCTION and not user and request.headers.get("X-User-Role"):
             user_role = request.headers.get("X-User-Role").upper()
 
         if user_role not in required_roles:
-            request_id = request.headers.get("X-Request-ID", "req-unknown")
+            request.headers.get("X-Request-ID", "req-unknown")
             raise HTTPException(
                 status_code=403,
-                detail=f"Access Denied: Role '{user_role}' lacks required permissions ({', '.join(required_roles)})."
+                detail=f"Access Denied: Role '{user_role}' lacks required permissions ({', '.join(required_roles)}).",
             )
         return user_role
-    return role_checker
 
+    return role_checker
 
 
 def escape_html_string(val: str) -> str:
@@ -221,5 +305,3 @@ def escape_html_string(val: str) -> str:
     if not val:
         return ""
     return html.escape(val, quote=True)
-
-

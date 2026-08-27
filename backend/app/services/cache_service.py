@@ -3,13 +3,17 @@ import os
 
 try:
     import redis
+
     redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
-    redis_client = redis.Redis.from_url(redis_url, decode_responses=True, socket_connect_timeout=0.2, socket_timeout=0.2)
+    redis_client = redis.Redis.from_url(
+        redis_url, decode_responses=True, socket_connect_timeout=0.2, socket_timeout=0.2
+    )
     redis_client.ping()
 except Exception:
     redis_client = None
 
-DEFAULT_TTL = 300 # 5 minutes
+DEFAULT_TTL = 300  # 5 minutes
+
 
 def get_cache(key: str):
     """
@@ -28,6 +32,7 @@ def get_cache(key: str):
         record_miss()
         return None
 
+
 def set_cache(key: str, value: any, ttl_seconds: int = DEFAULT_TTL):
     """
     Cache-Aside: Store JSON serialized data in Redis with TTL
@@ -41,6 +46,7 @@ def set_cache(key: str, value: any, ttl_seconds: int = DEFAULT_TTL):
     except Exception:
         return False
 
+
 def delete_cache(key: str):
     """
     Invalidate single cache key
@@ -52,6 +58,7 @@ def delete_cache(key: str):
         return True
     except Exception:
         return False
+
 
 def invalidate_pattern(pattern: str):
     """
@@ -67,6 +74,7 @@ def invalidate_pattern(pattern: str):
     except Exception:
         return False
 
+
 def record_hit():
     if redis_client:
         try:
@@ -74,12 +82,14 @@ def record_hit():
         except Exception:
             pass
 
+
 def record_miss():
     if redis_client:
         try:
             redis_client.incr("cache:stats:misses")
         except Exception:
             pass
+
 
 def get_cache_stats():
     if not redis_client:
@@ -94,7 +104,7 @@ def get_cache_stats():
             "hit_ratio": ratio,
             "hits": hits,
             "misses": misses,
-            "redis_connected": True
+            "redis_connected": True,
         }
     except Exception:
         return {"status": "error", "hit_ratio": "0%", "hits": 0, "misses": 0}

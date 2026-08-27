@@ -14,8 +14,9 @@ Cron / Scheduled Jobs -> Backend Notification Engine -> Dispatches to Target (In
 Dashboard & Attention Center subscribe/consume events without heavy client-side polling loops.
 """
 
-from datetime import datetime, timezone
-from typing import List, Dict, Any
+from datetime import UTC, datetime
+from typing import Any
+
 
 class SystemSchedulerService:
     def __init__(self):
@@ -26,7 +27,7 @@ class SystemSchedulerService:
                 "schedule": "Every 1 Hour (0 * * * *)",
                 "last_run": "2026-08-26T04:00:00Z",
                 "status": "ACTIVE",
-                "description": "Scans inventory items against safety reorder levels and generates low-stock events."
+                "description": "Scans inventory items against safety reorder levels and generates low-stock events.",
             },
             {
                 "id": "JOB-002",
@@ -34,7 +35,7 @@ class SystemSchedulerService:
                 "schedule": "Every 15 Minutes (*/15 * * * *)",
                 "last_run": "2026-08-26T04:30:00Z",
                 "status": "ACTIVE",
-                "description": "Scans pending refunds, stock write-offs, and receiving discrepancies for manager attention."
+                "description": "Scans pending refunds, stock write-offs, and receiving discrepancies for manager attention.",
             },
             {
                 "id": "JOB-003",
@@ -42,7 +43,7 @@ class SystemSchedulerService:
                 "schedule": "Daily at 08:00 AM (0 8 * * *)",
                 "last_run": "2026-08-26T08:00:00Z",
                 "status": "ACTIVE",
-                "description": "Aggregates revenue, margin, and stock movement KPIs into daily executive report."
+                "description": "Aggregates revenue, margin, and stock movement KPIs into daily executive report.",
             },
             {
                 "id": "JOB-004",
@@ -50,7 +51,7 @@ class SystemSchedulerService:
                 "schedule": "Daily at 09:00 AM (0 9 * * *)",
                 "last_run": "2026-08-26T09:00:00Z",
                 "status": "ACTIVE",
-                "description": "Flags purchase orders pending receiving for > 14 days and notifies procurement manager."
+                "description": "Flags purchase orders pending receiving for > 14 days and notifies procurement manager.",
             },
             {
                 "id": "JOB-005",
@@ -58,7 +59,7 @@ class SystemSchedulerService:
                 "schedule": "Every 6 Hours (0 */6 * * *)",
                 "last_run": "2026-08-26T00:00:00Z",
                 "status": "ACTIVE",
-                "description": "Reconciles transaction ledger entries against physical stock balances for anomaly detection."
+                "description": "Reconciles transaction ledger entries against physical stock balances for anomaly detection.",
             },
             {
                 "id": "JOB-006",
@@ -66,24 +67,25 @@ class SystemSchedulerService:
                 "schedule": "Weekly on Sunday 02:00 AM (0 2 * * 0)",
                 "last_run": "2026-08-24T02:00:00Z",
                 "status": "ACTIVE",
-                "description": "Purges expired tokens, temporary import batches, and stale socket logs."
-            }
+                "description": "Purges expired tokens, temporary import batches, and stale socket logs.",
+            },
         ]
 
-    def list_jobs(self) -> List[Dict[str, Any]]:
+    def list_jobs(self) -> list[dict[str, Any]]:
         return self.scheduled_jobs
 
-    def trigger_job(self, job_id: str) -> Dict[str, Any]:
+    def trigger_job(self, job_id: str) -> dict[str, Any]:
         for job in self.scheduled_jobs:
             if job["id"] == job_id:
-                job["last_run"] = datetime.now(timezone.utc).isoformat()
+                job["last_run"] = datetime.now(UTC).isoformat()
                 return {
                     "status": "EXECUTED",
                     "job_id": job_id,
                     "job_name": job["name"],
                     "timestamp": job["last_run"],
-                    "result": f"Cron job '{job['name']}' executed successfully. Generated operational events."
+                    "result": f"Cron job '{job['name']}' executed successfully. Generated operational events.",
                 }
         return {"status": "ERROR", "message": f"Job ID {job_id} not found."}
+
 
 scheduler_service = SystemSchedulerService()

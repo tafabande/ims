@@ -1,14 +1,17 @@
-import pytest
 import uuid
+
 from fastapi.testclient import TestClient
+
+from app.database import Base, SessionLocal, engine
 from app.main import app
-from app.database import Base, engine, SessionLocal
-from app.models import Category, Product, Supplier, Purchase, GoodsReceipt, InventoryTransaction
+from app.models import Category, Product, Supplier
 
 client = TestClient(app)
 
+
 def setup_module(module):
     Base.metadata.create_all(bind=engine)
+
 
 def test_procurement_grn_receiving_and_three_way_matching():
     """
@@ -28,7 +31,7 @@ def test_procurement_grn_receiving_and_three_way_matching():
     supplier = Supplier(
         name="Delta Beverages Ltd",
         contact_person="Sales Manager",
-        email=f"sales-{unique_id}@delta.co.zw"
+        email=f"sales-{unique_id}@delta.co.zw",
     )
     db.add(supplier)
     db.commit()
@@ -40,14 +43,14 @@ def test_procurement_grn_receiving_and_three_way_matching():
         supplier_id=supplier.id,
         purchase_price=0.70,
         selling_price=1.00,
-        stock_quantity=100
+        stock_quantity=100,
     )
     db.add(prod)
     db.commit()
 
     prod_id = prod.id
     supp_id = supplier.id
-    initial_stock = prod.stock_quantity # 100
+    initial_stock = prod.stock_quantity  # 100
     db.close()
 
     # 1. Create Purchase Order (Ordered Qty = 100 @ $0.70)
@@ -56,15 +59,9 @@ def test_procurement_grn_receiving_and_three_way_matching():
         json={
             "supplier_id": supp_id,
             "notes": "PO for 100 units Coca-Cola",
-            "items": [
-                {
-                    "product_id": prod_id,
-                    "quantity": 100,
-                    "unit_price": 0.70
-                }
-            ]
+            "items": [{"product_id": prod_id, "quantity": 100, "unit_price": 0.70}],
         },
-        headers={"X-User-Role": "MANAGER"}
+        headers={"X-User-Role": "MANAGER"},
     )
     assert po_res.status_code == 201
     po_data = po_res.json()
@@ -73,7 +70,7 @@ def test_procurement_grn_receiving_and_three_way_matching():
     # Verify Stock HAS NOT CHANGED upon PO Creation!
     db = SessionLocal()
     prod_ref = db.query(Product).filter(Product.id == prod_id).first()
-    assert prod_ref.stock_quantity == initial_stock # Still 100
+    assert prod_ref.stock_quantity == initial_stock  # Still 100
     db.close()
 
     # 2. Staff Receives Goods at Loading Bay (Ordered: 100, Received: 95, Accepted: 90, Damaged: 3, Rejected: 2)
@@ -93,11 +90,11 @@ def test_procurement_grn_receiving_and_three_way_matching():
                     "damaged_quantity": 3,
                     "unit_cost": 0.70,
                     "batch_number": f"BAT-{unique_id}",
-                    "storage_location": "A-03-04"
+                    "storage_location": "A-03-04",
                 }
-            ]
+            ],
         },
-        headers={"X-User-Role": "STAFF"}
+        headers={"X-User-Role": "STAFF"},
     )
     assert grn_res.status_code == 201
     grn_data = grn_res.json()
@@ -107,21 +104,18 @@ def test_procurement_grn_receiving_and_three_way_matching():
     # Verify Stock STILL HAS NOT CHANGED prior to Manager Verification!
     db = SessionLocal()
     prod_ref = db.query(Product).filter(Product.id == prod_id).first()
-    assert prod_ref.stock_quantity == initial_stock # Still 100
+    assert prod_ref.stock_quantity == initial_stock  # Still 100
     db.close()
 
     # 3. Manager Verifies and Approves GRN -> Stock INCREASES BY ACCEPTED QUANTITY (+90)
-    verify_res = client.post(
-        f"/api/procurement/grn/{grn_id}/verify",
-        headers={"X-User-Role": "MANAGER"}
-    )
+    verify_res = client.post(f"/api/procurement/grn/{grn_id}/verify", headers={"X-User-Role": "MANAGER"})
     assert verify_res.status_code == 200
     assert verify_res.json()["status"] == "ACCEPTED"
 
     # Verify Stock IS NOW 190 (100 initial + 90 accepted)!
     db = SessionLocal()
     prod_ref = db.query(Product).filter(Product.id == prod_id).first()
-    assert prod_ref.stock_quantity == initial_stock + 90 # Exactly 190
+    assert prod_ref.stock_quantity == initial_stock + 90  # Exactly 190
     db.close()
 
     # 4. Create Supplier Return for 5 damaged/rejected units
@@ -136,11 +130,11 @@ def test_procurement_grn_receiving_and_three_way_matching():
                     "grn_item_id": grn_data["items"][0]["id"],
                     "product_id": prod_id,
                     "returned_quantity": 5,
-                    "return_reason": "Damaged packaging"
+                    "return_reason": "Damaged packaging",
                 }
-            ]
+            ],
         },
-        headers={"X-User-Role": "STAFF"}
+        headers={"X-User-Role": "STAFF"},
     )
     assert return_res.status_code == 201
     assert return_res.json()["status"] == "AUTHORISED"
@@ -153,9 +147,9 @@ def test_procurement_grn_receiving_and_three_way_matching():
             "po_id": po_id,
             "supplier_invoice_code": f"INV-SUP-{unique_id}",
             "billed_quantity": 90,
-            "billed_unit_cost": 0.85 # Mismatch ($0.85 vs $0.70)
+            "billed_unit_cost": 0.85,  # Mismatch ($0.85 vs $0.70)
         },
-        headers={"X-User-Role": "MANAGER"}
+        headers={"X-User-Role": "MANAGER"},
     )
     assert match_res.status_code == 200
     match_data = match_res.json()

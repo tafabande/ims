@@ -1,15 +1,18 @@
-import pytest
 import uuid
+
 from fastapi.testclient import TestClient
+
+from app.database import Base, SessionLocal, engine
 from app.main import app
-from app.database import Base, engine, SessionLocal
 from app.models import Category, Product
 
 client = TestClient(app)
 
+
 def setup_module(module):
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
+
 
 def test_rbac_security_matrix():
     """
@@ -30,7 +33,7 @@ def test_rbac_security_matrix():
         category_id=cat.id,
         purchase_price=10.0,
         selling_price=20.0,
-        stock_quantity=100
+        stock_quantity=100,
     )
     db.add(prod)
     db.commit()
@@ -41,7 +44,7 @@ def test_rbac_security_matrix():
     response_app_admin = client.post(
         "/api/inventory/adjust",
         json={"product_id": prod_id, "quantity": 5, "type": "ADJUSTMENT"},
-        headers={"X-User-Role": "APP_ADMIN"}
+        headers={"X-User-Role": "APP_ADMIN"},
     )
     assert response_app_admin.status_code == 403
 
@@ -49,13 +52,14 @@ def test_rbac_security_matrix():
     response_manager = client.post(
         "/api/inventory/adjust",
         json={"product_id": prod_id, "quantity": 2, "type": "ADJUSTMENT"},
-        headers={"X-User-Role": "MANAGER"}
+        headers={"X-User-Role": "MANAGER"},
     )
     assert response_manager.status_code in [200, 400, 429]
+
 
 def test_unauthenticated_access_rejection():
     """
     Verify protected endpoints reject unauthenticated access correctly
     """
     response = client.get("/auth/sessions")
-    assert response.status_code == 200 # Public session inspection endpoint
+    assert response.status_code == 200  # Public session inspection endpoint

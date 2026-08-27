@@ -1,9 +1,11 @@
-from datetime import datetime, timezone
-from typing import Optional, List
+from datetime import UTC, datetime
+
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
-from app.models import Product, PriceRule, PriceHistory
+
+from app.models import PriceHistory, PriceRule, Product
 from app.services.settings_service import get_setting_value
+
 
 def configure_product_pricing(
     db: Session,
@@ -11,12 +13,12 @@ def configure_product_pricing(
     cost_price: float,
     selling_price: float,
     min_allowed_price: float,
-    min_margin_pct: Optional[float] = None,
-    staff_discount_limit_pct: Optional[float] = None,
-    manager_discount_limit_pct: Optional[float] = None,
-    negotiation_allowance_pct: Optional[float] = None,
-    user_id: Optional[int] = None,
-    reason: Optional[str] = "Pricing Configuration Update"
+    min_margin_pct: float | None = None,
+    staff_discount_limit_pct: float | None = None,
+    manager_discount_limit_pct: float | None = None,
+    negotiation_allowance_pct: float | None = None,
+    user_id: int | None = None,
+    reason: str | None = "Pricing Configuration Update",
 ) -> PriceRule:
     """
     Configure Commercial Pricing & Margin Protection Rules for a Product.
@@ -40,11 +42,11 @@ def configure_product_pricing(
     if min_allowed_price < min_margin_floor:
         raise HTTPException(
             status_code=400,
-            detail=f"Margin Violation: Minimum allowed price (${min_allowed_price:.2f}) is below the required {min_margin_pct}% margin floor (${min_margin_floor:.2f}). Approval required for below-cost/below-margin pricing."
+            detail=f"Margin Violation: Minimum allowed price (${min_allowed_price:.2f}) is below the required {min_margin_pct}% margin floor (${min_margin_floor:.2f}). Approval required for below-cost/below-margin pricing.",
         )
 
     rule = db.query(PriceRule).filter(PriceRule.product_id == product_id).first()
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     if not rule:
         rule = PriceRule(
@@ -57,7 +59,7 @@ def configure_product_pricing(
             manager_discount_limit_pct=manager_discount_limit_pct,
             negotiation_allowance_pct=negotiation_allowance_pct,
             effective_from=now,
-            created_at=now
+            created_at=now,
         )
         db.add(rule)
     else:
@@ -73,10 +75,11 @@ def configure_product_pricing(
     product.purchase_price = cost_price
     product.selling_price = selling_price
 
-    active_hist = db.query(PriceHistory).filter(
-        PriceHistory.product_id == product_id,
-        PriceHistory.effective_until == None
-    ).first()
+    active_hist = (
+        db.query(PriceHistory)
+        .filter(PriceHistory.product_id == product_id, PriceHistory.effective_until.is_(None))
+        .first()
+    )
     if active_hist:
         active_hist.effective_until = now
 
@@ -87,7 +90,7 @@ def configure_product_pricing(
         min_allowed_price=min_allowed_price,
         reason=reason,
         changed_by_user_id=user_id,
-        effective_from=now
+        effective_from=now,
     )
     db.add(new_hist)
 
@@ -95,21 +98,16 @@ def configure_product_pricing(
     db.refresh(rule)
     return rule
 
-def check_price_negotiation(
-    db: Session,
-    product_id: int,
-    offered_price: float,
-    user_role: str = "STAFF"
-) -> dict:
+
+def check_price_negotiation(db: Session, product_id: int, offered_price: float, user_role: str = "STAFF") -> dict:
     product = db.query(Product).filter(Product.id == product_id).first()
     if not product:
         raise HTTPException(status_code=404, detail="Product not found.")
 
     rule = db.query(PriceRule).filter(PriceRule.product_id == product_id).first()
-    cost_price = rule.cost_price if rule else product.purchase_price
     base_selling_price = rule.selling_price if rule else product.selling_price
     min_allowed_price = rule.min_allowed_price if rule else (base_selling_price * 0.95)
-    
+
     default_staff_limit = get_setting_value(db, "sales.max_staff_discount", 2.0)
     default_mgr_limit = get_setting_value(db, "sales.max_manager_discount", 5.0)
 
@@ -142,8 +140,14 @@ def check_price_negotiation(
         "min_allowed_price": min_allowed_price,
         "allowed_for_role": allowed_for_role,
         "requires_approval": requires_approval,
-        "reason": reason
+        "reason": reason,
     }
 
-def get_price_history(db: Session, product_id: int) -> List[PriceHistory]:
-    return db.query(PriceHistory).filter(PriceHistory.product_id == product_id).order_by(PriceHistory.effective_from.desc()).all()
+
+def get_price_history(db: Session, product_id: int) -> list[PriceHistory]:
+    return (
+        db.query(PriceHistory)
+        .filter(PriceHistory.product_id == product_id)
+        .order_by(PriceHistory.effective_from.desc())
+        .all()
+    )

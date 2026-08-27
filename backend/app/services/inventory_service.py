@@ -1,25 +1,36 @@
 import uuid
-from sqlalchemy.orm import Session
+from datetime import UTC, datetime
+
 from fastapi import HTTPException, status
-from app.models import Product, InventoryTransaction, Sale, SaleItem, Purchase, PurchaseItem, Customer
-from datetime import datetime, timezone
+from sqlalchemy.orm import Session
+
+from app.models import (
+    Customer,
+    InventoryTransaction,
+    Product,
+    Purchase,
+    Sale,
+    SaleItem,
+)
+
 
 class InsufficientStockError(HTTPException):
     def __init__(self, product_name: str, available: int, requested: int):
         super().__init__(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Insufficient stock for '{product_name}'. Available: {available}, Requested: {requested}"
+            detail=f"Insufficient stock for '{product_name}'. Available: {available}, Requested: {requested}",
         )
 
+
 def process_stock_adjustment(
-    db: Session, 
-    product_id: int, 
-    quantity: int, 
-    tx_type: str, 
-    reference: str, 
-    user_name: str, 
+    db: Session,
+    product_id: int,
+    quantity: int,
+    tx_type: str,
+    reference: str,
+    user_name: str,
     notes: str,
-    reason_category: str = "CORRECTION"
+    reason_category: str = "CORRECTION",
 ):
     """
     Atomic transaction executor for stock changes using row-level locking (.with_for_update()).
@@ -49,10 +60,11 @@ def process_stock_adjustment(
         reference=reference,
         user_name=user_name,
         notes=notes,
-        created_at=datetime.now(timezone.utc)
+        created_at=datetime.now(UTC),
     )
     db.add(tx)
     return product
+
 
 def process_sale_transaction(db: Session, customer_id: int, items: list, payment_method: str, user_name: str):
     """
@@ -64,7 +76,11 @@ def process_sale_transaction(db: Session, customer_id: int, items: list, payment
         if customer_id:
             cust = db.query(Customer).filter(Customer.id == customer_id).first()
             if not cust:
-                cust = Customer(id=customer_id, name=f"Customer {customer_id}", email=f"customer_{customer_id}@ims.local")
+                cust = Customer(
+                    id=customer_id,
+                    name=f"Customer {customer_id}",
+                    email=f"customer_{customer_id}@ims.local",
+                )
                 db.add(cust)
                 db.flush()
 
@@ -75,38 +91,33 @@ def process_sale_transaction(db: Session, customer_id: int, items: list, payment
             product = db.query(Product).filter(Product.id == item.product_id).with_for_update().first()
             if not product:
                 raise HTTPException(status_code=404, detail=f"Product ID {item.product_id} not found")
-            
+
             # Check available quantity (stock_quantity - reserved_quantity)
             available = product.available_quantity
             if available < item.quantity:
                 raise InsufficientStockError(product.name, available, item.quantity)
-            
+
             line_total = item.quantity * product.selling_price
             total_amount += line_total
             sale_items_data.append((product, item.quantity, product.selling_price))
 
-        grand_total = total_amount * 1.08 # 8% Tax
+        grand_total = total_amount * 1.08  # 8% Tax
 
-        invoice_num = f"INV-2026-{int(datetime.now(timezone.utc).timestamp())}-{uuid.uuid4().hex[:6]}"
+        invoice_num = f"INV-2026-{int(datetime.now(UTC).timestamp())}-{uuid.uuid4().hex[:6]}"
         sale = Sale(
             invoice_number=invoice_num,
             customer_id=customer_id,
             total_amount=grand_total,
             payment_status="PAID",
             payment_method=payment_method,
-            created_at=datetime.now(timezone.utc),
-            created_by=user_name
+            created_at=datetime.now(UTC),
+            created_by=user_name,
         )
         db.add(sale)
         db.flush()
 
         for product, qty, price in sale_items_data:
-            s_item = SaleItem(
-                sale_id=sale.id,
-                product_id=product.id,
-                quantity=qty,
-                unit_price=price
-            )
+            s_item = SaleItem(sale_id=sale.id, product_id=product.id, quantity=qty, unit_price=price)
             db.add(s_item)
 
             process_stock_adjustment(
@@ -117,7 +128,7 @@ def process_sale_transaction(db: Session, customer_id: int, items: list, payment
                 reference=invoice_num,
                 user_name=user_name,
                 notes=f"POS Sale to Customer #{customer_id}",
-                reason_category="POS_SALE"
+                reason_category="POS_SALE",
             )
 
         db.commit()
@@ -127,6 +138,7 @@ def process_sale_transaction(db: Session, customer_id: int, items: list, payment
     except Exception:
         db.rollback()
         raise
+
 
 def process_receive_purchase(db: Session, purchase_id: int, user_name: str = "System Operator"):
     """
@@ -148,17 +160,19 @@ def process_receive_purchase(db: Session, purchase_id: int, user_name: str = "Sy
             reference=purchase.po_number,
             user_name=user_name,
             notes=f"Goods received from Supplier #{purchase.supplier_id}",
-            reason_category="STOCK_RECEIVE"
+            reason_category="STOCK_RECEIVE",
         )
 
     purchase.status = "RECEIVED"
-    purchase.received_at = datetime.now(timezone.utc)
+    purchase.received_at = datetime.now(UTC)
     db.commit()
     db.refresh(purchase)
     return purchase
 
+
 # Alias for backwards compatibility
 receive_purchase_order = process_receive_purchase
+
 
 def reconcile_inventory_balance(db: Session, product_id: int) -> dict:
     """
@@ -170,7 +184,12 @@ def reconcile_inventory_balance(db: Session, product_id: int) -> dict:
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
 
-    txs = db.query(InventoryTransaction).filter(InventoryTransaction.product_id == product_id).order_by(InventoryTransaction.id.asc()).all()
+    txs = (
+        db.query(InventoryTransaction)
+        .filter(InventoryTransaction.product_id == product_id)
+        .order_by(InventoryTransaction.id.asc())
+        .all()
+    )
     if not txs:
         return {
             "product_id": product_id,
@@ -178,13 +197,13 @@ def reconcile_inventory_balance(db: Session, product_id: int) -> dict:
             "current_stock": product.stock_quantity,
             "calculated_stock": product.stock_quantity,
             "discrepancy": 0,
-            "reconciled": True
+            "reconciled": True,
         }
 
     # Verify chain of transactions: tx[n].quantity_after == tx[n+1].quantity_before
     chain_valid = True
     for i in range(len(txs) - 1):
-        if txs[i].quantity_after != txs[i+1].quantity_before:
+        if txs[i].quantity_after != txs[i + 1].quantity_before:
             chain_valid = False
             break
 
@@ -199,5 +218,5 @@ def reconcile_inventory_balance(db: Session, product_id: int) -> dict:
         "ledger_entries_count": len(txs),
         "chain_valid": chain_valid,
         "discrepancy": discrepancy,
-        "reconciled": (discrepancy == 0 and chain_valid)
+        "reconciled": (discrepancy == 0 and chain_valid),
     }

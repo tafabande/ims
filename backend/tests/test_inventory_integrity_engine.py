@@ -1,12 +1,16 @@
 import uuid
-import pytest
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
+
 from app.database import SessionLocal
 from app.models import (
-    Product, Category, Supplier, Warehouse, Store,
-    InventoryTransaction, StockReservation, BLEDeviceLocation
+    Category,
+    InventoryTransaction,
+    Product,
+    Store,
+    Supplier,
 )
 from app.services import integrity_service
+
 
 def test_inventory_integrity_equation_and_anomaly_detection():
     """
@@ -30,9 +34,9 @@ def test_inventory_integrity_equation_and_anomaly_detection():
         supplier_id=sup.id,
         purchase_price=0.50,
         selling_price=1.00,
-        stock_quantity=64, # Actual System Stock = 64
+        stock_quantity=64,  # Actual System Stock = 64
         reorder_level=10,
-        barcode=f"1920-{unique_suffix}"
+        barcode=f"1920-{unique_suffix}",
     )
     db.add(prod)
     db.flush()
@@ -53,12 +57,13 @@ def test_inventory_integrity_equation_and_anomaly_detection():
     anomaly = integrity_service.evaluate_inventory_integrity(db, prod.id)
 
     assert anomaly is not None
-    assert anomaly.expected_stock == -35 # (0 + 50 + 2 - 80 - 3 - 4) = -35
+    assert anomaly.expected_stock == -35  # (0 + 50 + 2 - 80 - 3 - 4) = -35
     assert anomaly.variance == anomaly.expected_stock - prod.stock_quantity
     assert anomaly.risk_score > 0.0
     assert anomaly.status in ["OPEN", "RESOLVED"]
 
     db.close()
+
 
 def test_explain_this_number_data_lineage():
     """
@@ -80,7 +85,7 @@ def test_explain_this_number_data_lineage():
         purchase_price=800.0,
         selling_price=1200.0,
         stock_quantity=15,
-        barcode=f"9921-{unique_suffix}"
+        barcode=f"9921-{unique_suffix}",
     )
     db.add(prod)
     db.commit()
@@ -97,6 +102,7 @@ def test_explain_this_number_data_lineage():
     assert "$400.00" in margin_lineage["current_value"]
 
     db.close()
+
 
 def test_digital_stock_reservation_and_expiration():
     """
@@ -118,17 +124,30 @@ def test_digital_stock_reservation_and_expiration():
         purchase_price=500.0,
         selling_price=750.0,
         stock_quantity=50,
-        barcode=f"7721-{unique_suffix}"
+        barcode=f"7721-{unique_suffix}",
     )
     db.add(prod)
     db.commit()
 
-    from app.models import Store, Cart
-    store = Store(store_code=f"STR-{unique_suffix}", name=f"Store {unique_suffix}", address="123 Street", phone="123", email="s@s.com", status="ACTIVE")
+    from app.models import Cart
+
+    store = Store(
+        store_code=f"STR-{unique_suffix}",
+        name=f"Store {unique_suffix}",
+        address="123 Street",
+        phone="123",
+        email="s@s.com",
+        status="ACTIVE",
+    )
     db.add(store)
     db.flush()
 
-    cart = Cart(cart_code=f"CART-{unique_suffix}", store_id=store.id, status="ACTIVE", expires_at=datetime.now(timezone.utc) + timedelta(minutes=15))
+    cart = Cart(
+        cart_code=f"CART-{unique_suffix}",
+        store_id=store.id,
+        status="ACTIVE",
+        expires_at=datetime.now(UTC) + timedelta(minutes=15),
+    )
     db.add(cart)
     db.commit()
 
@@ -139,7 +158,7 @@ def test_digital_stock_reservation_and_expiration():
         quantity=10,
         cart_id=cart.id,
         store_id=store.id,
-        duration_minutes=15
+        duration_minutes=15,
     )
 
     assert res.reservation_code.startswith("RES-2026-")
@@ -151,14 +170,15 @@ def test_digital_stock_reservation_and_expiration():
     assert available == 40
 
     # 3. Simulate expired reservation
-    res.expires_at = datetime.now(timezone.utc) - timedelta(minutes=1)
+    res.expires_at = datetime.now(UTC) - timedelta(minutes=1)
     db.commit()
 
     # 4. Check Available Stock after automatic expiration release
     available_after_exp = integrity_service.get_available_stock(db, prod.id)
-    assert available_after_exp == 50 # Released back to 50
+    assert available_after_exp == 50  # Released back to 50
 
     db.close()
+
 
 def test_ble_device_location_tracking_and_mismatch():
     """
@@ -180,7 +200,7 @@ def test_ble_device_location_tracking_and_mismatch():
         purchase_price=10.0,
         selling_price=20.0,
         stock_quantity=100,
-        barcode=f"5521-{unique_suffix}"
+        barcode=f"5521-{unique_suffix}",
     )
     db.add(prod)
     db.commit()
@@ -193,7 +213,7 @@ def test_ble_device_location_tracking_and_mismatch():
         expected_location="Shelf A3",
         detected_location="Shelf B2",
         rssi_dbm=-68,
-        confidence_percentage=85.0
+        confidence_percentage=85.0,
     )
 
     assert ble.has_mismatch == True

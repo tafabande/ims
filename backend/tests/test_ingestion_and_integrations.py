@@ -3,15 +3,17 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from app.main import app
 from app.database import Base, get_db
-from app.models import Product, Employee, ImportBatch, IntegrationAccount, IntegrationApiKey, User
+from app.main import app
+from app.models import (
+    Product,
+    User,
+)
 from app.services import ingestion_service, integration_service
 
 SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
 engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
 
 
 def override_get_db():
@@ -32,7 +34,14 @@ def setup_db():
     db = TestingSessionLocal()
     try:
         if not db.query(User).filter(User.id == 1).first():
-            admin = User(id=1, email="admin@test.com", user_code="USR-001", full_name="Admin", hashed_password="hash", role="ADMIN")
+            admin = User(
+                id=1,
+                email="admin@test.com",
+                user_code="USR-001",
+                full_name="Admin",
+                hashed_password="hash",
+                role="ADMIN",
+            )
             db.add(admin)
             db.commit()
     finally:
@@ -51,17 +60,35 @@ def test_suggest_column_mapping():
 def test_file_hash_duplicate_detection():
     db = TestingSessionLocal()
     csv_bytes = b"SKU,Name,Cost Price,Selling Price\nPRD-001,Test Item,10,20\n"
-    
+
     # First Upload
     res1 = ingestion_service.validate_and_stage_import(
-        db, "test.csv", csv_bytes, "products", {"SKU": "sku", "Name": "name", "Cost Price": "purchase_price", "Selling Price": "selling_price"}
+        db,
+        "test.csv",
+        csv_bytes,
+        "products",
+        {
+            "SKU": "sku",
+            "Name": "name",
+            "Cost Price": "purchase_price",
+            "Selling Price": "selling_price",
+        },
     )
     assert res1["status"] == "VALIDATED"
     assert res1["is_duplicate"] is False
 
     # Second Upload with same content
     res2 = ingestion_service.validate_and_stage_import(
-        db, "test.csv", csv_bytes, "products", {"SKU": "sku", "Name": "name", "Cost Price": "purchase_price", "Selling Price": "selling_price"}
+        db,
+        "test.csv",
+        csv_bytes,
+        "products",
+        {
+            "SKU": "sku",
+            "Name": "name",
+            "Cost Price": "purchase_price",
+            "Selling Price": "selling_price",
+        },
     )
     assert res2["is_duplicate"] is True
     assert "Possible duplicate import detected" in res2["duplicate_warning_message"]
@@ -70,10 +97,21 @@ def test_file_hash_duplicate_detection():
 def test_validation_blocks_negative_values_and_duplicates():
     db = TestingSessionLocal()
     # CSV with invalid negative cost and duplicate SKU
-    csv_bytes = b"SKU,Name,Cost Price,Selling Price\nPRD-100,Good Item,10,20\nPRD-101,Bad Item,-5,20\nPRD-100,Dup Item,15,30\n"
-    
+    csv_bytes = (
+        b"SKU,Name,Cost Price,Selling Price\nPRD-100,Good Item,10,20\nPRD-101,Bad Item,-5,20\nPRD-100,Dup Item,15,30\n"
+    )
+
     res = ingestion_service.validate_and_stage_import(
-        db, "invalid.csv", csv_bytes, "products", {"SKU": "sku", "Name": "name", "Cost Price": "purchase_price", "Selling Price": "selling_price"}
+        db,
+        "invalid.csv",
+        csv_bytes,
+        "products",
+        {
+            "SKU": "sku",
+            "Name": "name",
+            "Cost Price": "purchase_price",
+            "Selling Price": "selling_price",
+        },
     )
     assert res["status"] == "REQUIRES_CORRECTION"
     assert res["valid_records"] == 1
@@ -84,12 +122,21 @@ def test_validation_blocks_negative_values_and_duplicates():
 def test_execute_approved_batch_commits_to_core():
     db = TestingSessionLocal()
     csv_bytes = b"SKU,Name,Cost Price,Selling Price\nPRD-777,Widget A,15,30\n"
-    
+
     staged = ingestion_service.validate_and_stage_import(
-        db, "valid.csv", csv_bytes, "products", {"SKU": "sku", "Name": "name", "Cost Price": "purchase_price", "Selling Price": "selling_price"}
+        db,
+        "valid.csv",
+        csv_bytes,
+        "products",
+        {
+            "SKU": "sku",
+            "Name": "name",
+            "Cost Price": "purchase_price",
+            "Selling Price": "selling_price",
+        },
     )
     batch_id = staged["batch_id"]
-    
+
     executed_batch = ingestion_service.execute_approved_batch(db, batch_id, approver_user_id=1)
     assert executed_batch.status == "IMPORTED"
 

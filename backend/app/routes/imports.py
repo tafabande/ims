@@ -1,16 +1,26 @@
 import json
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Response, status
+
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Response,
+    UploadFile,
+)
 from sqlalchemy.orm import Session
-from typing import List, Optional, Dict, Any
 
 from app.database import get_db
+from app.models import ImportBatch, ImportRecord
 from app.schemas import (
-    ImportBatchResponse, ImportRecordResponse, ColumnMappingRequest,
-    ValidationResultResponse
+    ColumnMappingRequest,
+    ImportBatchResponse,
+    ImportRecordResponse,
+    ValidationResultResponse,
 )
 from app.services import ingestion_service
 from app.services.iam_service import require_permission
-from app.models import ImportBatch, ImportRecord
 
 router = APIRouter(prefix="/api/imports", tags=["Data Intake & Ingestion Engine"])
 
@@ -18,7 +28,7 @@ router = APIRouter(prefix="/api/imports", tags=["Data Intake & Ingestion Engine"
 @router.get("/intake-dashboard")
 def get_intake_dashboard_metrics(
     db: Session = Depends(get_db),
-    auth_ctx: dict = Depends(require_permission("products:read"))
+    auth_ctx: dict = Depends(require_permission("products:read")),
 ):
     """
     Data Intake Dashboard telemetry:
@@ -38,17 +48,19 @@ def get_intake_dashboard_metrics(
 
     recent_activity = []
     for b in recent_batches:
-        recent_activity.append({
-            "batch_id": b.batch_id,
-            "filename": b.filename,
-            "entity_type": b.entity_type,
-            "source_type": b.source_type,
-            "record_count": b.record_count,
-            "valid_count": b.valid_count,
-            "rejected_count": b.rejected_count,
-            "status": b.status,
-            "created_at": b.created_at.isoformat()
-        })
+        recent_activity.append(
+            {
+                "batch_id": b.batch_id,
+                "filename": b.filename,
+                "entity_type": b.entity_type,
+                "source_type": b.source_type,
+                "record_count": b.record_count,
+                "valid_count": b.valid_count,
+                "rejected_count": b.rejected_count,
+                "status": b.status,
+                "created_at": b.created_at.isoformat(),
+            }
+        )
 
     return {
         "metrics": {
@@ -57,34 +69,31 @@ def get_intake_dashboard_metrics(
             "validation_errors": validation_errs,
             "awaiting_approval": pending,
             "completed_imports": imported,
-            "duplicate_imports_flagged": 1 if total_batches > 3 else 0
+            "duplicate_imports_flagged": 1 if total_batches > 3 else 0,
         },
-        "recent_activity": recent_activity
+        "recent_activity": recent_activity,
     }
 
 
 @router.post("/suggest-mapping")
 def suggest_column_mappings(
     data: ColumnMappingRequest,
-    auth_ctx: dict = Depends(require_permission("products:read"))
+    auth_ctx: dict = Depends(require_permission("products:read")),
 ):
     """
     Suggests canonical IMS field mappings for raw business column headers.
     """
     suggestions = ingestion_service.suggest_column_mapping(data.entity_type, data.file_headers)
-    return {
-        "entity_type": data.entity_type,
-        "suggested_mapping": suggestions
-    }
+    return {"entity_type": data.entity_type, "suggested_mapping": suggestions}
 
 
 @router.post("/upload", response_model=ValidationResultResponse)
 async def upload_and_validate_import_file(
     entity_type: str = Form(...),
-    column_mapping_json: Optional[str] = Form("{}"),
+    column_mapping_json: str | None = Form("{}"),
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    auth_ctx: dict = Depends(require_permission("products:read"))
+    auth_ctx: dict = Depends(require_permission("products:read")),
 ):
     """
     Uploads CSV/Excel spreadsheet, computes SHA-256 file hash to check duplicates,
@@ -113,18 +122,18 @@ async def upload_and_validate_import_file(
         entity_type=entity_type,
         column_mapping=mapping,
         uploader_user_id=uploader_id,
-        source_type="CSV"
+        source_type="CSV",
     )
 
     return result
 
 
-@router.get("/batches", response_model=List[ImportBatchResponse])
+@router.get("/batches", response_model=list[ImportBatchResponse])
 def list_import_batches(
-    status_filter: Optional[str] = None,
-    entity_filter: Optional[str] = None,
+    status_filter: str | None = None,
+    entity_filter: str | None = None,
     db: Session = Depends(get_db),
-    auth_ctx: dict = Depends(require_permission("products:read"))
+    auth_ctx: dict = Depends(require_permission("products:read")),
 ):
     query = db.query(ImportBatch)
     if status_filter:
@@ -138,7 +147,7 @@ def list_import_batches(
 def get_import_batch_details(
     batch_id: str,
     db: Session = Depends(get_db),
-    auth_ctx: dict = Depends(require_permission("products:read"))
+    auth_ctx: dict = Depends(require_permission("products:read")),
 ):
     batch = db.query(ImportBatch).filter(ImportBatch.batch_id == batch_id).first()
     if not batch:
@@ -146,11 +155,11 @@ def get_import_batch_details(
     return batch
 
 
-@router.get("/batches/{batch_id}/records", response_model=List[ImportRecordResponse])
+@router.get("/batches/{batch_id}/records", response_model=list[ImportRecordResponse])
 def get_import_batch_records(
     batch_id: str,
     db: Session = Depends(get_db),
-    auth_ctx: dict = Depends(require_permission("products:read"))
+    auth_ctx: dict = Depends(require_permission("products:read")),
 ):
     records = db.query(ImportRecord).filter(ImportRecord.batch_id == batch_id).all()
     return records
@@ -160,7 +169,7 @@ def get_import_batch_records(
 def execute_import_batch(
     batch_id: str,
     db: Session = Depends(get_db),
-    auth_ctx: dict = Depends(require_permission("stores:manage")) # Requires Manager/Admin
+    auth_ctx: dict = Depends(require_permission("stores:manage")),  # Requires Manager/Admin
 ):
     """
     Commits staged records from an approved batch into production database core tables.
@@ -170,10 +179,7 @@ def execute_import_batch(
 
 
 @router.get("/templates/{entity_type}")
-def download_import_template(
-    entity_type: str,
-    auth_ctx: dict = Depends(require_permission("products:read"))
-):
+def download_import_template(entity_type: str, auth_ctx: dict = Depends(require_permission("products:read"))):
     """
     Downloads downloadable template CSV with sample rows & header fields.
     """
@@ -181,7 +187,7 @@ def download_import_template(
     return Response(
         content=csv_content,
         media_type="text/csv",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
 
@@ -189,7 +195,7 @@ def download_import_template(
 def export_entity_dataset(
     entity_type: str,
     db: Session = Depends(get_db),
-    auth_ctx: dict = Depends(require_permission("reports:read"))
+    auth_ctx: dict = Depends(require_permission("reports:read")),
 ):
     """
     Exports core production dataset (products, employees, valuation, etc.) to CSV.
@@ -198,5 +204,5 @@ def export_entity_dataset(
     return Response(
         content=csv_content,
         media_type="text/csv",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )

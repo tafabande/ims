@@ -1,8 +1,9 @@
-import pytest
 from fastapi.testclient import TestClient
+
 from app.main import app
 
 client = TestClient(app)
+
 
 def test_cors_options_preflight_request():
     """
@@ -14,8 +15,8 @@ def test_cors_options_preflight_request():
         headers={
             "Origin": "http://localhost:5173",
             "Access-Control-Request-Method": "GET",
-            "Access-Control-Request-Headers": "authorization,content-type,x-request-id,x-requested-with"
-        }
+            "Access-Control-Request-Headers": "authorization,content-type,x-request-id,x-requested-with",
+        },
     )
     assert response.status_code == 200
     assert response.headers.get("access-control-allow-origin") == "http://localhost:5173"
@@ -28,6 +29,6 @@ def test_idempotency_key_header_propagation():
     """
     res = client.get(
         "/api/products/",
-        headers={"X-User-Role": "ADMIN", "Idempotency-Key": "IDEM-TEST-KEY-001"}
+        headers={"X-User-Role": "ADMIN", "Idempotency-Key": "IDEM-TEST-KEY-001"},
     )
     assert res.status_code == 200

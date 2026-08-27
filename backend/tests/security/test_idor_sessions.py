@@ -1,22 +1,20 @@
-import pytest
 from fastapi.testclient import TestClient
-from app.main import app
+
 from app.logger import sanitize_data
-from app.database import engine, Base
+from app.main import app
 
 client = TestClient(app)
+
 
 def test_idor_unauthorized_user_deletion_rejected():
     """
     IDOR & RBAC Security Test:
     Staff member attempting to delete a user account must receive HTTP 403 Forbidden.
     """
-    response = client.delete(
-        "/api/users/9999",
-        headers={"X-User-Role": "STAFF"}
-    )
+    response = client.delete("/api/users/9999", headers={"X-User-Role": "STAFF"})
     assert response.status_code == 403
     assert "Authorization Failed" in response.json()["detail"]
+
 
 def test_nested_credential_log_sanitization():
     """
@@ -30,13 +28,13 @@ def test_nested_credential_log_sanitization():
             "session": {
                 "access_token": "secret_jwt_token_12345",
                 "refresh_token": "secret_refresh_token_67890",
-                "cookie": "session_id_abc"
+                "cookie": "session_id_abc",
             },
             "credentials": {
                 "password": "SuperSecretPassword123!",
-                "api_key": "api_key_live_9999"
-            }
-        }
+                "api_key": "api_key_live_9999",
+            },
+        },
     }
 
     sanitized = sanitize_data(payload)

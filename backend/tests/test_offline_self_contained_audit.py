@@ -1,7 +1,9 @@
 import os
 import re
+
 import pytest
 from fastapi.testclient import TestClient
+
 from app.main import app
 
 client = TestClient(app)
@@ -15,8 +17,9 @@ PROHIBITED_CDN_PATTERNS = [
     r"esm\.sh",
     r"cloudinary\.com",
     r"firebase\.com",
-    r"supabase\.co"
+    r"supabase\.co",
 ]
+
 
 def test_dep_01_content_security_policy_headers():
     """
@@ -29,6 +32,7 @@ def test_dep_01_content_security_policy_headers():
     assert csp is not None
     assert "default-src 'self'" in csp
     assert "object-src 'none'" in csp
+
 
 def test_dep_01_frontend_offline_dependency_audit():
     """
@@ -50,7 +54,7 @@ def test_dep_01_frontend_offline_dependency_audit():
         for file in files:
             if file.endswith((".jsx", ".js", ".css", ".html", ".tsx", ".ts")):
                 filepath = os.path.join(root, file)
-                with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
+                with open(filepath, encoding="utf-8", errors="ignore") as f:
                     content = f.read()
                     for pattern in PROHIBITED_CDN_PATTERNS:
                         matches = re.findall(pattern, content, re.IGNORECASE)
@@ -59,6 +63,7 @@ def test_dep_01_frontend_offline_dependency_audit():
                             violations.append(f"File '{rel_path}' contains external CDN reference matching '{pattern}'")
 
     assert len(violations) == 0, f"DEP-01 Violations Found: {violations}"
+
 
 def test_dep_01_backend_offline_dependency_audit():
     """
@@ -74,7 +79,7 @@ def test_dep_01_backend_offline_dependency_audit():
         for file in files:
             if file.endswith(".py"):
                 filepath = os.path.join(root, file)
-                with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
+                with open(filepath, encoding="utf-8", errors="ignore") as f:
                     content = f.read()
                     for pattern in PROHIBITED_CDN_PATTERNS:
                         matches = re.findall(pattern, content, re.IGNORECASE)

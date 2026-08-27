@@ -1,24 +1,32 @@
 import uuid
-from datetime import datetime, timezone
-from typing import List, Optional, Dict, Any
+from datetime import UTC, datetime
+from typing import Any
+
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+
 from app.models import (
-    Purchase, PurchaseItem, Product, InventoryTransaction,
-    GoodsReceipt, GoodsReceiptItem, SupplierReturn, SupplierReturnItem, SupplierInvoice
+    GoodsReceipt,
+    GoodsReceiptItem,
+    InventoryTransaction,
+    Product,
+    Purchase,
+    SupplierInvoice,
+    SupplierReturn,
+    SupplierReturnItem,
 )
+
 
 def receive_goods(
     db: Session,
     po_id: int,
     supplier_id: int,
-    items_data: List[Dict[str, Any]],
-    store_id: Optional[int] = None,
-    warehouse_id: Optional[int] = None,
-    staff_user_id: Optional[int] = None,
-    delivery_note_ref: Optional[str] = None,
-    notes: Optional[str] = None
+    items_data: list[dict[str, Any]],
+    store_id: int | None = None,
+    warehouse_id: int | None = None,
+    staff_user_id: int | None = None,
+    delivery_note_ref: str | None = None,
+    notes: str | None = None,
 ) -> GoodsReceipt:
     """
     Step 1: Physical Goods Receiving (GRN Creation).
@@ -41,7 +49,7 @@ def receive_goods(
         status="PENDING_VERIFICATION",
         delivery_note_ref=delivery_note_ref,
         notes=notes,
-        created_at=datetime.now(timezone.utc)
+        created_at=datetime.now(UTC),
     )
     db.add(grn)
     db.flush()
@@ -59,7 +67,7 @@ def receive_goods(
             expiry_date=item.get("expiry_date"),
             storage_location=item.get("storage_location"),
             rejection_reason=item.get("rejection_reason"),
-            notes=item.get("notes")
+            notes=item.get("notes"),
         )
         db.add(grn_item)
 
@@ -70,11 +78,8 @@ def receive_goods(
     db.refresh(grn)
     return grn
 
-def verify_and_approve_grn(
-    db: Session,
-    grn_id: int,
-    manager_user_id: int
-) -> GoodsReceipt:
+
+def verify_and_approve_grn(db: Session, grn_id: int, manager_user_id: int) -> GoodsReceipt:
     """
     Step 2: Manager Verification & Stock Increment.
     Manager verifies delivery note vs actual goods.
@@ -87,9 +92,12 @@ def verify_and_approve_grn(
         raise HTTPException(status_code=404, detail="Goods Receipt Note (GRN) not found.")
 
     if grn.status == "ACCEPTED":
-        raise HTTPException(status_code=400, detail="GRN is already verified and accepted into inventory.")
+        raise HTTPException(
+            status_code=400,
+            detail="GRN is already verified and accepted into inventory.",
+        )
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     grn.status = "ACCEPTED"
     grn.verified_by_manager_id = manager_user_id
     grn.verified_at = now
@@ -108,7 +116,7 @@ def verify_and_approve_grn(
                     type="RECEIVE",
                     quantity=item.accepted_quantity,
                     notes=f"Goods Receipt {grn.grn_code} Verification: Accepted {item.accepted_quantity} units into stock (prev: {prev_stock}, new: {product.stock_quantity}). Batch: {item.batch_number or 'N/A'}",
-                    created_at=now
+                    created_at=now,
                 )
                 db.add(tx)
 
@@ -116,18 +124,11 @@ def verify_and_approve_grn(
     po = db.query(Purchase).filter(Purchase.id == grn.po_id).first()
     if po:
         total_ordered = sum(pi.quantity for pi in po.items)
-        
+
         # Calculate total received across all accepted GRNs for this PO
-        all_grns = db.query(GoodsReceipt).filter(
-            GoodsReceipt.po_id == po.id,
-            GoodsReceipt.status == "ACCEPTED"
-        ).all()
-        
-        total_received_so_far = sum(
-            gri.received_quantity
-            for g in all_grns
-            for gri in g.items
-        )
+        all_grns = db.query(GoodsReceipt).filter(GoodsReceipt.po_id == po.id, GoodsReceipt.status == "ACCEPTED").all()
+
+        total_received_so_far = sum(gri.received_quantity for g in all_grns for gri in g.items)
 
         if total_received_so_far >= total_ordered:
             po.status = "FULLY_RECEIVED"
@@ -138,12 +139,13 @@ def verify_and_approve_grn(
     db.refresh(grn)
     return grn
 
+
 def create_supplier_return(
     db: Session,
     grn_id: int,
     supplier_id: int,
     reason: str,
-    items_data: List[Dict[str, Any]]
+    items_data: list[dict[str, Any]],
 ) -> SupplierReturn:
     """
     Create a Supplier Return for rejected or damaged goods.
@@ -155,8 +157,8 @@ def create_supplier_return(
         supplier_id=supplier_id,
         status="AUTHORISED",
         reason=reason,
-        created_at=datetime.now(timezone.utc),
-        authorized_at=datetime.now(timezone.utc)
+        created_at=datetime.now(UTC),
+        authorized_at=datetime.now(UTC),
     )
     db.add(ret)
     db.flush()
@@ -167,7 +169,7 @@ def create_supplier_return(
             grn_item_id=item["grn_item_id"],
             product_id=item["product_id"],
             returned_quantity=item["returned_quantity"],
-            return_reason=item.get("return_reason", reason)
+            return_reason=item.get("return_reason", reason),
         )
         db.add(ret_item)
 
@@ -175,12 +177,13 @@ def create_supplier_return(
     db.refresh(ret)
     return ret
 
+
 def perform_three_way_matching(
     db: Session,
     po_id: int,
     supplier_invoice_code: str,
     billed_quantity: int,
-    billed_unit_cost: float
+    billed_unit_cost: float,
 ) -> SupplierInvoice:
     """
     Three-Way Matching Control Engine:
@@ -195,23 +198,16 @@ def perform_three_way_matching(
     if not po:
         raise HTTPException(status_code=404, detail="Purchase Order not found.")
 
-    po_ordered_qty = sum(pi.quantity for pi in po.items)
+    sum(pi.quantity for pi in po.items)
     po_agreed_cost = po.items[0].unit_price if po.items else 0.0
 
     # Calculate total accepted quantity across GRNs
-    accepted_grns = db.query(GoodsReceipt).filter(
-        GoodsReceipt.po_id == po.id,
-        GoodsReceipt.status == "ACCEPTED"
-    ).all()
-    
-    accepted_qty = sum(
-        gri.accepted_quantity
-        for g in accepted_grns
-        for gri in g.items
-    )
+    accepted_grns = db.query(GoodsReceipt).filter(GoodsReceipt.po_id == po.id, GoodsReceipt.status == "ACCEPTED").all()
 
-    qty_mismatch = (billed_quantity != accepted_qty)
-    cost_mismatch = (abs(billed_unit_cost - po_agreed_cost) > 0.01)
+    accepted_qty = sum(gri.accepted_quantity for g in accepted_grns for gri in g.items)
+
+    qty_mismatch = billed_quantity != accepted_qty
+    cost_mismatch = abs(billed_unit_cost - po_agreed_cost) > 0.01
 
     three_way_status = "MATCHED"
     status = "APPROVED_FOR_PAYMENT"
@@ -242,7 +238,7 @@ def perform_three_way_matching(
         status=status,
         three_way_match_status=three_way_status,
         mismatch_reason=mismatch_reason,
-        created_at=datetime.now(timezone.utc)
+        created_at=datetime.now(UTC),
     )
     db.add(inv)
     db.commit()

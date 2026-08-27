@@ -1,9 +1,12 @@
-from sqlalchemy.orm import Session
-from fastapi import HTTPException, status
-from app.models import Stocktake, StocktakeItem, Product, Store
-from app.services.inventory_service import process_stock_adjustment
-from datetime import datetime, timezone
 import uuid
+from datetime import UTC, datetime
+
+from fastapi import HTTPException
+from sqlalchemy.orm import Session
+
+from app.models import Stocktake, StocktakeItem, Store
+from app.services.inventory_service import process_stock_adjustment
+
 
 def create_stocktake(db: Session, stocktake_data, user_name: str = "System Operator") -> Stocktake:
     store = db.query(Store).filter(Store.id == stocktake_data.store_id).first()
@@ -18,7 +21,7 @@ def create_stocktake(db: Session, stocktake_data, user_name: str = "System Opera
         status="IN_PROGRESS",
         reason=stocktake_data.reason,
         conducted_by_emp_id=stocktake_data.conducted_by_emp_id,
-        created_at=datetime.now(timezone.utc)
+        created_at=datetime.now(UTC),
     )
     db.add(stocktake)
     db.flush()
@@ -31,7 +34,7 @@ def create_stocktake(db: Session, stocktake_data, user_name: str = "System Opera
             system_quantity=item.system_quantity,
             physical_count=item.physical_count,
             variance_quantity=variance,
-            notes=item.notes
+            notes=item.notes,
         )
         db.add(s_item)
 
@@ -39,11 +42,12 @@ def create_stocktake(db: Session, stocktake_data, user_name: str = "System Opera
     db.refresh(stocktake)
     return stocktake
 
+
 def approve_stocktake(db: Session, stocktake_id: int, approved_by_emp_id: int, user_name: str = "Manager") -> Stocktake:
     stocktake = db.query(Stocktake).filter(Stocktake.id == stocktake_id).first()
     if not stocktake:
         raise HTTPException(status_code=404, detail="Stocktake session not found")
-    
+
     if stocktake.status == "APPROVED":
         raise HTTPException(status_code=400, detail="Stocktake has already been approved and posted")
 
@@ -59,7 +63,7 @@ def approve_stocktake(db: Session, stocktake_id: int, approved_by_emp_id: int, u
                 reference=stocktake.stocktake_code,
                 user_name=user_name,
                 notes=f"Stocktake Variance Adjustment ({stocktake.reason}): System={s_item.system_quantity}, Physical={s_item.physical_count}",
-                reason_category=stocktake.reason
+                reason_category=stocktake.reason,
             )
 
     stocktake.status = "APPROVED"
@@ -68,8 +72,10 @@ def approve_stocktake(db: Session, stocktake_id: int, approved_by_emp_id: int, u
     db.refresh(stocktake)
     return stocktake
 
+
 def get_stocktakes(db: Session):
     return db.query(Stocktake).order_by(Stocktake.id.desc()).all()
+
 
 def get_stocktake_by_id(db: Session, stocktake_id: int) -> Stocktake:
     stk = db.query(Stocktake).filter(Stocktake.id == stocktake_id).first()

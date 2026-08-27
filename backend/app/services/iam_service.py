@@ -1,20 +1,22 @@
-import os
-import json
 import base64
-import hmac
 import hashlib
+import hmac
+import json
+import os
 import uuid
-from datetime import datetime, timedelta, timezone
-from typing import List, Optional
-from fastapi import Request, HTTPException, Depends
+from datetime import UTC, datetime, timedelta
+
+from fastapi import HTTPException
 
 # Attempt to import PyJWT or python-jose, fallback to stdlib HMAC-SHA256
 try:
     import jwt
+
     HAS_JWT = True
 except ImportError:
     try:
         from jose import jwt
+
         HAS_JWT = True
     except ImportError:
         HAS_JWT = False
@@ -38,12 +40,12 @@ SECRET_KEY = os.getenv("SECRET_KEY", "" if _IS_PRODUCTION else "local_dev_only_n
 if _IS_PRODUCTION and (not SECRET_KEY or SECRET_KEY in _INSECURE_DEFAULTS or len(SECRET_KEY) < 32):
     raise RuntimeError(
         "FATAL: SECRET_KEY is missing, too short (< 32 chars), or matches a known insecure default. "
-        "Generate a production key with: python -c \"import secrets; print(secrets.token_hex(64))\""
+        'Generate a production key with: python -c "import secrets; print(secrets.token_hex(64))"'
     )
 
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 15 # Short-lived access token
-REFRESH_TOKEN_EXPIRE_DAYS = 7    # Long-lived refresh session
+ACCESS_TOKEN_EXPIRE_MINUTES = 15  # Short-lived access token
+REFRESH_TOKEN_EXPIRE_DAYS = 7  # Long-lived refresh session
 
 # ─── Granular RBAC Permission Matrix — Strict Separation of Duties ────────────
 # Permission codes use dot-notation matching the frontend permissions.js exactly.
@@ -51,92 +53,162 @@ REFRESH_TOKEN_EXPIRE_DAYS = 7    # Long-lived refresh session
 ROLE_PERMISSIONS = {
     # 1. SYSADMIN — Infrastructure & Server Operations ONLY. Zero business data access.
     "SYSADMIN": [
-        "system.health", "system.metrics", "system.logs", "system.config",
-        "users.manage", "roles.manage", "audit.view", "audit.export",
+        "system.health",
+        "system.metrics",
+        "system.logs",
+        "system.config",
+        "users.manage",
+        "roles.manage",
+        "audit.view",
+        "audit.export",
         # No inventory, sales, purchases, or financial data access
     ],
-
     # 2. APP_ADMIN — IAM, Security, Users, Audit. NO operational transactions.
     # SOD: APP_ADMIN cannot process sales, approve POs, or adjust inventory.
     "APP_ADMIN": [
-        "users.manage", "roles.manage",
-        "audit.view", "audit.export", "integrity.view",
+        "users.manage",
+        "roles.manage",
+        "audit.view",
+        "audit.export",
+        "integrity.view",
         "system.config",
         "reports.view",
         # Read-only visibility into catalog (no write access)
-        "products.view", "inventory.view", "sales.view", "purchases.view",
+        "products.view",
+        "inventory.view",
+        "sales.view",
+        "purchases.view",
         "employees.view",
         # No: sales.create, sales.refund, purchases.approve, inventory.adjust
     ],
-
     # Universal Administrator (for test suites and superuser operations)
     "ADMIN": [
-        "users.manage", "roles.manage", "audit.view", "audit.export", "integrity.view",
-        "system.config", "reports.view", "stores.manage",
-        "products.view", "products.create", "products.edit", "products.delete",
-        "inventory.view", "inventory.adjust", "inventory.receive", "inventory.transfer", "inventory.count",
-        "sales.view", "sales.create", "sales.policy", "sales.approve_large", "sales.refund", "sales.refund.approve",
-        "purchases.view", "purchases.create", "purchases.approve", "purchases.receive",
-        "gateways.manage", "employees.view", "employees.manage", "suppliers.manage", "customers.manage", "shifts.manage"
+        "users.manage",
+        "roles.manage",
+        "audit.view",
+        "audit.export",
+        "integrity.view",
+        "system.config",
+        "reports.view",
+        "stores.manage",
+        "products.view",
+        "products.create",
+        "products.edit",
+        "products.delete",
+        "inventory.view",
+        "inventory.adjust",
+        "inventory.receive",
+        "inventory.transfer",
+        "inventory.count",
+        "sales.view",
+        "sales.create",
+        "sales.policy",
+        "sales.approve_large",
+        "sales.refund",
+        "sales.refund.approve",
+        "purchases.view",
+        "purchases.create",
+        "purchases.approve",
+        "purchases.receive",
+        "gateways.manage",
+        "employees.view",
+        "employees.manage",
+        "suppliers.manage",
+        "customers.manage",
+        "shifts.manage",
     ],
-
     # 3. MANAGER — Full operational authority. NO user management or system config.
     # SOD: MANAGER cannot create/disable system users or change server settings.
     "MANAGER": [
-        "attention.view", "attention.decide", "attention.comment",
+        "attention.view",
+        "attention.decide",
+        "attention.comment",
         "stores.manage",
-        "products.view", "products.create", "products.edit", "products.delete",
-        "inventory.view", "inventory.adjust", "inventory.receive", "inventory.transfer", "inventory.count",
-        "sales.view", "sales.create", "sales.policy", "sales.approve_large", "sales.refund", "sales.refund.approve",
-        "purchases.view", "purchases.create", "purchases.approve", "purchases.receive",
+        "products.view",
+        "products.create",
+        "products.edit",
+        "products.delete",
+        "inventory.view",
+        "inventory.adjust",
+        "inventory.receive",
+        "inventory.transfer",
+        "inventory.count",
+        "sales.view",
+        "sales.create",
+        "sales.policy",
+        "sales.approve_large",
+        "sales.refund",
+        "sales.refund.approve",
+        "purchases.view",
+        "purchases.create",
+        "purchases.approve",
+        "purchases.receive",
         "gateways.manage",
-        "employees.view", "employees.manage",
-        "suppliers.manage", "customers.manage",
-        "reports.view", "shifts.manage",
+        "employees.view",
+        "employees.manage",
+        "suppliers.manage",
+        "customers.manage",
+        "reports.view",
+        "shifts.manage",
         "integrity.view",
         # No: users.manage, roles.manage, system.config, audit.export
     ],
-
     # 4. STAFF — POS, Shifts, Returns only. Minimal read access.
     # SOD: STAFF cannot see reports, approve anything, or manage users/products.
     "STAFF": [
-        "products.view", "inventory.view", "inventory.receive",
-        "sales.view", "sales.create", "sales.refund",
+        "products.view",
+        "inventory.view",
+        "inventory.receive",
+        "sales.view",
+        "sales.create",
+        "sales.refund",
         "shifts.manage",
         "customers.manage",
         # No: reports.view, users.manage, purchases.*, employees.manage
     ],
-
     # 5. WAREHOUSE — Goods receipt and stock movement. No sales or reports.
     "WAREHOUSE": [
-        "products.view", "inventory.view", "inventory.adjust",
-        "inventory.receive", "inventory.transfer", "inventory.count",
-        "purchases.view", "purchases.receive",
+        "products.view",
+        "inventory.view",
+        "inventory.adjust",
+        "inventory.receive",
+        "inventory.transfer",
+        "inventory.count",
+        "purchases.view",
+        "purchases.receive",
         # No: sales.*, reports.view, users.manage
     ],
-
     # 6. AUDITOR — Strictly read-only. No writes of any kind.
     "AUDITOR": [
-        "products.view", "inventory.view",
-        "sales.view", "purchases.view",
-        "employees.view", "suppliers.view", "customers.view",
-        "audit.view", "audit.export",
-        "reports.view", "integrity.view",
+        "products.view",
+        "inventory.view",
+        "sales.view",
+        "purchases.view",
+        "employees.view",
+        "suppliers.view",
+        "customers.view",
+        "audit.view",
+        "audit.export",
+        "reports.view",
+        "integrity.view",
         # No creates, updates, or deletes — enforced by audit_read_only() dependency
     ],
 }
 
 try:
     import bcrypt
+
     HAS_BCRYPT = True
 except ImportError:
     HAS_BCRYPT = False
 
 try:
     from passlib.context import CryptContext
+
     pwd_context = CryptContext(schemes=["bcrypt", "pbkdf2_sha256"], deprecated="auto")
 except Exception:
     pwd_context = None
+
 
 def hash_password(password: str) -> str:
     """
@@ -145,10 +217,10 @@ def hash_password(password: str) -> str:
     """
     if not password:
         password = ""
-    pwd_bytes = password.encode('utf-8')[:72]
+    pwd_bytes = password.encode("utf-8")[:72]
     if HAS_BCRYPT:
         salt = bcrypt.gensalt()
-        return bcrypt.hashpw(pwd_bytes, salt).decode('utf-8')
+        return bcrypt.hashpw(pwd_bytes, salt).decode("utf-8")
     if pwd_context is not None:
         try:
             return pwd_context.hash(password[:72])
@@ -156,20 +228,21 @@ def hash_password(password: str) -> str:
             pass
     # Fallback to PBKDF2-HMAC-SHA256
     salt = os.urandom(16)
-    derived = hashlib.pbkdf2_hmac('sha256', pwd_bytes, salt, 100_000)
+    derived = hashlib.pbkdf2_hmac("sha256", pwd_bytes, salt, 100_000)
     return f"$pbkdf2-sha256$100000${base64.b64encode(salt).decode('utf-8')}${base64.b64encode(derived).decode('utf-8')}"
 
+
 get_password_hash = hash_password
+
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify raw password against stored hash using constant-time comparison with fallback for legacy hashes"""
     if not plain_password or not hashed_password:
         return False
-    pwd_bytes = plain_password.encode('utf-8')[:72]
+    pwd_bytes = plain_password.encode("utf-8")[:72]
     try:
-        if hashed_password.startswith(("$2a$", "$2b$", "$2y$")):
-            if HAS_BCRYPT:
-                return bcrypt.checkpw(pwd_bytes, hashed_password.encode('utf-8'))
+        if hashed_password.startswith(("$2a$", "$2b$", "$2y$")) and HAS_BCRYPT:
+            return bcrypt.checkpw(pwd_bytes, hashed_password.encode("utf-8"))
         if pwd_context is not None and pwd_context.identify(hashed_password):
             return pwd_context.verify(plain_password[:72], hashed_password)
     except Exception:
@@ -183,17 +256,26 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
                 iterations = int(parts[2])
                 salt = base64.b64decode(parts[3])
                 expected = base64.b64decode(parts[4])
-                derived = hashlib.pbkdf2_hmac('sha256', pwd_bytes, salt, iterations)
+                derived = hashlib.pbkdf2_hmac("sha256", pwd_bytes, salt, iterations)
                 return hmac.compare_digest(derived, expected)
         except Exception:
             pass
 
     # Fallback for legacy PBKDF2 hex strings
     _salt_value = os.getenv("PASSWORD_SALT", "" if _IS_PRODUCTION else "local_dev_only_not_for_production")
-    if _IS_PRODUCTION and (not _salt_value or _salt_value in {"ims_secure_salt_2026", "local_dev_only_not_for_production", "CHANGE_ME_GENERATE_WITH_python_secrets_token_hex_32", ""}):
+    if _IS_PRODUCTION and (
+        not _salt_value
+        or _salt_value
+        in {
+            "ims_secure_salt_2026",
+            "local_dev_only_not_for_production",
+            "CHANGE_ME_GENERATE_WITH_python_secrets_token_hex_32",
+            "",
+        }
+    ):
         raise RuntimeError("FATAL: PASSWORD_SALT is missing or matches a known insecure default in production.")
-    salt = _salt_value.encode('utf-8')
-    derived = hashlib.pbkdf2_hmac('sha256', plain_password.encode('utf-8'), salt, 100_000).hex()
+    salt = _salt_value.encode("utf-8")
+    derived = hashlib.pbkdf2_hmac("sha256", plain_password.encode("utf-8"), salt, 100_000).hex()
     return hmac.compare_digest(derived, hashed_password)
 
 
@@ -201,19 +283,20 @@ def hash_refresh_token(token: str) -> str:
     """Hash refresh token for secure database storage"""
     return hashlib.sha256(token.encode()).hexdigest()
 
-def create_access_token(user_id: str, role: str, permissions: List[str], session_id: Optional[str] = None) -> str:
+
+def create_access_token(user_id: str, role: str, permissions: list[str], session_id: str | None = None) -> str:
     """
     Issue short-lived JWT access token (15m TTL).
     Embeds session_id for server-side session tracking and revocation.
     """
-    expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    expire = datetime.now(UTC) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     payload = {
         "sub": user_id,
         "role": role,
         "permissions": permissions,
         "exp": int(expire.timestamp()),
         "iss": "ims-iam-auth",
-        "iat": int(datetime.now(timezone.utc).timestamp()),
+        "iat": int(datetime.now(UTC).timestamp()),
     }
     if session_id:
         payload["session_id"] = session_id
@@ -232,9 +315,11 @@ def create_access_token(user_id: str, role: str, permissions: List[str], session
     sig_b64 = base64.urlsafe_b64encode(signature).decode().rstrip("=")
     return f"{header_b64}.{payload_b64}.{sig_b64}"
 
+
 def create_refresh_token(user_id: str) -> str:
     """Issue opaque refresh token"""
     return f"ref_{user_id}_{uuid.uuid4().hex}"
+
 
 def decode_access_token(token: str) -> dict:
     """
@@ -244,30 +329,31 @@ def decode_access_token(token: str) -> dict:
         try:
             return jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         except Exception as e:
-            raise HTTPException(status_code=401, detail=f"Invalid or expired JWT token: {str(e)}")
+            raise HTTPException(status_code=401, detail=f"Invalid or expired JWT token: {e!s}") from e
 
     # Fallback Standard Library JWT Validation
     try:
         parts = token.split(".")
         if len(parts) != 3:
             raise ValueError("Malformed token")
-        
+
         header_b64, payload_b64, sig_b64 = parts
         expected_sig = hmac.new(SECRET_KEY.encode(), f"{header_b64}.{payload_b64}".encode(), hashlib.sha256).digest()
         actual_sig = base64.urlsafe_b64decode(sig_b64 + "==")
-        
+
         if not hmac.compare_digest(expected_sig, actual_sig):
             raise ValueError("Signature mismatch")
-        
+
         payload_bytes = base64.urlsafe_b64decode(payload_b64 + "==")
         payload = json.loads(payload_bytes.decode())
-        
-        if payload.get("exp", 0) < int(datetime.now(timezone.utc).timestamp()):
+
+        if payload.get("exp", 0) < int(datetime.now(UTC).timestamp()):
             raise ValueError("Token expired")
-        
+
         return payload
-    except Exception:
-        raise HTTPException(status_code=401, detail="Invalid or expired authentication token.")
+    except Exception as err:
+        raise HTTPException(status_code=401, detail="Invalid or expired authentication token.") from err
+
 
 def create_refresh_session() -> tuple[str, str]:
     """
@@ -277,11 +363,15 @@ def create_refresh_session() -> tuple[str, str]:
     raw_token = f"ref_{session_id}_{uuid.uuid4().hex}"
     return session_id, raw_token
 
+
 # Backward compatibility re-export: all existing routes can import require_permission from here.
 def require_permission(permission: str):
     from app.dependencies import require_permission as _require_permission
+
     return _require_permission(permission)
+
 
 def get_current_user(*args, **kwargs):
     from app.dependencies import get_current_user as _get_current_user
+
     return _get_current_user(*args, **kwargs)

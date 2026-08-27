@@ -1,21 +1,29 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
-from typing import List, Optional
+
 from app.database import get_db
 from app.schemas import (
-    DeviceRegisterRequest, DeviceResponse,
-    SessionResponse, RiskEvaluationRequest, RiskEvaluationResponse
+    DeviceRegisterRequest,
+    DeviceResponse,
+    RiskEvaluationRequest,
+    RiskEvaluationResponse,
+    SessionResponse,
 )
 from app.services import device_trust_service
 from app.services.iam_service import require_permission
 
 router = APIRouter(prefix="/api/sessions", tags=["Device Trust & Session Security"])
 
-@router.post("/register-device", response_model=DeviceResponse, status_code=status.HTTP_201_CREATED)
+
+@router.post(
+    "/register-device",
+    response_model=DeviceResponse,
+    status_code=status.HTTP_201_CREATED,
+)
 def register_device(
     data: DeviceRegisterRequest,
     db: Session = Depends(get_db),
-    auth_ctx: dict = Depends(require_permission("products:read")) # All authenticated users
+    auth_ctx: dict = Depends(require_permission("products:read")),  # All authenticated users
 ):
     """
     Register device fingerprint and browser characteristics for active session recognition.
@@ -27,36 +35,39 @@ def register_device(
         device_name=data.device_name,
         raw_fingerprint=data.fingerprint_raw,
         ip_address=data.ip_address,
-        user_agent=data.user_agent
+        user_agent=data.user_agent,
     )
 
-@router.get("/active", response_model=List[SessionResponse])
+
+@router.get("/active", response_model=list[SessionResponse])
 def get_active_sessions(
-    user_id: Optional[int] = None,
+    user_id: int | None = None,
     db: Session = Depends(get_db),
-    auth_ctx: dict = Depends(require_permission("stores:manage")) # Manager or Sysadmin
+    auth_ctx: dict = Depends(require_permission("stores:manage")),  # Manager or Sysadmin
 ):
     """
     View active operational sessions across the enterprise for session security auditing.
     """
     return device_trust_service.list_active_sessions(db, user_id)
 
-@router.get("/devices", response_model=List[DeviceResponse])
+
+@router.get("/devices", response_model=list[DeviceResponse])
 def get_registered_devices(
-    user_id: Optional[int] = None,
+    user_id: int | None = None,
     db: Session = Depends(get_db),
-    auth_ctx: dict = Depends(require_permission("stores:manage")) # Manager or Sysadmin
+    auth_ctx: dict = Depends(require_permission("stores:manage")),  # Manager or Sysadmin
 ):
     """
     View registered employee devices and trust status.
     """
     return device_trust_service.list_user_devices(db, user_id)
 
+
 @router.post("/evaluate-risk", response_model=RiskEvaluationResponse)
 def evaluate_risk(
     data: RiskEvaluationRequest,
     db: Session = Depends(get_db),
-    auth_ctx: dict = Depends(require_permission("products:read"))
+    auth_ctx: dict = Depends(require_permission("products:read")),
 ):
     """
     Risk-Based Authentication Engine:
@@ -68,7 +79,7 @@ def evaluate_risk(
         session_id=data.session_id,
         action_name=data.action_name,
         raw_fingerprint=data.fingerprint_raw,
-        current_ip=data.ip_address
+        current_ip=data.ip_address,
     )
     return RiskEvaluationResponse(
         session_id=data.session_id,
@@ -76,14 +87,15 @@ def evaluate_risk(
         risk_level=risk_level,
         is_device_trusted=is_trusted,
         step_up_required=step_up,
-        reasons=reasons
+        reasons=reasons,
     )
+
 
 @router.post("/{session_id}/revoke", response_model=SessionResponse)
 def revoke_session(
     session_id: str,
     db: Session = Depends(get_db),
-    auth_ctx: dict = Depends(require_permission("stores:manage")) # Manager or Sysadmin
+    auth_ctx: dict = Depends(require_permission("stores:manage")),  # Manager or Sysadmin
 ):
     """
     Immediately terminate a suspicious or compromised user session.
@@ -91,11 +103,12 @@ def revoke_session(
     revoker_user_id = auth_ctx.get("user_id", 1)
     return device_trust_service.revoke_session(db, session_id, revoker_user_id)
 
+
 @router.post("/devices/{device_id}/revoke", response_model=DeviceResponse)
 def revoke_device(
     device_id: str,
     db: Session = Depends(get_db),
-    auth_ctx: dict = Depends(require_permission("stores:manage")) # Manager or Sysadmin
+    auth_ctx: dict = Depends(require_permission("stores:manage")),  # Manager or Sysadmin
 ):
     """
     Revoke a device fingerprint. Automatically invalidates all active sessions linked to this device.

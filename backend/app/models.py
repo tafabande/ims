@@ -1,30 +1,43 @@
-from sqlmodel import SQLModel, Field, Relationship
-from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, ForeignKey, Text, CheckConstraint
-from sqlalchemy.orm import relationship
 from datetime import datetime
+
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    Column,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+)
+from sqlalchemy.orm import relationship
+
 from app.database import Base
+
 
 class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_code = Column(String(50), unique=True, index=True, nullable=True) # e.g. USR-000042
+    user_code = Column(String(50), unique=True, index=True, nullable=True)  # e.g. USR-000042
     email = Column(String(255), unique=True, index=True, nullable=False)
     hashed_password = Column(String(255), nullable=False)
     full_name = Column(String(255), nullable=False)
-    role = Column(String(50), nullable=False, default="STAFF") # ADMIN, MANAGER, STAFF
+    role = Column(String(50), nullable=False, default="STAFF")  # ADMIN, MANAGER, STAFF
     department = Column(String(100), nullable=True)
-    active = Column(Boolean, default=True) # Soft deletion flag
+    active = Column(Boolean, default=True)  # Soft deletion flag
     created_at = Column(DateTime, default=datetime.utcnow)
 
     sessions = relationship("SessionRecord", back_populates="user")
     employee = relationship("Employee", back_populates="user", uselist=False)
 
+
 class Department(Base):
     __tablename__ = "departments"
 
     id = Column(Integer, primary_key=True, index=True)
-    department_code = Column(String(50), unique=True, index=True, nullable=False) # e.g. DEP-00001
+    department_code = Column(String(50), unique=True, index=True, nullable=False)  # e.g. DEP-00001
     name = Column(String(100), nullable=False)
     description = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -32,11 +45,12 @@ class Department(Base):
     job_roles = relationship("JobRole", back_populates="department")
     employees = relationship("Employee", back_populates="department")
 
+
 class JobRole(Base):
     __tablename__ = "job_roles"
 
     id = Column(Integer, primary_key=True, index=True)
-    role_code = Column(String(50), unique=True, index=True, nullable=False) # e.g. JOB-00012
+    role_code = Column(String(50), unique=True, index=True, nullable=False)  # e.g. JOB-00012
     name = Column(String(100), nullable=False)
     department_id = Column(Integer, ForeignKey("departments.id"), nullable=False)
     description = Column(Text, nullable=True)
@@ -45,22 +59,29 @@ class JobRole(Base):
     department = relationship("Department", back_populates="job_roles")
     employees = relationship("Employee", back_populates="job_role")
 
+
 class Employee(Base):
     __tablename__ = "employees"
 
     id = Column(Integer, primary_key=True, index=True)
-    employee_code = Column(String(50), unique=True, index=True, nullable=False) # e.g. EMP-2026-00042
+    employee_code = Column(String(50), unique=True, index=True, nullable=False)  # e.g. EMP-2026-00042
     first_name = Column(String(100), nullable=False)
     last_name = Column(String(100), nullable=False)
     email = Column(String(255), unique=True, index=True, nullable=False)
     phone = Column(String(50), nullable=True)
-    position = Column(String(100), nullable=True, default="CASHIER") # STORE_MANAGER, CASHIER, WAREHOUSE_ASSISTANT, STOCK_CONTROLLER, etc.
+    position = Column(
+        String(100), nullable=True, default="CASHIER"
+    )  # STORE_MANAGER, CASHIER, WAREHOUSE_ASSISTANT, STOCK_CONTROLLER, etc.
     department_id = Column(Integer, ForeignKey("departments.id"), nullable=True)
     job_role_id = Column(Integer, ForeignKey("job_roles.id"), nullable=True)
-    store_id = Column(Integer, ForeignKey("stores.id", use_alter=True, name="fk_employee_store_id"), nullable=True)
+    store_id = Column(
+        Integer,
+        ForeignKey("stores.id", use_alter=True, name="fk_employee_store_id"),
+        nullable=True,
+    )
     manager_id = Column(Integer, ForeignKey("employees.id"), nullable=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=True) # Optional 0..1 relationship
-    status = Column(String(50), default="ACTIVE") # ACTIVE, INACTIVE, SUSPENDED, TERMINATED
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)  # Optional 0..1 relationship
+    status = Column(String(50), default="ACTIVE")  # ACTIVE, INACTIVE, SUSPENDED, TERMINATED
     created_at = Column(DateTime, default=datetime.utcnow)
 
     department = relationship("Department", back_populates="employees")
@@ -70,20 +91,21 @@ class Employee(Base):
     manager = relationship("Employee", foreign_keys=[manager_id], remote_side=[id])
 
 
-
 class Role(Base):
     __tablename__ = "roles"
 
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(50), unique=True, nullable=False) # ADMIN, MANAGER, STAFF
+    name = Column(String(50), unique=True, nullable=False)  # ADMIN, MANAGER, STAFF
     description = Column(String(255), nullable=True)
+
 
 class Permission(Base):
     __tablename__ = "permissions"
 
     id = Column(Integer, primary_key=True, index=True)
-    code = Column(String(100), unique=True, nullable=False) # e.g. inventory:adjust, products:delete
+    code = Column(String(100), unique=True, nullable=False)  # e.g. inventory:adjust, products:delete
     description = Column(String(255), nullable=True)
+
 
 class RolePermission(Base):
     __tablename__ = "role_permissions"
@@ -91,6 +113,7 @@ class RolePermission(Base):
     id = Column(Integer, primary_key=True, index=True)
     role_name = Column(String(50), nullable=False)
     permission_code = Column(String(100), nullable=False)
+
 
 class SessionRecord(Base):
     __tablename__ = "session_records"
@@ -113,25 +136,27 @@ class FileRecord(Base):
 
     id = Column(String(100), primary_key=True, index=True)
     original_name = Column(String(255), nullable=False)
-    storage_key = Column(String(255), nullable=False) # UUID filename
+    storage_key = Column(String(255), nullable=False)  # UUID filename
     mime_type = Column(String(100), nullable=False)
     size_bytes = Column(Integer, nullable=False)
     sha256_hash = Column(String(64), nullable=False)
     uploaded_by = Column(String(255), default="System Operator")
     created_at = Column(DateTime, default=datetime.utcnow)
 
+
 class Category(Base):
     __tablename__ = "categories"
 
     id = Column(Integer, primary_key=True, index=True)
-    category_code = Column(String(50), unique=True, index=True, nullable=True) # e.g. CAT-000018
+    category_code = Column(String(50), unique=True, index=True, nullable=True)  # e.g. CAT-000018
     name = Column(String(100), nullable=False)
     code = Column(String(20), unique=True, index=True, nullable=False)
     description = Column(Text, nullable=True)
-    parent_id = Column(Integer, ForeignKey("categories.id"), nullable=True) # Hierarchical Category Tree
+    parent_id = Column(Integer, ForeignKey("categories.id"), nullable=True)  # Hierarchical Category Tree
 
     products = relationship("Product", back_populates="category")
     children = relationship("Category", backref="parent", remote_side=[id])
+
 
 class Supplier(Base):
     __tablename__ = "suppliers"
@@ -146,6 +171,7 @@ class Supplier(Base):
     products = relationship("Product", back_populates="supplier")
     purchases = relationship("Purchase", back_populates="supplier")
 
+
 class Customer(Base):
     __tablename__ = "customers"
 
@@ -157,11 +183,12 @@ class Customer(Base):
 
     sales = relationship("Sale", back_populates="customer")
 
+
 class Product(Base):
     __tablename__ = "products"
 
     id = Column(Integer, primary_key=True, index=True)
-    product_code = Column(String(50), unique=True, index=True, nullable=True) # e.g. PRD-000381
+    product_code = Column(String(50), unique=True, index=True, nullable=True)  # e.g. PRD-000381
     sku = Column(String(50), unique=True, index=True, nullable=False)
     name = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
@@ -170,7 +197,7 @@ class Product(Base):
     purchase_price = Column(Float, nullable=False)
     selling_price = Column(Float, nullable=False)
     stock_quantity = Column(Integer, nullable=False, default=0)
-    reserved_quantity = Column(Integer, nullable=False, default=0) # Reserved stock
+    reserved_quantity = Column(Integer, nullable=False, default=0)  # Reserved stock
     reorder_level = Column(Integer, nullable=False, default=5)
     unit = Column(String(20), default="Units")
     barcode = Column(String(100), index=True, nullable=True)
@@ -178,10 +205,10 @@ class Product(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     __table_args__ = (
-        CheckConstraint('stock_quantity >= 0', name='check_non_negative_stock'),
-        CheckConstraint('reserved_quantity >= 0', name='check_non_negative_reserved'),
-        CheckConstraint('purchase_price >= 0', name='check_non_negative_buy_price'),
-        CheckConstraint('selling_price >= 0', name='check_non_negative_sell_price'),
+        CheckConstraint("stock_quantity >= 0", name="check_non_negative_stock"),
+        CheckConstraint("reserved_quantity >= 0", name="check_non_negative_reserved"),
+        CheckConstraint("purchase_price >= 0", name="check_non_negative_buy_price"),
+        CheckConstraint("selling_price >= 0", name="check_non_negative_sell_price"),
     )
 
     category = relationship("Category", back_populates="products")
@@ -193,40 +220,51 @@ class Product(Base):
         """Available stock = stock_quantity - reserved_quantity"""
         return max(0, self.stock_quantity - self.reserved_quantity)
 
+
 class InventoryTransaction(Base):
     __tablename__ = "inventory_transactions"
 
     id = Column(Integer, primary_key=True, index=True)
     product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
-    type = Column(String(50), nullable=False) # RECEIVE, SALE, ADJUSTMENT, DAMAGE, RETURN
-    quantity = Column(Integer, nullable=False) # Delta (+ / -)
-    quantity_before = Column(Integer, nullable=False, default=0) # Snapshot before
-    quantity_after = Column(Integer, nullable=False, default=0) # Snapshot after
+    type = Column(String(50), nullable=False)  # RECEIVE, SALE, ADJUSTMENT, DAMAGE, RETURN
+    quantity = Column(Integer, nullable=False)  # Delta (+ / -)
+    quantity_before = Column(Integer, nullable=False, default=0)  # Snapshot before
+    quantity_after = Column(Integer, nullable=False, default=0)  # Snapshot after
     reason_category = Column(String(100), default="CORRECTION")
     reference = Column(String(100), nullable=True)
     user_name = Column(String(255), nullable=True)
-    work_session_id = Column(Integer, ForeignKey("work_sessions.id", use_alter=True, name="fk_tx_work_session"), nullable=True)
+    work_session_id = Column(
+        Integer,
+        ForeignKey("work_sessions.id", use_alter=True, name="fk_tx_work_session"),
+        nullable=True,
+    )
     work_session_code = Column(String(50), nullable=True)
     notes = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     product = relationship("Product", back_populates="transactions")
 
+
 class Purchase(Base):
     __tablename__ = "purchases"
 
     id = Column(Integer, primary_key=True, index=True)
-    po_number = Column(String(50), unique=True, index=True, nullable=False) # e.g. PO-2026-000057
+    po_number = Column(String(50), unique=True, index=True, nullable=False)  # e.g. PO-2026-000057
     supplier_id = Column(Integer, ForeignKey("suppliers.id"), nullable=False)
-    status = Column(String(50), default="PENDING") # PENDING, RECEIVED, CANCELLED
+    status = Column(String(50), default="PENDING")  # PENDING, RECEIVED, CANCELLED
     total_amount = Column(Float, default=0.0)
-    work_session_id = Column(Integer, ForeignKey("work_sessions.id", use_alter=True, name="fk_po_work_session"), nullable=True)
+    work_session_id = Column(
+        Integer,
+        ForeignKey("work_sessions.id", use_alter=True, name="fk_po_work_session"),
+        nullable=True,
+    )
     work_session_code = Column(String(50), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     received_at = Column(DateTime, nullable=True)
 
     supplier = relationship("Supplier", back_populates="purchases")
     items = relationship("PurchaseItem", back_populates="purchase")
+
 
 class PurchaseItem(Base):
     __tablename__ = "purchase_items"
@@ -240,22 +278,28 @@ class PurchaseItem(Base):
     purchase = relationship("Purchase", back_populates="items")
     product = relationship("Product")
 
+
 class Sale(Base):
     __tablename__ = "sales"
 
     id = Column(Integer, primary_key=True, index=True)
-    invoice_number = Column(String(50), unique=True, index=True, nullable=False) # e.g. SAL-2026-000184
+    invoice_number = Column(String(50), unique=True, index=True, nullable=False)  # e.g. SAL-2026-000184
     customer_id = Column(Integer, ForeignKey("customers.id"), nullable=True)
     total_amount = Column(Float, nullable=False)
     payment_status = Column(String(50), default="PAID")
     payment_method = Column(String(50), default="Cash")
-    work_session_id = Column(Integer, ForeignKey("work_sessions.id", use_alter=True, name="fk_sale_work_session"), nullable=True)
+    work_session_id = Column(
+        Integer,
+        ForeignKey("work_sessions.id", use_alter=True, name="fk_sale_work_session"),
+        nullable=True,
+    )
     work_session_code = Column(String(50), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     created_by = Column(String(255), nullable=True)
 
     customer = relationship("Customer", back_populates="sales")
     items = relationship("SaleItem", back_populates="sale")
+
 
 class SaleItem(Base):
     __tablename__ = "sale_items"
@@ -269,18 +313,23 @@ class SaleItem(Base):
     sale = relationship("Sale", back_populates="items")
     product = relationship("Product")
 
+
 class Store(Base):
     __tablename__ = "stores"
 
     id = Column(Integer, primary_key=True, index=True)
-    store_code = Column(String(50), unique=True, index=True, nullable=False) # e.g. STR-HRE-001
+    store_code = Column(String(50), unique=True, index=True, nullable=False)  # e.g. STR-HRE-001
     name = Column(String(100), nullable=False)
     address = Column(Text, nullable=True)
     phone = Column(String(50), nullable=True)
     email = Column(String(255), nullable=True)
-    manager_id = Column(Integer, ForeignKey("employees.id", use_alter=True, name="fk_store_manager_id"), nullable=True)
+    manager_id = Column(
+        Integer,
+        ForeignKey("employees.id", use_alter=True, name="fk_store_manager_id"),
+        nullable=True,
+    )
 
-    status = Column(String(50), default="ACTIVE") # ACTIVE, INACTIVE, MAINTENANCE
+    status = Column(String(50), default="ACTIVE")  # ACTIVE, INACTIVE, MAINTENANCE
     operating_hours = Column(String(255), default="08:00 - 18:00")
     created_at = Column(DateTime, default=datetime.utcnow)
 
@@ -289,11 +338,12 @@ class Store(Base):
     registers = relationship("Register", back_populates="store")
     shifts = relationship("Shift", back_populates="store")
 
+
 class Warehouse(Base):
     __tablename__ = "warehouses"
 
     id = Column(Integer, primary_key=True, index=True)
-    warehouse_code = Column(String(50), unique=True, index=True, nullable=False) # e.g. WH-HRE-001
+    warehouse_code = Column(String(50), unique=True, index=True, nullable=False)  # e.g. WH-HRE-001
     store_id = Column(Integer, ForeignKey("stores.id"), nullable=False)
     name = Column(String(100), nullable=False)
     is_default = Column(Boolean, default=True)
@@ -301,6 +351,7 @@ class Warehouse(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     store = relationship("Store", back_populates="warehouses")
+
 
 class StoreStock(Base):
     __tablename__ = "store_stocks"
@@ -318,14 +369,15 @@ class StoreStock(Base):
     warehouse = relationship("Warehouse")
     product = relationship("Product")
 
+
 class Register(Base):
     __tablename__ = "registers"
 
     id = Column(Integer, primary_key=True, index=True)
-    register_code = Column(String(50), unique=True, index=True, nullable=False) # e.g. POS-HRE-001
+    register_code = Column(String(50), unique=True, index=True, nullable=False)  # e.g. POS-HRE-001
     store_id = Column(Integer, ForeignKey("stores.id"), nullable=False)
     name = Column(String(100), nullable=False)
-    status = Column(String(50), default="CLOSED") # OPEN, CLOSED, MAINTENANCE
+    status = Column(String(50), default="CLOSED")  # OPEN, CLOSED, MAINTENANCE
     current_operator_id = Column(Integer, ForeignKey("employees.id"), nullable=True)
     current_balance = Column(Float, default=0.0)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -334,11 +386,12 @@ class Register(Base):
     current_operator = relationship("Employee", foreign_keys=[current_operator_id])
     shifts = relationship("Shift", back_populates="register")
 
+
 class Shift(Base):
     __tablename__ = "shifts"
 
     id = Column(Integer, primary_key=True, index=True)
-    shift_code = Column(String(50), unique=True, index=True, nullable=False) # e.g. SHIFT-2026-00421
+    shift_code = Column(String(50), unique=True, index=True, nullable=False)  # e.g. SHIFT-2026-00421
     employee_id = Column(Integer, ForeignKey("employees.id"), nullable=False)
     store_id = Column(Integer, ForeignKey("stores.id"), nullable=False)
     register_id = Column(Integer, ForeignKey("registers.id"), nullable=False)
@@ -350,7 +403,7 @@ class Shift(Base):
     expected_cash = Column(Float, default=0.0)
     actual_cash = Column(Float, nullable=True)
     variance = Column(Float, nullable=True)
-    status = Column(String(50), default="OPEN") # OPEN, CLOSED, RECONCILED
+    status = Column(String(50), default="OPEN")  # OPEN, CLOSED, RECONCILED
     supervisor_id = Column(Integer, ForeignKey("employees.id"), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
@@ -359,29 +412,31 @@ class Shift(Base):
     register = relationship("Register", back_populates="shifts")
     supervisor = relationship("Employee", foreign_keys=[supervisor_id])
 
+
 class PaymentMethodConfig(Base):
     __tablename__ = "payment_method_configs"
 
     id = Column(Integer, primary_key=True, index=True)
-    code = Column(String(50), unique=True, nullable=False) # CASH, CARD, MOBILE_MONEY, BANK_TRANSFER, CREDIT
+    code = Column(String(50), unique=True, nullable=False)  # CASH, CARD, MOBILE_MONEY, BANK_TRANSFER, CREDIT
     name = Column(String(100), nullable=False)
     fee_percentage = Column(Float, default=0.0)
     enabled = Column(Boolean, default=True)
+
 
 class ReturnOrder(Base):
     __tablename__ = "return_orders"
 
     id = Column(Integer, primary_key=True, index=True)
-    return_code = Column(String(50), unique=True, index=True, nullable=False) # e.g. RET-2026-00041
+    return_code = Column(String(50), unique=True, index=True, nullable=False)  # e.g. RET-2026-00041
     sale_id = Column(Integer, ForeignKey("sales.id"), nullable=False)
     customer_id = Column(Integer, ForeignKey("customers.id"), nullable=True)
     store_id = Column(Integer, ForeignKey("stores.id"), nullable=True)
     total_refund_amount = Column(Float, nullable=False, default=0.0)
-    reason_category = Column(String(100), default="DEFECTIVE") # DEFECTIVE, WRONG_ITEM, EXPIRED, CUSTOMER_CHANGE
+    reason_category = Column(String(100), default="DEFECTIVE")  # DEFECTIVE, WRONG_ITEM, EXPIRED, CUSTOMER_CHANGE
     is_damaged = Column(Boolean, default=False)
     restock_approved = Column(Boolean, default=True)
     approved_by_emp_id = Column(Integer, ForeignKey("employees.id"), nullable=True)
-    status = Column(String(50), default="COMPLETED") # REQUESTED, APPROVED, REJECTED, COMPLETED
+    status = Column(String(50), default="COMPLETED")  # REQUESTED, APPROVED, REJECTED, COMPLETED
     created_at = Column(DateTime, default=datetime.utcnow)
 
     sale = relationship("Sale")
@@ -389,6 +444,7 @@ class ReturnOrder(Base):
     store = relationship("Store")
     approved_by = relationship("Employee")
     items = relationship("ReturnItem", back_populates="return_order")
+
 
 class ReturnItem(Base):
     __tablename__ = "return_items"
@@ -403,14 +459,17 @@ class ReturnItem(Base):
     return_order = relationship("ReturnOrder", back_populates="items")
     product = relationship("Product")
 
+
 class StockTransfer(Base):
     __tablename__ = "stock_transfers"
 
     id = Column(Integer, primary_key=True, index=True)
-    transfer_code = Column(String(50), unique=True, index=True, nullable=False) # e.g. TRF-2026-00012
+    transfer_code = Column(String(50), unique=True, index=True, nullable=False)  # e.g. TRF-2026-00012
     source_store_id = Column(Integer, ForeignKey("stores.id"), nullable=False)
     destination_store_id = Column(Integer, ForeignKey("stores.id"), nullable=False)
-    status = Column(String(50), default="REQUESTED") # REQUESTED, APPROVED, DISPATCHED, IN_TRANSIT, RECEIVED, COMPLETED, CANCELLED
+    status = Column(
+        String(50), default="REQUESTED"
+    )  # REQUESTED, APPROVED, DISPATCHED, IN_TRANSIT, RECEIVED, COMPLETED, CANCELLED
     requested_by_emp_id = Column(Integer, ForeignKey("employees.id"), nullable=True)
     approved_by_emp_id = Column(Integer, ForeignKey("employees.id"), nullable=True)
     notes = Column(Text, nullable=True)
@@ -421,6 +480,7 @@ class StockTransfer(Base):
     requested_by = relationship("Employee", foreign_keys=[requested_by_emp_id])
     approved_by = relationship("Employee", foreign_keys=[approved_by_emp_id])
     items = relationship("StockTransferItem", back_populates="transfer")
+
 
 class StockTransferItem(Base):
     __tablename__ = "stock_transfer_items"
@@ -433,15 +493,16 @@ class StockTransferItem(Base):
     transfer = relationship("StockTransfer", back_populates="items")
     product = relationship("Product")
 
+
 class Stocktake(Base):
     __tablename__ = "stocktakes"
 
     id = Column(Integer, primary_key=True, index=True)
-    stocktake_code = Column(String(50), unique=True, index=True, nullable=False) # e.g. STK-2026-00017
+    stocktake_code = Column(String(50), unique=True, index=True, nullable=False)  # e.g. STK-2026-00017
     store_id = Column(Integer, ForeignKey("stores.id"), nullable=False)
     warehouse_id = Column(Integer, ForeignKey("warehouses.id"), nullable=True)
-    status = Column(String(50), default="IN_PROGRESS") # DRAFT, IN_PROGRESS, SUBMITTED, APPROVED, REJECTED
-    reason = Column(String(100), default="PERIODIC_AUDIT") # PERIODIC_AUDIT, EXPIRY, DAMAGE, THEFT
+    status = Column(String(50), default="IN_PROGRESS")  # DRAFT, IN_PROGRESS, SUBMITTED, APPROVED, REJECTED
+    reason = Column(String(100), default="PERIODIC_AUDIT")  # PERIODIC_AUDIT, EXPIRY, DAMAGE, THEFT
     conducted_by_emp_id = Column(Integer, ForeignKey("employees.id"), nullable=True)
     approved_by_emp_id = Column(Integer, ForeignKey("employees.id"), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -452,6 +513,7 @@ class Stocktake(Base):
     approved_by = relationship("Employee", foreign_keys=[approved_by_emp_id])
     items = relationship("StocktakeItem", back_populates="stocktake")
 
+
 class StocktakeItem(Base):
     __tablename__ = "stocktake_items"
 
@@ -460,26 +522,27 @@ class StocktakeItem(Base):
     product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
     system_quantity = Column(Integer, nullable=False)
     physical_count = Column(Integer, nullable=False)
-    variance_quantity = Column(Integer, nullable=False) # physical - system
+    variance_quantity = Column(Integer, nullable=False)  # physical - system
     notes = Column(Text, nullable=True)
 
     stocktake = relationship("Stocktake", back_populates="items")
     product = relationship("Product")
 
+
 class Promotion(Base):
     __tablename__ = "promotions"
 
     id = Column(Integer, primary_key=True, index=True)
-    promo_code = Column(String(50), unique=True, index=True, nullable=False) # e.g. PROMO-2026-014
+    promo_code = Column(String(50), unique=True, index=True, nullable=False)  # e.g. PROMO-2026-014
     name = Column(String(100), nullable=False)
-    discount_type = Column(String(50), nullable=False) # PERCENTAGE, FIXED_AMOUNT, BUY_X_GET_Y
+    discount_type = Column(String(50), nullable=False)  # PERCENTAGE, FIXED_AMOUNT, BUY_X_GET_Y
     value = Column(Float, nullable=False)
     category_id = Column(Integer, ForeignKey("categories.id"), nullable=True)
     product_id = Column(Integer, ForeignKey("products.id"), nullable=True)
     store_id = Column(Integer, ForeignKey("stores.id"), nullable=True)
     start_date = Column(DateTime, nullable=False)
     end_date = Column(DateTime, nullable=False)
-    status = Column(String(50), default="PENDING") # PENDING, ACTIVE, EXPIRED, DISABLED
+    status = Column(String(50), default="PENDING")  # PENDING, ACTIVE, EXPIRED, DISABLED
     created_by_emp_id = Column(Integer, ForeignKey("employees.id"), nullable=True)
     approved_by_emp_id = Column(Integer, ForeignKey("employees.id"), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -490,11 +553,12 @@ class Promotion(Base):
     created_by = relationship("Employee", foreign_keys=[created_by_emp_id])
     approved_by = relationship("Employee", foreign_keys=[approved_by_emp_id])
 
+
 class LocationBin(Base):
     __tablename__ = "location_bins"
 
     id = Column(Integer, primary_key=True, index=True)
-    bin_code = Column(String(50), unique=True, index=True, nullable=False) # e.g. BIN-B12
+    bin_code = Column(String(50), unique=True, index=True, nullable=False)  # e.g. BIN-B12
     store_id = Column(Integer, ForeignKey("stores.id"), nullable=False)
     warehouse_id = Column(Integer, ForeignKey("warehouses.id"), nullable=True)
     zone = Column(String(50), nullable=False, default="ZONE-A")
@@ -505,15 +569,16 @@ class LocationBin(Base):
     store = relationship("Store")
     warehouse = relationship("Warehouse")
 
+
 class Cart(Base):
     __tablename__ = "carts"
 
     id = Column(Integer, primary_key=True, index=True)
-    cart_code = Column(String(50), unique=True, index=True, nullable=False) # e.g. CART-2026-00051
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=True) # User or customer ID
+    cart_code = Column(String(50), unique=True, index=True, nullable=False)  # e.g. CART-2026-00051
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)  # User or customer ID
     store_id = Column(Integer, ForeignKey("stores.id"), nullable=False)
-    status = Column(String(50), default="ACTIVE") # ACTIVE, CONVERTED, EXPIRED, CANCELLED
-    expires_at = Column(DateTime, nullable=False) # 15-minute TTL
+    status = Column(String(50), default="ACTIVE")  # ACTIVE, CONVERTED, EXPIRED, CANCELLED
+    expires_at = Column(DateTime, nullable=False)  # 15-minute TTL
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -521,6 +586,7 @@ class Cart(Base):
     user = relationship("User")
     items = relationship("CartItem", back_populates="cart", cascade="all, delete-orphan")
     reservations = relationship("StockReservation", back_populates="cart", cascade="all, delete-orphan")
+
 
 class CartItem(Base):
     __tablename__ = "cart_items"
@@ -535,17 +601,18 @@ class CartItem(Base):
     cart = relationship("Cart", back_populates="items")
     product = relationship("Product")
 
+
 class StockReservation(Base):
     __tablename__ = "stock_reservations"
 
     id = Column(Integer, primary_key=True, index=True)
-    reservation_code = Column(String(50), unique=True, index=True, nullable=False) # e.g. RES-2026-00017
+    reservation_code = Column(String(50), unique=True, index=True, nullable=False)  # e.g. RES-2026-00017
     cart_id = Column(Integer, ForeignKey("carts.id"), nullable=True)
     product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
     store_id = Column(Integer, ForeignKey("stores.id"), nullable=True)
     warehouse_id = Column(Integer, ForeignKey("warehouses.id"), nullable=True)
     quantity = Column(Integer, nullable=False)
-    status = Column(String(50), default="ACTIVE") # ACTIVE, CONVERTED, EXPIRED, CANCELLED
+    status = Column(String(50), default="ACTIVE")  # ACTIVE, CONVERTED, EXPIRED, CANCELLED
     created_at = Column(DateTime, default=datetime.utcnow)
     expires_at = Column(DateTime, nullable=False)
 
@@ -554,15 +621,16 @@ class StockReservation(Base):
     store = relationship("Store")
     warehouse = relationship("Warehouse")
 
+
 class StorePickupOrder(Base):
     __tablename__ = "store_pickup_orders"
 
     id = Column(Integer, primary_key=True, index=True)
-    pickup_code = Column(String(50), unique=True, index=True, nullable=False) # e.g. PICKUP-2026-0017
+    pickup_code = Column(String(50), unique=True, index=True, nullable=False)  # e.g. PICKUP-2026-0017
     sale_id = Column(Integer, ForeignKey("sales.id"), nullable=False)
     store_id = Column(Integer, ForeignKey("stores.id"), nullable=False)
     customer_name = Column(String(100), nullable=False)
-    status = Column(String(50), default="READY_FOR_COLLECTION") # READY_FOR_COLLECTION, COLLECTED, CANCELLED
+    status = Column(String(50), default="READY_FOR_COLLECTION")  # READY_FOR_COLLECTION, COLLECTED, CANCELLED
     created_at = Column(DateTime, default=datetime.utcnow)
     collected_at = Column(DateTime, nullable=True)
     collected_by_staff = Column(String(100), nullable=True)
@@ -570,50 +638,57 @@ class StorePickupOrder(Base):
     sale = relationship("Sale")
     store = relationship("Store")
 
+
 class ApprovalRequest(Base):
     __tablename__ = "approval_requests"
 
     id = Column(Integer, primary_key=True, index=True)
-    request_code = Column(String(50), unique=True, index=True, nullable=False) # e.g. APR-2026-00042
-    request_type = Column(String(50), nullable=False) # STOCK_ADJUSTMENT, REFUND, PRICE_CHANGE, PRODUCT_DELETE, BELOW_MARGIN_SALE
+    request_code = Column(String(50), unique=True, index=True, nullable=False)  # e.g. APR-2026-00042
+    request_type = Column(
+        String(50), nullable=False
+    )  # STOCK_ADJUSTMENT, REFUND, PRICE_CHANGE, PRODUCT_DELETE, BELOW_MARGIN_SALE
     requester_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     approver_id = Column(Integer, ForeignKey("users.id"), nullable=True)
-    status = Column(String(50), default="PENDING") # PENDING, APPROVED, REJECTED, EXECUTED, CANCELLED
-    risk_level = Column(String(50), default="MEDIUM") # LOW, MEDIUM, HIGH, CRITICAL
-    entity_name = Column(String(100), nullable=True) # e.g. Product #482
+    status = Column(String(50), default="PENDING")  # PENDING, APPROVED, REJECTED, EXECUTED, CANCELLED
+    risk_level = Column(String(50), default="MEDIUM")  # LOW, MEDIUM, HIGH, CRITICAL
+    entity_name = Column(String(100), nullable=True)  # e.g. Product #482
     entity_id = Column(Integer, nullable=True)
     amount = Column(Float, nullable=True)
     notes = Column(Text, nullable=True)
     rejection_reason = Column(Text, nullable=True)
-    payload_json = Column(Text, nullable=True) # Serialized JSON payload for execution
+    payload_json = Column(Text, nullable=True)  # Serialized JSON payload for execution
     created_at = Column(DateTime, default=datetime.utcnow)
     reviewed_at = Column(DateTime, nullable=True)
 
     requester = relationship("User", foreign_keys=[requester_id])
     approver = relationship("User", foreign_keys=[approver_id])
 
+
 class ReconciliationException(Base):
     __tablename__ = "reconciliation_exceptions"
 
     id = Column(Integer, primary_key=True, index=True)
-    exception_code = Column(String(50), unique=True, index=True, nullable=False) # e.g. EXC-2026-00041
-    exception_type = Column(String(50), nullable=False) # STOCK_VARIANCE, SALES_INVENTORY_ANOMALY, UNMATCHED_RECEIPT
+    exception_code = Column(String(50), unique=True, index=True, nullable=False)  # e.g. EXC-2026-00041
+    exception_type = Column(String(50), nullable=False)  # STOCK_VARIANCE, SALES_INVENTORY_ANOMALY, UNMATCHED_RECEIPT
     store_id = Column(Integer, ForeignKey("stores.id"), nullable=True)
     warehouse_id = Column(Integer, ForeignKey("warehouses.id"), nullable=True)
     product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
     expected_stock = Column(Integer, nullable=False)
     actual_stock = Column(Integer, nullable=False)
-    variance = Column(Integer, nullable=False) # Expected - Actual
-    severity = Column(String(50), default="HIGH") # LOW, MEDIUM, HIGH, CRITICAL
-    status = Column(String(50), default="DETECTED") # DETECTED, OPEN, UNDER_REVIEW, EXPLAINED, RESOLVED
+    variance = Column(Integer, nullable=False)  # Expected - Actual
+    severity = Column(String(50), default="HIGH")  # LOW, MEDIUM, HIGH, CRITICAL
+    status = Column(String(50), default="DETECTED")  # DETECTED, OPEN, UNDER_REVIEW, EXPLAINED, RESOLVED
     investigation_notes = Column(Text, nullable=True)
-    resolution_type = Column(String(50), nullable=True) # REVERSAL_POSTED, DAMAGE_WRITEOFF, CORRECTION_ADJUSTMENT, SHRINKAGE_CONFIRMED
+    resolution_type = Column(
+        String(50), nullable=True
+    )  # REVERSAL_POSTED, DAMAGE_WRITEOFF, CORRECTION_ADJUSTMENT, SHRINKAGE_CONFIRMED
     created_at = Column(DateTime, default=datetime.utcnow)
     resolved_at = Column(DateTime, nullable=True)
 
     store = relationship("Store")
     warehouse = relationship("Warehouse")
     product = relationship("Product")
+
 
 class PriceRule(Base):
     __tablename__ = "price_rules"
@@ -622,17 +697,18 @@ class PriceRule(Base):
     product_id = Column(Integer, ForeignKey("products.id"), unique=True, nullable=False)
     cost_price = Column(Float, nullable=False)
     selling_price = Column(Float, nullable=False)
-    min_allowed_price = Column(Float, nullable=False) # Hard lower bound floor
-    min_margin_pct = Column(Float, default=10.0) # e.g. 10.0%
-    staff_discount_limit_pct = Column(Float, default=2.0) # Staff can negotiate up to 2%
-    manager_discount_limit_pct = Column(Float, default=5.0) # Manager can negotiate up to 5%
-    negotiation_allowance_pct = Column(Float, default=5.0) # Standard allowance %
+    min_allowed_price = Column(Float, nullable=False)  # Hard lower bound floor
+    min_margin_pct = Column(Float, default=10.0)  # e.g. 10.0%
+    staff_discount_limit_pct = Column(Float, default=2.0)  # Staff can negotiate up to 2%
+    manager_discount_limit_pct = Column(Float, default=5.0)  # Manager can negotiate up to 5%
+    negotiation_allowance_pct = Column(Float, default=5.0)  # Standard allowance %
     effective_from = Column(DateTime, default=datetime.utcnow)
     effective_until = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     product = relationship("Product")
+
 
 class PriceHistory(Base):
     __tablename__ = "price_history"
@@ -645,24 +721,27 @@ class PriceHistory(Base):
     reason = Column(String(255), nullable=True)
     changed_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     effective_from = Column(DateTime, default=datetime.utcnow)
-    effective_until = Column(DateTime, nullable=True) # Null if current active price
+    effective_until = Column(DateTime, nullable=True)  # Null if current active price
 
     product = relationship("Product")
     changed_by = relationship("User")
+
 
 class GoodsReceipt(Base):
     __tablename__ = "goods_receipts"
 
     id = Column(Integer, primary_key=True, index=True)
-    grn_code = Column(String(50), unique=True, index=True, nullable=False) # e.g. GRN-2026-000091
+    grn_code = Column(String(50), unique=True, index=True, nullable=False)  # e.g. GRN-2026-000091
     po_id = Column(Integer, ForeignKey("purchases.id"), nullable=False)
     supplier_id = Column(Integer, ForeignKey("suppliers.id"), nullable=False)
     store_id = Column(Integer, ForeignKey("stores.id"), nullable=True)
     warehouse_id = Column(Integer, ForeignKey("warehouses.id"), nullable=True)
     received_by_staff_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     verified_by_manager_id = Column(Integer, ForeignKey("users.id"), nullable=True)
-    status = Column(String(50), default="PENDING_VERIFICATION") # DRAFT, RECEIVING, PENDING_VERIFICATION, VERIFIED, PARTIALLY_ACCEPTED, ACCEPTED, REJECTED, CLOSED
-    delivery_note_ref = Column(String(100), nullable=True) # e.g. SUP-DEL-98124
+    status = Column(
+        String(50), default="PENDING_VERIFICATION"
+    )  # DRAFT, RECEIVING, PENDING_VERIFICATION, VERIFIED, PARTIALLY_ACCEPTED, ACCEPTED, REJECTED, CLOSED
+    delivery_note_ref = Column(String(100), nullable=True)  # e.g. SUP-DEL-98124
     notes = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     verified_at = Column(DateTime, nullable=True)
@@ -675,34 +754,38 @@ class GoodsReceipt(Base):
     verified_by = relationship("User", foreign_keys=[verified_by_manager_id])
     items = relationship("GoodsReceiptItem", back_populates="goods_receipt", cascade="all, delete-orphan")
 
+
 class GoodsReceiptItem(Base):
     __tablename__ = "goods_receipt_items"
 
     id = Column(Integer, primary_key=True, index=True)
     grn_id = Column(Integer, ForeignKey("goods_receipts.id"), nullable=False)
     product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
-    received_quantity = Column(Integer, nullable=False) # Total physically delivered
-    accepted_quantity = Column(Integer, nullable=False) # Enters inventory (+stock)
-    rejected_quantity = Column(Integer, nullable=False, default=0) # Rejected -> Return
-    damaged_quantity = Column(Integer, nullable=False, default=0) # Damaged -> Write-off/Return
+    received_quantity = Column(Integer, nullable=False)  # Total physically delivered
+    accepted_quantity = Column(Integer, nullable=False)  # Enters inventory (+stock)
+    rejected_quantity = Column(Integer, nullable=False, default=0)  # Rejected -> Return
+    damaged_quantity = Column(Integer, nullable=False, default=0)  # Damaged -> Write-off/Return
     unit_cost = Column(Float, nullable=False)
-    batch_number = Column(String(100), nullable=True) # Batch / Lot tracking
-    expiry_date = Column(DateTime, nullable=True) # Expiry date
-    storage_location = Column(String(100), nullable=True) # e.g. A-03-04
+    batch_number = Column(String(100), nullable=True)  # Batch / Lot tracking
+    expiry_date = Column(DateTime, nullable=True)  # Expiry date
+    storage_location = Column(String(100), nullable=True)  # e.g. A-03-04
     rejection_reason = Column(String(255), nullable=True)
     notes = Column(Text, nullable=True)
 
     goods_receipt = relationship("GoodsReceipt", back_populates="items")
     product = relationship("Product")
 
+
 class SupplierReturn(Base):
     __tablename__ = "supplier_returns"
 
     id = Column(Integer, primary_key=True, index=True)
-    return_code = Column(String(50), unique=True, index=True, nullable=False) # e.g. RET-2026-000014
+    return_code = Column(String(50), unique=True, index=True, nullable=False)  # e.g. RET-2026-000014
     grn_id = Column(Integer, ForeignKey("goods_receipts.id"), nullable=False)
     supplier_id = Column(Integer, ForeignKey("suppliers.id"), nullable=False)
-    status = Column(String(50), default="DRAFT") # DRAFT, PENDING_APPROVAL, AUTHORISED, DISPATCHED, RECEIVED_BY_SUPPLIER, CREDIT_PENDING, CLOSED
+    status = Column(
+        String(50), default="DRAFT"
+    )  # DRAFT, PENDING_APPROVAL, AUTHORISED, DISPATCHED, RECEIVED_BY_SUPPLIER, CREDIT_PENDING, CLOSED
     reason = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     authorized_at = Column(DateTime, nullable=True)
@@ -710,7 +793,12 @@ class SupplierReturn(Base):
 
     goods_receipt = relationship("GoodsReceipt")
     supplier = relationship("Supplier")
-    items = relationship("SupplierReturnItem", back_populates="supplier_return", cascade="all, delete-orphan")
+    items = relationship(
+        "SupplierReturnItem",
+        back_populates="supplier_return",
+        cascade="all, delete-orphan",
+    )
+
 
 class SupplierReturnItem(Base):
     __tablename__ = "supplier_return_items"
@@ -726,63 +814,73 @@ class SupplierReturnItem(Base):
     grn_item = relationship("GoodsReceiptItem")
     product = relationship("Product")
 
+
 class SupplierInvoice(Base):
     __tablename__ = "supplier_invoices"
 
     id = Column(Integer, primary_key=True, index=True)
-    invoice_code = Column(String(50), unique=True, index=True, nullable=False) # e.g. INV-SUP-2026-0082
+    invoice_code = Column(String(50), unique=True, index=True, nullable=False)  # e.g. INV-SUP-2026-0082
     po_id = Column(Integer, ForeignKey("purchases.id"), nullable=False)
     supplier_id = Column(Integer, ForeignKey("suppliers.id"), nullable=False)
     billed_quantity = Column(Integer, nullable=False)
     billed_unit_cost = Column(Float, nullable=False)
     total_billed_amount = Column(Float, nullable=False)
-    status = Column(String(50), default="PENDING_MATCH") # PENDING_MATCH, MATCHED, PAYMENT_HOLD, APPROVED_FOR_PAYMENT, PAID
-    three_way_match_status = Column(String(50), default="UNVERIFIED") # MATCHED, MISMATCH_QTY, MISMATCH_COST, MISMATCH_BOTH
+    status = Column(
+        String(50), default="PENDING_MATCH"
+    )  # PENDING_MATCH, MATCHED, PAYMENT_HOLD, APPROVED_FOR_PAYMENT, PAID
+    three_way_match_status = Column(
+        String(50), default="UNVERIFIED"
+    )  # MATCHED, MISMATCH_QTY, MISMATCH_COST, MISMATCH_BOTH
     mismatch_reason = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     purchase_order = relationship("Purchase")
     supplier = relationship("Supplier")
 
+
 class SystemSetting(Base):
     __tablename__ = "system_settings"
 
     id = Column(Integer, primary_key=True, index=True)
-    key = Column(String(100), unique=True, index=True, nullable=False) # e.g. sales.max_staff_discount
-    value = Column(String(255), nullable=False) # e.g. "2.0"
-    data_type = Column(String(50), default="float") # float, int, string, bool, json
-    category = Column(String(50), default="sales") # inventory, sales, pricing, purchases, security
+    key = Column(String(100), unique=True, index=True, nullable=False)  # e.g. sales.max_staff_discount
+    value = Column(String(255), nullable=False)  # e.g. "2.0"
+    data_type = Column(String(50), default="float")  # float, int, string, bool, json
+    category = Column(String(50), default="sales")  # inventory, sales, pricing, purchases, security
     description = Column(String(255), nullable=True)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
 
 class PaymentMethod(Base):
     __tablename__ = "payment_methods"
 
     id = Column(Integer, primary_key=True, index=True)
-    code = Column(String(50), unique=True, index=True, nullable=False) # e.g. ECOCASH_MERCHANT, INNBUCKS, ZIPIT_TRANSFER
-    name = Column(String(100), nullable=False) # e.g. "EcoCash Merchant Payment"
-    type = Column(String(50), default="MOBILE_MONEY") # CASH, MOBILE_MONEY, BANK_TRANSFER, CARD
-    merchant_number = Column(String(100), nullable=True) # e.g. 304891 / Till 89210
-    merchant_name = Column(String(100), nullable=True) # e.g. "Harare Main Delta Ltd"
-    markup_percentage = Column(Float, default=0.0) # e.g. 2.5% markup fee
-    instructions = Column(Text, nullable=True) # e.g. "Dial *151*2*2# Enter Merchant Code 304891"
-    requires_pop = Column(Boolean, default=True) # Requires Proof of Payment upload/reference
+    code = Column(
+        String(50), unique=True, index=True, nullable=False
+    )  # e.g. ECOCASH_MERCHANT, INNBUCKS, ZIPIT_TRANSFER
+    name = Column(String(100), nullable=False)  # e.g. "EcoCash Merchant Payment"
+    type = Column(String(50), default="MOBILE_MONEY")  # CASH, MOBILE_MONEY, BANK_TRANSFER, CARD
+    merchant_number = Column(String(100), nullable=True)  # e.g. 304891 / Till 89210
+    merchant_name = Column(String(100), nullable=True)  # e.g. "Harare Main Delta Ltd"
+    markup_percentage = Column(Float, default=0.0)  # e.g. 2.5% markup fee
+    instructions = Column(Text, nullable=True)  # e.g. "Dial *151*2*2# Enter Merchant Code 304891"
+    requires_pop = Column(Boolean, default=True)  # Requires Proof of Payment upload/reference
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+
 
 class POPVerification(Base):
     __tablename__ = "pop_verifications"
 
     id = Column(Integer, primary_key=True, index=True)
-    pop_code = Column(String(50), unique=True, index=True, nullable=False) # e.g. POP-2026-00042
+    pop_code = Column(String(50), unique=True, index=True, nullable=False)  # e.g. POP-2026-00042
     sale_id = Column(Integer, ForeignKey("sales.id"), nullable=True)
     payment_method_id = Column(Integer, ForeignKey("payment_methods.id"), nullable=False)
-    transaction_reference = Column(String(100), nullable=False) # e.g. MP260825.1840.A90123
-    pop_file_key = Column(String(255), nullable=True) # Storage key of uploaded POP receipt image/PDF
+    transaction_reference = Column(String(100), nullable=False)  # e.g. MP260825.1840.A90123
+    pop_file_key = Column(String(255), nullable=True)  # Storage key of uploaded POP receipt image/PDF
     base_amount = Column(Float, nullable=False)
     markup_amount = Column(Float, default=0.0)
     total_amount_paid = Column(Float, nullable=False)
-    status = Column(String(50), default="PENDING_VERIFICATION") # PENDING_VERIFICATION, VERIFIED, REJECTED
+    status = Column(String(50), default="PENDING_VERIFICATION")  # PENDING_VERIFICATION, VERIFIED, REJECTED
     rejection_reason = Column(Text, nullable=True)
     verified_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -792,33 +890,35 @@ class POPVerification(Base):
     sale = relationship("Sale")
     verified_by = relationship("User")
 
+
 class UserDevice(Base):
     __tablename__ = "user_devices"
 
     id = Column(Integer, primary_key=True, index=True)
-    device_id = Column(String(50), unique=True, index=True, nullable=False) # e.g. DEV-2026-8F31A
+    device_id = Column(String(50), unique=True, index=True, nullable=False)  # e.g. DEV-2026-8F31A
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    device_name = Column(String(150), nullable=False) # e.g. "Chrome 128 / Windows 11"
-    fingerprint_hash = Column(String(64), index=True, nullable=False) # SHA-256 fingerprint hash
+    device_name = Column(String(150), nullable=False)  # e.g. "Chrome 128 / Windows 11"
+    fingerprint_hash = Column(String(64), index=True, nullable=False)  # SHA-256 fingerprint hash
     ip_address = Column(String(50), nullable=True)
     user_agent = Column(Text, nullable=True)
     first_seen = Column(DateTime, default=datetime.utcnow)
     last_seen = Column(DateTime, default=datetime.utcnow)
     is_trusted = Column(Boolean, default=True)
     is_revoked = Column(Boolean, default=False)
-    risk_score = Column(Float, default=0.0) # 0.0 (Safe) to 1.0 (High Risk)
+    risk_score = Column(Float, default=0.0)  # 0.0 (Safe) to 1.0 (High Risk)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     user = relationship("User")
+
 
 class UserSession(Base):
     __tablename__ = "user_sessions"
 
     id = Column(Integer, primary_key=True, index=True)
-    session_id = Column(String(50), unique=True, index=True, nullable=False) # e.g. SES-2026-000492
+    session_id = Column(String(50), unique=True, index=True, nullable=False)  # e.g. SES-2026-000492
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     device_id = Column(Integer, ForeignKey("user_devices.id"), nullable=True)
-    token_hash = Column(String(64), index=True, nullable=False) # Hashed session JWT/token
+    token_hash = Column(String(64), index=True, nullable=False)  # Hashed session JWT/token
     ip_address = Column(String(50), nullable=True)
     user_agent = Column(Text, nullable=True)
     location_summary = Column(String(100), default="Harare Main Hub")
@@ -836,7 +936,7 @@ class InventoryAnomaly(Base):
     __tablename__ = "inventory_anomalies"
 
     id = Column(Integer, primary_key=True, index=True)
-    anomaly_code = Column(String(50), unique=True, index=True, nullable=False) # e.g. ANOM-2026-0041
+    anomaly_code = Column(String(50), unique=True, index=True, nullable=False)  # e.g. ANOM-2026-0041
     product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
     warehouse_id = Column(Integer, ForeignKey("warehouses.id"), nullable=True)
     opening_stock = Column(Integer, default=0)
@@ -847,11 +947,11 @@ class InventoryAnomaly(Base):
     adjustments_qty = Column(Integer, default=0)
     expected_stock = Column(Integer, nullable=False)
     system_stock = Column(Integer, nullable=False)
-    variance = Column(Integer, nullable=False) # expected - actual
-    risk_score = Column(Float, default=0.0) # 0 to 100
-    risk_level = Column(String(50), default="MEDIUM") # NORMAL, MONITOR, REVIEW, HIGH_RISK, CRITICAL
-    status = Column(String(50), default="OPEN") # OPEN, UNDER_INVESTIGATION, RESOLVED, DISMISSED
-    reasons_json = Column(Text, nullable=True) # JSON string of contributing risk factors
+    variance = Column(Integer, nullable=False)  # expected - actual
+    risk_score = Column(Float, default=0.0)  # 0 to 100
+    risk_level = Column(String(50), default="MEDIUM")  # NORMAL, MONITOR, REVIEW, HIGH_RISK, CRITICAL
+    status = Column(String(50), default="OPEN")  # OPEN, UNDER_INVESTIGATION, RESOLVED, DISMISSED
+    reasons_json = Column(Text, nullable=True)  # JSON string of contributing risk factors
     created_at = Column(DateTime, default=datetime.utcnow)
 
     product = relationship("Product")
@@ -862,13 +962,13 @@ class InvestigationCase(Base):
     __tablename__ = "investigation_cases"
 
     id = Column(Integer, primary_key=True, index=True)
-    case_code = Column(String(50), unique=True, index=True, nullable=False) # e.g. INVEST-2026-0041
+    case_code = Column(String(50), unique=True, index=True, nullable=False)  # e.g. INVEST-2026-0041
     anomaly_id = Column(Integer, ForeignKey("inventory_anomalies.id"), nullable=True)
     product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
     warehouse_id = Column(Integer, ForeignKey("warehouses.id"), nullable=True)
     risk_score = Column(Float, default=0.0)
     risk_level = Column(String(50), default="HIGH_RISK")
-    status = Column(String(50), default="OPEN") # OPEN, IN_PROGRESS, RESOLVED, CLOSED
+    status = Column(String(50), default="OPEN")  # OPEN, IN_PROGRESS, RESOLVED, CLOSED
     assigned_to_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     resolution_notes = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -884,11 +984,11 @@ class BLEDeviceLocation(Base):
     __tablename__ = "ble_device_locations"
 
     id = Column(Integer, primary_key=True, index=True)
-    tag_id = Column(String(100), unique=True, index=True, nullable=False) # e.g. BLE-TAG-0091
+    tag_id = Column(String(100), unique=True, index=True, nullable=False)  # e.g. BLE-TAG-0091
     product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
-    expected_location = Column(String(100), nullable=False) # e.g. Shelf A3
-    detected_location = Column(String(100), nullable=False) # e.g. Shelf B2
-    rssi_dbm = Column(Integer, default=-65) # Signal strength in dBm
+    expected_location = Column(String(100), nullable=False)  # e.g. Shelf A3
+    detected_location = Column(String(100), nullable=False)  # e.g. Shelf B2
+    rssi_dbm = Column(Integer, default=-65)  # Signal strength in dBm
     confidence_percentage = Column(Float, default=82.0)
     has_mismatch = Column(Boolean, default=False)
     updated_at = Column(DateTime, default=datetime.utcnow)
@@ -900,18 +1000,22 @@ class ImportBatch(Base):
     __tablename__ = "import_batches"
 
     id = Column(Integer, primary_key=True, index=True)
-    batch_id = Column(String(50), unique=True, index=True, nullable=False) # e.g. IMP-2026-00041
+    batch_id = Column(String(50), unique=True, index=True, nullable=False)  # e.g. IMP-2026-00041
     filename = Column(String(255), nullable=False)
-    file_hash = Column(String(64), index=True, nullable=False) # SHA-256
+    file_hash = Column(String(64), index=True, nullable=False)  # SHA-256
     file_size = Column(Integer, default=0)
     uploader_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
-    source_type = Column(String(50), default="CSV") # CSV, EXCEL, API, MANUAL
-    entity_type = Column(String(50), nullable=False) # PRODUCTS, EMPLOYEES, CUSTOMERS, SUPPLIERS, OPENING_STOCK, PURCHASES, SALES
+    source_type = Column(String(50), default="CSV")  # CSV, EXCEL, API, MANUAL
+    entity_type = Column(
+        String(50), nullable=False
+    )  # PRODUCTS, EMPLOYEES, CUSTOMERS, SUPPLIERS, OPENING_STOCK, PURCHASES, SALES
     record_count = Column(Integer, default=0)
     valid_count = Column(Integer, default=0)
     rejected_count = Column(Integer, default=0)
-    status = Column(String(50), default="STAGED") # STAGED, VALIDATED, REQUIRES_CORRECTION, PENDING_APPROVAL, APPROVED, REJECTED, IMPORTED, FAILED
-    column_mapping_json = Column(Text, nullable=True) # Business -> IMS field mapping JSON
+    status = Column(
+        String(50), default="STAGED"
+    )  # STAGED, VALIDATED, REQUIRES_CORRECTION, PENDING_APPROVAL, APPROVED, REJECTED, IMPORTED, FAILED
+    column_mapping_json = Column(Text, nullable=True)  # Business -> IMS field mapping JSON
     storage_path = Column(String(255), nullable=True)
     approval_id = Column(Integer, ForeignKey("approval_requests.id"), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -931,9 +1035,9 @@ class ImportRecord(Base):
     row_number = Column(Integer, nullable=False)
     raw_data_json = Column(Text, nullable=False)
     normalized_data_json = Column(Text, nullable=True)
-    validation_status = Column(String(50), default="VALID") # VALID, REJECTED, WARNING
+    validation_status = Column(String(50), default="VALID")  # VALID, REJECTED, WARNING
     error_message = Column(Text, nullable=True)
-    imported_entity_id = Column(String(100), nullable=True) # ID or Code of created entity after approval
+    imported_entity_id = Column(String(100), nullable=True)  # ID or Code of created entity after approval
 
     batch = relationship("ImportBatch", back_populates="records")
 
@@ -942,11 +1046,11 @@ class IntegrationAccount(Base):
     __tablename__ = "integration_accounts"
 
     id = Column(Integer, primary_key=True, index=True)
-    account_id = Column(String(50), unique=True, index=True, nullable=False) # e.g. INT-2026-00012
-    name = Column(String(150), nullable=False) # e.g. Accounting ERP System
+    account_id = Column(String(50), unique=True, index=True, nullable=False)  # e.g. INT-2026-00012
+    name = Column(String(150), nullable=False)  # e.g. Accounting ERP System
     description = Column(Text, nullable=True)
-    status = Column(String(50), default="ACTIVE") # ACTIVE, SUSPENDED, REVOKED
-    scopes_json = Column(Text, default="[]") # e.g. ["products:read", "sales:create"]
+    status = Column(String(50), default="ACTIVE")  # ACTIVE, SUSPENDED, REVOKED
+    scopes_json = Column(Text, default="[]")  # e.g. ["products:read", "sales:create"]
     created_at = Column(DateTime, default=datetime.utcnow)
     expires_at = Column(DateTime, nullable=True)
 
@@ -959,9 +1063,9 @@ class IntegrationApiKey(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     account_id = Column(String(50), ForeignKey("integration_accounts.account_id"), nullable=False)
-    api_key_hash = Column(String(128), unique=True, index=True, nullable=False) # Hashed key
-    prefix = Column(String(20), nullable=False) # e.g. ims_live_a1b2
-    name = Column(String(100), nullable=False) # e.g. Production Secret Key
+    api_key_hash = Column(String(128), unique=True, index=True, nullable=False)  # Hashed key
+    prefix = Column(String(20), nullable=False)  # e.g. ims_live_a1b2
+    name = Column(String(100), nullable=False)  # e.g. Production Secret Key
     created_at = Column(DateTime, default=datetime.utcnow)
     last_used_at = Column(DateTime, nullable=True)
     revoked_at = Column(DateTime, nullable=True)
@@ -988,17 +1092,27 @@ class Organisation(Base):
     __tablename__ = "organisations"
 
     id = Column(Integer, primary_key=True, index=True)
-    org_code = Column(String(50), unique=True, index=True, nullable=False) # e.g. ORG-000001
-    trading_name = Column(String(255), nullable=False) # e.g. Taa Electronics
-    legal_name = Column(String(255), nullable=False) # e.g. Taa Electronics (Pvt) Ltd
-    business_type = Column(String(100), nullable=False, default="Retail") # Retail, Wholesale, Manufacturing, Distribution, Service, Mixed
-    industry = Column(String(100), nullable=False, default="Electronics") # Telecommunications, Electronics, Grocery, Automotive, Hardware, etc.
+    org_code = Column(String(50), unique=True, index=True, nullable=False)  # e.g. ORG-000001
+    trading_name = Column(String(255), nullable=False)  # e.g. Taa Electronics
+    legal_name = Column(String(255), nullable=False)  # e.g. Taa Electronics (Pvt) Ltd
+    business_type = Column(
+        String(100), nullable=False, default="Retail"
+    )  # Retail, Wholesale, Manufacturing, Distribution, Service, Mixed
+    industry = Column(
+        String(100), nullable=False, default="Electronics"
+    )  # Telecommunications, Electronics, Grocery, Automotive, Hardware, etc.
     domain = Column(String(100), nullable=False, default="Electronics & Telecommunications")
-    operating_model = Column(String(100), default="Warehouse + Retail") # Single Store, Multi-Store, Warehouse + Retail, Distribution Network
-    status = Column(String(50), default="ACTIVE") # ACTIVE, SUSPENDED
+    operating_model = Column(
+        String(100), default="Warehouse + Retail"
+    )  # Single Store, Multi-Store, Warehouse + Retail, Distribution Network
+    status = Column(String(50), default="ACTIVE")  # ACTIVE, SUSPENDED
     created_at = Column(DateTime, default=datetime.utcnow)
 
-    classification_history = relationship("OrganisationClassificationHistory", back_populates="organisation", cascade="all, delete-orphan")
+    classification_history = relationship(
+        "OrganisationClassificationHistory",
+        back_populates="organisation",
+        cascade="all, delete-orphan",
+    )
 
 
 class OrganisationClassificationHistory(Base):
@@ -1006,7 +1120,7 @@ class OrganisationClassificationHistory(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     organisation_id = Column(Integer, ForeignKey("organisations.id"), nullable=False)
-    classification_type = Column(String(50), nullable=False) # INDUSTRY, BUSINESS_TYPE, OPERATING_MODEL
+    classification_type = Column(String(50), nullable=False)  # INDUSTRY, BUSINESS_TYPE, OPERATING_MODEL
     old_value = Column(String(255), nullable=True)
     new_value = Column(String(255), nullable=False)
     reason = Column(Text, nullable=True)
@@ -1021,6 +1135,7 @@ class OrganisationClassificationHistory(Base):
 # UNIFIED OPERATIONAL CASE & ESCALATION WORKFLOW ENGINE (SoD Architecture)
 # -----------------------------------------------------------------------------
 
+
 class OperationalCase(Base):
     """
     Unified Operational Case model.
@@ -1028,27 +1143,38 @@ class OperationalCase(Base):
     REFUND_REQUEST, RECEIVING_DISCREPANCY, FLOAT_VARIANCE, STOCK_ADJUSTMENT,
     SYSTEM_ERROR, PRICE_OVERRIDE, DAMAGE_REPORT, SUPPLIER_DISPUTE.
     """
+
     __tablename__ = "cases"
 
     id = Column(Integer, primary_key=True, index=True)
-    case_number = Column(String(50), unique=True, index=True, nullable=False) # e.g. REF-2026-0042, CAS-2026-0087
-    case_type = Column(String(50), nullable=False) # REFUND_REQUEST, RECEIVING_DISCREPANCY, FLOAT_VARIANCE, STOCK_ADJUSTMENT, SYSTEM_ERROR, PRICE_OVERRIDE
-    status = Column(String(50), nullable=False, default="PENDING_REVIEW") # DRAFT, SUBMITTED, PENDING_REVIEW, APPROVED, DENIED, CONTESTED, RETURNED, EXECUTED, ESCALATED
-    priority = Column(String(20), nullable=False, default="NORMAL") # LOW, NORMAL, HIGH, CRITICAL
-    
+    case_number = Column(String(50), unique=True, index=True, nullable=False)  # e.g. REF-2026-0042, CAS-2026-0087
+    case_type = Column(
+        String(50), nullable=False
+    )  # REFUND_REQUEST, RECEIVING_DISCREPANCY, FLOAT_VARIANCE, STOCK_ADJUSTMENT, SYSTEM_ERROR, PRICE_OVERRIDE
+    status = Column(
+        String(50), nullable=False, default="PENDING_REVIEW"
+    )  # DRAFT, SUBMITTED, PENDING_REVIEW, APPROVED, DENIED, CONTESTED, RETURNED, EXECUTED, ESCALATED
+    priority = Column(String(20), nullable=False, default="NORMAL")  # LOW, NORMAL, HIGH, CRITICAL
+
     subject = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
-    
-    created_by = Column(String(100), nullable=False) # e.g. Tendai M. (EMP-00014)
-    assigned_to_role = Column(String(50), nullable=False, default="MANAGER") # MANAGER, STORE_MANAGER, WAREHOUSE_MANAGER
+
+    created_by = Column(String(100), nullable=False)  # e.g. Tendai M. (EMP-00014)
+    assigned_to_role = Column(
+        String(50), nullable=False, default="MANAGER"
+    )  # MANAGER, STORE_MANAGER, WAREHOUSE_MANAGER
     assigned_to_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
-    
-    entity_type = Column(String(50), nullable=True) # REFUND, PURCHASE_ORDER, CASH_SESSION, PRODUCT, STOCK_MOVEMENT
-    entity_id = Column(String(100), nullable=True) # e.g. INV-004281, PO-00431, SES-00021
-    amount = Column(Float, nullable=True, default=0.0) # Financial impact if applicable
-    
-    evidence_metadata = Column(Text, nullable=True) # JSON representation of attached receipts, logs, photos
-    work_session_id = Column(Integer, ForeignKey("work_sessions.id", use_alter=True, name="fk_case_work_session"), nullable=True)
+
+    entity_type = Column(String(50), nullable=True)  # REFUND, PURCHASE_ORDER, CASH_SESSION, PRODUCT, STOCK_MOVEMENT
+    entity_id = Column(String(100), nullable=True)  # e.g. INV-004281, PO-00431, SES-00021
+    amount = Column(Float, nullable=True, default=0.0)  # Financial impact if applicable
+
+    evidence_metadata = Column(Text, nullable=True)  # JSON representation of attached receipts, logs, photos
+    work_session_id = Column(
+        Integer,
+        ForeignKey("work_sessions.id", use_alter=True, name="fk_case_work_session"),
+        nullable=True,
+    )
     work_session_code = Column(String(50), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -1063,15 +1189,18 @@ class CaseEvent(Base):
     Immutable Case Audit Event Trail.
     Logs every state transition and comment. Never overwrites original request.
     """
+
     __tablename__ = "case_events"
 
     id = Column(Integer, primary_key=True, index=True)
     case_id = Column(Integer, ForeignKey("cases.id"), nullable=False)
-    event_type = Column(String(50), nullable=False) # CREATED, SUBMITTED, REVIEWED, APPROVED, DENIED, CONTESTED, RETURNED, EXECUTED, ESCALATED
-    performed_by = Column(String(100), nullable=False) # Name and role of actor
+    event_type = Column(
+        String(50), nullable=False
+    )  # CREATED, SUBMITTED, REVIEWED, APPROVED, DENIED, CONTESTED, RETURNED, EXECUTED, ESCALATED
+    performed_by = Column(String(100), nullable=False)  # Name and role of actor
     old_status = Column(String(50), nullable=True)
     new_status = Column(String(50), nullable=False)
-    comment = Column(Text, nullable=True) # Decision rationale or note
+    comment = Column(Text, nullable=True)  # Decision rationale or note
     metadata_json = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
@@ -1082,6 +1211,7 @@ class CaseAttachment(Base):
     """
     Evidence & Attachments linked to an Operational Case.
     """
+
     __tablename__ = "case_attachments"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -1098,6 +1228,7 @@ class CaseAttachment(Base):
 # THREE-LAYER OPERATIONAL WORK SESSION ARCHITECTURE (Chaa Specification)
 # -----------------------------------------------------------------------------
 
+
 class WorkSession(Base):
     """
     Operational Work Session model.
@@ -1108,16 +1239,21 @@ class WorkSession(Base):
 
     States: SCHEDULED, OPEN, ACTIVE, PAUSED, CLOSING, CLOSED, SUSPENDED, ABANDONED, FORCED_CLOSED
     """
+
     __tablename__ = "work_sessions"
 
     id = Column(Integer, primary_key=True, index=True)
-    session_code = Column(String(50), unique=True, index=True, nullable=False) # e.g. WS-2026-0826-0041
+    session_code = Column(String(50), unique=True, index=True, nullable=False)  # e.g. WS-2026-0826-0041
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    role = Column(String(50), nullable=False) # APP_ADMIN, MANAGER, STAFF, WAREHOUSE, AUDITOR
+    role = Column(String(50), nullable=False)  # APP_ADMIN, MANAGER, STAFF, WAREHOUSE, AUDITOR
     location_name = Column(String(100), nullable=False, default="Harare Store #01")
     device_id = Column(String(50), nullable=False, default="POS-01")
-    session_type = Column(String(50), nullable=False, default="SALES") # SALES, GOODS_RECEIVING, STOCK_COUNT, STOCK_TRANSFER, DISPATCH, RETURN_PROCESSING, REFUND_PROCESSING, STOCK_ADJUSTMENT, WAREHOUSE_PICKING, WAREHOUSE_PACKING, AUDIT
-    status = Column(String(50), nullable=False, default="ACTIVE") # SCHEDULED, OPEN, ACTIVE, PAUSED, CLOSING, CLOSED, SUSPENDED, ABANDONED, FORCED_CLOSED
+    session_type = Column(
+        String(50), nullable=False, default="SALES"
+    )  # SALES, GOODS_RECEIVING, STOCK_COUNT, STOCK_TRANSFER, DISPATCH, RETURN_PROCESSING, REFUND_PROCESSING, STOCK_ADJUSTMENT, WAREHOUSE_PICKING, WAREHOUSE_PACKING, AUDIT
+    status = Column(
+        String(50), nullable=False, default="ACTIVE"
+    )  # SCHEDULED, OPEN, ACTIVE, PAUSED, CLOSING, CLOSED, SUSPENDED, ABANDONED, FORCED_CLOSED
     opening_float = Column(Float, nullable=False, default=0.0)
     closing_float = Column(Float, nullable=False, default=0.0)
     expected_closing = Column(Float, nullable=False, default=0.0)
@@ -1138,16 +1274,17 @@ class SessionEvent(Base):
     Immutable Operational Session Event Trail.
     Logs every action during a work session (e.g. ITEM_SCANNED, SALE_CREATED, REFUND_APPROVED, SESSION_PAUSED).
     """
+
     __tablename__ = "session_events"
 
     id = Column(Integer, primary_key=True, index=True)
     session_id = Column(Integer, ForeignKey("work_sessions.id"), nullable=False)
-    event_type = Column(String(50), nullable=False) # SESSION_STARTED, ITEM_SCANNED, SALE_CREATED, REFUND_REQUESTED, REFUND_APPROVED, STOCK_ADJUSTED, TRANSFER_STARTED, TRANSFER_DISPATCHED, TRANSFER_RECEIVED, EXCEPTION_RAISED, ESCALATION_CREATED, SESSION_PAUSED, SESSION_RESUMED, SESSION_CLOSED
-    entity_type = Column(String(50), nullable=True) # Sale, Refund, Transfer, Product
+    event_type = Column(
+        String(50), nullable=False
+    )  # SESSION_STARTED, ITEM_SCANNED, SALE_CREATED, REFUND_REQUESTED, REFUND_APPROVED, STOCK_ADJUSTED, TRANSFER_STARTED, TRANSFER_DISPATCHED, TRANSFER_RECEIVED, EXCEPTION_RAISED, ESCALATION_CREATED, SESSION_PAUSED, SESSION_RESUMED, SESSION_CLOSED
+    entity_type = Column(String(50), nullable=True)  # Sale, Refund, Transfer, Product
     entity_id = Column(String(100), nullable=True)
     metadata_json = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     work_session = relationship("WorkSession", back_populates="events")
-
-

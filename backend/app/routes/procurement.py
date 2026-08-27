@@ -1,23 +1,27 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
-from typing import List, Optional
+
 from app.database import get_db
+from app.dependencies import require_permission
+from app.models import GoodsReceipt
 from app.schemas import (
-    GoodsReceiptCreate, GoodsReceiptResponse,
-    SupplierReturnCreate, SupplierReturnResponse,
-    ThreeWayMatchRequest, ThreeWayMatchResponse
+    GoodsReceiptCreate,
+    GoodsReceiptResponse,
+    SupplierReturnCreate,
+    SupplierReturnResponse,
+    ThreeWayMatchRequest,
+    ThreeWayMatchResponse,
 )
 from app.services import procurement_service
-from app.dependencies import require_permission, get_current_user
-from app.models import GoodsReceipt, SupplierReturn, SupplierInvoice
 
 router = APIRouter(prefix="/api/procurement", tags=["Procurement, GRN & Receiving"])
+
 
 @router.post("/receive", response_model=GoodsReceiptResponse, status_code=status.HTTP_201_CREATED)
 def receive_goods_against_po(
     data: GoodsReceiptCreate,
     db: Session = Depends(get_db),
-    auth_ctx: dict = Depends(require_permission("inventory:receive")) # Staff counter or Receiving staff
+    auth_ctx: dict = Depends(require_permission("inventory:receive")),  # Staff counter or Receiving staff
 ):
     """
     Step 1: Receiving staff creates Goods Receipt Note (GRN) upon physical delivery.
@@ -33,37 +37,44 @@ def receive_goods_against_po(
         warehouse_id=data.warehouse_id,
         staff_user_id=1,
         delivery_note_ref=data.delivery_note_ref,
-        notes=data.notes
+        notes=data.notes,
     )
+
 
 @router.post("/grn/{grn_id}/verify", response_model=GoodsReceiptResponse)
 def verify_and_approve_grn(
     grn_id: int,
     db: Session = Depends(get_db),
-    auth_ctx: dict = Depends(require_permission("stores:manage")) # Manager or App Admin
+    auth_ctx: dict = Depends(require_permission("stores:manage")),  # Manager or App Admin
 ):
     """
     Step 2: Store Manager verifies GRN and approves accepted stock into physical inventory (+stock).
     """
-    manager_id = 2 # Manager user ID
+    manager_id = 2  # Manager user ID
     return procurement_service.verify_and_approve_grn(db, grn_id, manager_id)
 
-@router.get("/grn", response_model=List[GoodsReceiptResponse])
+
+@router.get("/grn", response_model=list[GoodsReceiptResponse])
 def list_goods_receipts(
-    po_id: Optional[int] = None,
+    po_id: int | None = None,
     db: Session = Depends(get_db),
-    auth_ctx: dict = Depends(require_permission("inventory:view"))
+    auth_ctx: dict = Depends(require_permission("inventory:view")),
 ):
     query = db.query(GoodsReceipt)
     if po_id:
         query = query.filter(GoodsReceipt.po_id == po_id)
     return query.order_by(GoodsReceipt.created_at.desc()).all()
 
-@router.post("/returns", response_model=SupplierReturnResponse, status_code=status.HTTP_201_CREATED)
+
+@router.post(
+    "/returns",
+    response_model=SupplierReturnResponse,
+    status_code=status.HTTP_201_CREATED,
+)
 def create_supplier_return(
     data: SupplierReturnCreate,
     db: Session = Depends(get_db),
-    auth_ctx: dict = Depends(require_permission("inventory:receive")) # Staff or Manager
+    auth_ctx: dict = Depends(require_permission("inventory:receive")),  # Staff or Manager
 ):
     """
     Create a Supplier Return for rejected or damaged goods.
@@ -73,14 +84,15 @@ def create_supplier_return(
         grn_id=data.grn_id,
         supplier_id=data.supplier_id,
         reason=data.reason,
-        items_data=data.items
+        items_data=data.items,
     )
+
 
 @router.post("/three-way-match", response_model=ThreeWayMatchResponse)
 def perform_three_way_match(
     data: ThreeWayMatchRequest,
     db: Session = Depends(get_db),
-    auth_ctx: dict = Depends(require_permission("reports:read"))
+    auth_ctx: dict = Depends(require_permission("reports:read")),
 ):
     """
     Three-Way Matching Verification (PO vs GRN Accepted Qty vs Supplier Invoice).
@@ -91,19 +103,19 @@ def perform_three_way_match(
         po_id=data.po_id,
         supplier_invoice_code=data.supplier_invoice_code,
         billed_quantity=data.billed_quantity,
-        billed_unit_cost=data.billed_unit_cost
+        billed_unit_cost=data.billed_unit_cost,
     )
 
     # Fetch PO and accepted GRN quantities for response audit detail
     from app.models import Purchase
+
     po = db.query(Purchase).filter(Purchase.id == data.po_id).first()
     ordered_qty = sum(pi.quantity for pi in po.items) if po else 0
     agreed_cost = po.items[0].unit_price if po and po.items else 0.0
 
-    accepted_grns = db.query(GoodsReceipt).filter(
-        GoodsReceipt.po_id == data.po_id,
-        GoodsReceipt.status == "ACCEPTED"
-    ).all()
+    accepted_grns = (
+        db.query(GoodsReceipt).filter(GoodsReceipt.po_id == data.po_id, GoodsReceipt.status == "ACCEPTED").all()
+    )
     accepted_qty = sum(gri.accepted_quantity for g in accepted_grns for gri in g.items)
 
     return ThreeWayMatchResponse(
@@ -116,5 +128,5 @@ def perform_three_way_match(
         accepted_qty=accepted_qty,
         billed_qty=data.billed_quantity,
         agreed_unit_cost=agreed_cost,
-        billed_unit_cost=data.billed_unit_cost
+        billed_unit_cost=data.billed_unit_cost,
     )

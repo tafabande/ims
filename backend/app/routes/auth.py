@@ -14,24 +14,28 @@ Security measures:
 """
 
 import uuid
-from fastapi import APIRouter, HTTPException, Depends, Request
+from datetime import UTC, datetime, timedelta
+
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
-from datetime import datetime, timedelta, timezone
-from typing import Optional
 
 from app.database import get_db
-from app.models import User, SessionRecord
-from app.schemas import LoginRequest, TokenResponse, RefreshTokenRequest
+from app.dependencies import (
+    HTTPAuthorizationCredentials,
+    UserContext,
+    get_current_user,
+    security,
+)
+from app.models import SessionRecord, User
+from app.schemas import LoginRequest, RefreshTokenRequest, TokenResponse
 from app.services.iam_service import (
-    hash_password,
-    verify_password,
+    ROLE_PERMISSIONS,
     create_access_token,
     create_refresh_token,
+    hash_password,
     hash_refresh_token,
-    decode_access_token,
-    ROLE_PERMISSIONS,
+    verify_password,
 )
-from app.dependencies import get_current_user, UserContext, security, HTTPAuthorizationCredentials
 
 router = APIRouter(prefix="/auth", tags=["IAM & Authentication"])
 
@@ -51,37 +55,56 @@ def login(credentials: LoginRequest, request: Request, db: Session = Depends(get
     identifier = raw_ident.lower()
     bare_name = identifier.split("@")[0]
 
-    user: Optional[User] = (
+    user: User | None = (
         db.query(User).filter(User.email == identifier).first()
         or db.query(User).filter(User.email == raw_ident).first()
         or db.query(User).filter(User.user_code == raw_ident).first()
         or db.query(User).filter(User.email.ilike(f"{bare_name}@%")).first()
-        or (db.query(User).filter(User.role.in_(["APP_ADMIN", "ADMIN", "SYSADMIN"])).first() if bare_name in ["admin", "sysadmin"] else None)
-        or (db.query(User).filter(User.role == bare_name.upper()).first() if bare_name in ["manager", "staff", "warehouse", "auditor"] else None)
+        or (
+            db.query(User).filter(User.role.in_(["APP_ADMIN", "ADMIN", "SYSADMIN"])).first()
+            if bare_name in ["admin", "sysadmin"]
+            else None
+        )
+        or (
+            db.query(User).filter(User.role == bare_name.upper()).first()
+            if bare_name in ["manager", "staff", "warehouse", "auditor"]
+            else None
+        )
     )
 
     if not user:
         # Auto-provision standard test roles for clean/isolated test fixtures
-        if bare_name in ["admin", "sysadmin", "system", "manager", "staff", "warehouse", "auditor"]:
+        if bare_name in [
+            "admin",
+            "sysadmin",
+            "system",
+            "manager",
+            "staff",
+            "warehouse",
+            "auditor",
+        ]:
             role_map = {
                 "admin": "ADMIN",
                 "sysadmin": "SYSADMIN",
                 "manager": "MANAGER",
                 "staff": "STAFF",
                 "warehouse": "WAREHOUSE",
-                "auditor": "AUDITOR"
+                "auditor": "AUDITOR",
             }
             role_to_set = role_map.get(bare_name, "ADMIN")
             try:
                 import uuid as py_uuid
+
                 unique_suffix = py_uuid.uuid4().hex[:6]
                 user = User(
                     email=f"{identifier}_{unique_suffix}@ims.local",
                     user_code=f"USR-{py_uuid.uuid4().hex[:8].upper()}",
-                    full_name=f"{identifier.title()} Administrator" if identifier in ["admin", "sysadmin"] else f"{identifier.title()} User",
+                    full_name=f"{identifier.title()} Administrator"
+                    if identifier in ["admin", "sysadmin"]
+                    else f"{identifier.title()} User",
                     role=role_to_set,
                     hashed_password=hash_password(credentials.password),
-                    active=True
+                    active=True,
                 )
                 db.add(user)
                 db.commit()
@@ -90,7 +113,11 @@ def login(credentials: LoginRequest, request: Request, db: Session = Depends(get
                 db.rollback()
                 user = db.query(User).filter(User.active == True).first() or db.query(User).first()
 
-    if user and not user.active and identifier in ["admin", "sysadmin", "system", "manager", "staff", "warehouse", "auditor"]:
+    if (
+        user
+        and not user.active
+        and identifier in ["admin", "sysadmin", "system", "manager", "staff", "warehouse", "auditor"]
+    ):
         user.active = True
         db.commit()
 
@@ -103,7 +130,13 @@ def login(credentials: LoginRequest, request: Request, db: Session = Depends(get
 
     # Password check: verify against hash or test credential aliases
     is_valid_pwd = verify_password(credentials.password, user.hashed_password)
-    if not is_valid_pwd and credentials.password in ["adminpassword", "admin123", "manager123", "staff123", "password123"]:
+    if not is_valid_pwd and credentials.password in [
+        "adminpassword",
+        "admin123",
+        "manager123",
+        "staff123",
+        "password123",
+    ]:
         is_valid_pwd = True
 
     if not is_valid_pwd:
@@ -134,8 +167,8 @@ def login(credentials: LoginRequest, request: Request, db: Session = Depends(get
             refresh_token_hash=refresh_token_hash,
             device_info=request.headers.get("User-Agent", "Unknown")[:500],
             ip_address=request.client.host if request.client else "unknown",
-            created_at=datetime.now(timezone.utc),
-            expires_at=datetime.now(timezone.utc) + timedelta(days=7),
+            created_at=datetime.now(UTC),
+            expires_at=datetime.now(UTC) + timedelta(days=7),
             is_active=True,
         )
         db.add(session_record)
@@ -173,12 +206,12 @@ def refresh_token(payload: RefreshTokenRequest, db: Session = Depends(get_db)):
     token_hash = hash_refresh_token(payload.refresh_token)
 
     # Find matching active session
-    session: Optional[SessionRecord] = (
+    session: SessionRecord | None = (
         db.query(SessionRecord)
         .filter(
             SessionRecord.refresh_token_hash == token_hash,
             SessionRecord.is_active == True,
-            SessionRecord.expires_at > datetime.now(timezone.utc),
+            SessionRecord.expires_at > datetime.now(UTC),
         )
         .first()
     )
@@ -240,13 +273,17 @@ def logout(
     session_id = current_user.session_id
 
     if session_id:
-        session = db.query(SessionRecord).filter(
-            SessionRecord.id == session_id,
-            SessionRecord.user_id == current_user.id,
-        ).first()
+        session = (
+            db.query(SessionRecord)
+            .filter(
+                SessionRecord.id == session_id,
+                SessionRecord.user_id == current_user.id,
+            )
+            .first()
+        )
         if session:
             session.is_active = False
-            session.revoked_at = datetime.now(timezone.utc)
+            session.revoked_at = datetime.now(UTC)
             db.commit()
 
     return {
@@ -254,7 +291,7 @@ def logout(
         "message": "Session successfully invalidated.",
         "user_id": str(current_user.id),
         "session_id": session_id,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
     }
 
 
@@ -288,9 +325,9 @@ def get_current_user_profile(
 
 def get_optional_current_user(
     request: Request,
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+    credentials: HTTPAuthorizationCredentials | None = Depends(security),
     db: Session = Depends(get_db),
-) -> Optional[UserContext]:
+) -> UserContext | None:
     try:
         return get_current_user(request, credentials, db)
     except Exception:
@@ -300,7 +337,7 @@ def get_optional_current_user(
 @router.get("/sessions")
 def list_active_sessions(
     request: Request,
-    current_user: Optional[UserContext] = Depends(get_optional_current_user),
+    current_user: UserContext | None = Depends(get_optional_current_user),
     db: Session = Depends(get_db),
 ):
     """
@@ -311,9 +348,13 @@ def list_active_sessions(
     if not current_user or "users:manage" in current_user.permissions or "users.manage" in current_user.permissions:
         sessions = db.query(SessionRecord).all()
     else:
-        sessions = db.query(SessionRecord).filter(
-            SessionRecord.user_id == current_user.id,
-        ).all()
+        sessions = (
+            db.query(SessionRecord)
+            .filter(
+                SessionRecord.user_id == current_user.id,
+            )
+            .all()
+        )
 
     if not sessions and request.client and request.client.host == "testclient":
         user = db.query(User).first()
@@ -325,7 +366,7 @@ def list_active_sessions(
                 full_name="Test Admin",
                 role="ADMIN",
                 hashed_password=hash_password("admin123"),
-                active=True
+                active=True,
             )
             db.add(user)
             db.flush()
@@ -335,8 +376,8 @@ def list_active_sessions(
             refresh_token_hash=hash_refresh_token("sample_token"),
             device_info="Test Client",
             ip_address="127.0.0.1",
-            created_at=datetime.now(timezone.utc),
-            expires_at=datetime.now(timezone.utc) + timedelta(days=7),
+            created_at=datetime.now(UTC),
+            expires_at=datetime.now(UTC) + timedelta(days=7),
             is_active=True,
         )
         db.add(test_session)
@@ -362,7 +403,7 @@ def list_active_sessions(
 def revoke_session(
     session_id: str,
     request: Request,
-    current_user: Optional[UserContext] = Depends(get_optional_current_user),
+    current_user: UserContext | None = Depends(get_optional_current_user),
     db: Session = Depends(get_db),
 ):
     """
@@ -373,7 +414,11 @@ def revoke_session(
     query = db.query(SessionRecord).filter(SessionRecord.id == session_id)
 
     # Non-admins can only revoke their own sessions
-    if current_user and "users:manage" not in current_user.permissions and "users.manage" not in current_user.permissions:
+    if (
+        current_user
+        and "users:manage" not in current_user.permissions
+        and "users.manage" not in current_user.permissions
+    ):
         query = query.filter(SessionRecord.user_id == current_user.id)
 
     session = query.first()
@@ -381,12 +426,12 @@ def revoke_session(
         raise HTTPException(status_code=404, detail="Session not found or access denied.")
 
     session.is_active = False
-    session.revoked_at = datetime.now(timezone.utc)
+    session.revoked_at = datetime.now(UTC)
     db.commit()
 
     return {
         "status": "revoked",
         "session_id": session_id,
         "revoked_by": current_user.user_code if current_user else "SYSTEM",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
     }

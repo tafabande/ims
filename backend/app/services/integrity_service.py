@@ -1,20 +1,25 @@
-import uuid
 import json
-from datetime import datetime, timezone, timedelta
-from typing import List, Optional, Dict, Any
+import uuid
+from datetime import UTC, datetime, timedelta
+from typing import Any
+
 from fastapi import HTTPException
-from sqlmodel import select, Session
+from sqlmodel import Session
+
 from app.models import (
-    Product, Warehouse, InventoryTransaction, Sale, Purchase,
-    ReturnOrder, SystemSetting, InventoryAnomaly, InvestigationCase,
-    StockReservation, BLEDeviceLocation, UserDevice, UserSession
+    BLEDeviceLocation,
+    InventoryAnomaly,
+    InventoryTransaction,
+    InvestigationCase,
+    Product,
+    Sale,
+    StockReservation,
+    UserSession,
+    Warehouse,
 )
 
-def evaluate_inventory_integrity(
-    db: Session,
-    product_id: int,
-    warehouse_id: Optional[int] = None
-) -> InventoryAnomaly:
+
+def evaluate_inventory_integrity(db: Session, product_id: int, warehouse_id: int | None = None) -> InventoryAnomaly:
     """
     Evaluates the continuous Inventory Integrity Equation:
     Opening + Receipts + Returns - Sales - Damages - Adjustments = Expected Stock
@@ -26,9 +31,8 @@ def evaluate_inventory_integrity(
     if not prod:
         raise HTTPException(status_code=404, detail="Product not found.")
 
-    wh = None
     if warehouse_id:
-        wh = db.query(Warehouse).filter(Warehouse.id == warehouse_id).first()
+        db.query(Warehouse).filter(Warehouse.id == warehouse_id).first()
 
     txs = db.query(InventoryTransaction).filter(InventoryTransaction.product_id == product_id).all()
 
@@ -116,7 +120,7 @@ def evaluate_inventory_integrity(
         risk_level=risk_level,
         status="OPEN" if risk_score >= 40.0 else "RESOLVED",
         reasons_json=json.dumps(reasons),
-        created_at=datetime.now(timezone.utc)
+        created_at=datetime.now(UTC),
     )
     db.add(anomaly)
     db.flush()
@@ -132,7 +136,7 @@ def evaluate_inventory_integrity(
             risk_score=risk_score,
             risk_level=risk_level,
             status="OPEN",
-            created_at=datetime.now(timezone.utc)
+            created_at=datetime.now(UTC),
         )
         db.add(case)
 
@@ -140,7 +144,8 @@ def evaluate_inventory_integrity(
     db.refresh(anomaly)
     return anomaly
 
-def get_investigation_case_evidence(db: Session, case_code: str) -> Dict[str, Any]:
+
+def get_investigation_case_evidence(db: Session, case_code: str) -> dict[str, Any]:
     """
     Gathers automated evidence timeline across Sales, POs, Returns, Adjustments, Devices, and Audit Logs.
     """
@@ -154,36 +159,44 @@ def get_investigation_case_evidence(db: Session, case_code: str) -> Dict[str, An
     # Gather evidence events timeline
     timeline = []
 
-    txs = db.query(InventoryTransaction).filter(InventoryTransaction.product_id == case.product_id).order_by(InventoryTransaction.created_at.desc()).all()
+    txs = (
+        db.query(InventoryTransaction)
+        .filter(InventoryTransaction.product_id == case.product_id)
+        .order_by(InventoryTransaction.created_at.desc())
+        .all()
+    )
     for tx in txs:
-        timeline.append({
-            "timestamp": tx.created_at.isoformat() if tx.created_at else datetime.now(timezone.utc).isoformat(),
-            "event_type": (tx.type or "TRANSACTION").upper(),
-            "actor_name": tx.user_name or "System Operator",
-            "reference_code": tx.reference or f"TX-{tx.id}",
-            "description": f"{tx.type}: {tx.quantity:+d} units",
-            "details": tx.notes or "Inventory ledger transaction"
-        })
+        timeline.append(
+            {
+                "timestamp": tx.created_at.isoformat() if tx.created_at else datetime.now(UTC).isoformat(),
+                "event_type": (tx.type or "TRANSACTION").upper(),
+                "actor_name": tx.user_name or "System Operator",
+                "reference_code": tx.reference or f"TX-{tx.id}",
+                "description": f"{tx.type}: {tx.quantity:+d} units",
+                "details": tx.notes or "Inventory ledger transaction",
+            }
+        )
 
     sessions = db.query(UserSession).order_by(UserSession.created_at.desc()).limit(5).all()
     for sess in sessions:
-        timeline.append({
-            "timestamp": sess.created_at.isoformat() if sess.created_at else datetime.now(timezone.utc).isoformat(),
-            "event_type": "SESSION_EVENT",
-            "actor_name": f"User #{sess.user_id}",
-            "reference_code": sess.session_id,
-            "description": f"Active Session from IP {sess.ip_address or 'LAN'}",
-            "details": f"Location: {sess.location_summary}"
-        })
+        timeline.append(
+            {
+                "timestamp": sess.created_at.isoformat() if sess.created_at else datetime.now(UTC).isoformat(),
+                "event_type": "SESSION_EVENT",
+                "actor_name": f"User #{sess.user_id}",
+                "reference_code": sess.session_id,
+                "description": f"Active Session from IP {sess.ip_address or 'LAN'}",
+                "details": f"Location: {sess.location_summary}",
+            }
+        )
 
     timeline.sort(key=lambda x: x["timestamp"], reverse=True)
 
-    reasons = []
     if case.anomaly and case.anomaly.reasons_json:
         try:
-            reasons = json.loads(case.anomaly.reasons_json)
+            json.loads(case.anomaly.reasons_json)
         except Exception:
-            reasons = []
+            pass
 
     return {
         "id": case.id,
@@ -200,10 +213,11 @@ def get_investigation_case_evidence(db: Session, case_code: str) -> Dict[str, An
         "risk_level": case.risk_level,
         "status": case.status,
         "evidence_timeline": timeline,
-        "created_at": case.created_at
+        "created_at": case.created_at,
     }
 
-def get_explainable_number_lineage(db: Session, entity_type: str, entity_id: str) -> Dict[str, Any]:
+
+def get_explainable_number_lineage(db: Session, entity_type: str, entity_id: str) -> dict[str, Any]:
     """
     "Explain This Number" — Business & Data Lineage Breakdown Engine
     Explains Current Stock, Total Revenue, or Product Margin with constituent mathematical proof nodes.
@@ -231,14 +245,49 @@ def get_explainable_number_lineage(db: Session, entity_type: str, entity_id: str
             "current_value": prod.stock_quantity,
             "equation_formula": "Opening + Receipts + Returns - Sales - Damages - Adjustments = Calculated Stock",
             "lineage_items": [
-                {"label": "Opening Stock", "amount_or_qty": opening, "operation": "+", "details": "Base inventory count"},
-                {"label": "Purchase Receipts", "amount_or_qty": received, "operation": "+", "details": f"{received} units received via POs"},
-                {"label": "Customer Returns", "amount_or_qty": returns, "operation": "+", "details": f"{returns} units returned & restocked"},
-                {"label": "Completed Sales", "amount_or_qty": sales, "operation": "-", "details": f"{sales} units sold across POS"},
-                {"label": "Damaged Goods", "amount_or_qty": damages, "operation": "-", "details": f"{damages} units written off"},
-                {"label": "Approved Adjustments", "amount_or_qty": adjustments, "operation": "-", "details": f"{adjustments} units manual stock corrections"},
-                {"label": "Calculated Current Stock", "amount_or_qty": calc_stock, "operation": "=", "details": f"Matches system stock: {prod.stock_quantity}"}
-            ]
+                {
+                    "label": "Opening Stock",
+                    "amount_or_qty": opening,
+                    "operation": "+",
+                    "details": "Base inventory count",
+                },
+                {
+                    "label": "Purchase Receipts",
+                    "amount_or_qty": received,
+                    "operation": "+",
+                    "details": f"{received} units received via POs",
+                },
+                {
+                    "label": "Customer Returns",
+                    "amount_or_qty": returns,
+                    "operation": "+",
+                    "details": f"{returns} units returned & restocked",
+                },
+                {
+                    "label": "Completed Sales",
+                    "amount_or_qty": sales,
+                    "operation": "-",
+                    "details": f"{sales} units sold across POS",
+                },
+                {
+                    "label": "Damaged Goods",
+                    "amount_or_qty": damages,
+                    "operation": "-",
+                    "details": f"{damages} units written off",
+                },
+                {
+                    "label": "Approved Adjustments",
+                    "amount_or_qty": adjustments,
+                    "operation": "-",
+                    "details": f"{adjustments} units manual stock corrections",
+                },
+                {
+                    "label": "Calculated Current Stock",
+                    "amount_or_qty": calc_stock,
+                    "operation": "=",
+                    "details": f"Matches system stock: {prod.stock_quantity}",
+                },
+            ],
         }
 
     elif e_type == "MARGIN":
@@ -257,35 +306,66 @@ def get_explainable_number_lineage(db: Session, entity_type: str, entity_id: str
             "current_value": f"${margin_val:.2f} ({margin_pct:.1f}%)",
             "equation_formula": "Selling Price - Purchase Cost = Gross Profit Margin",
             "lineage_items": [
-                {"label": "Retail Selling Price", "amount_or_qty": f"${selling:.2f}", "operation": "+", "details": "Active catalog price"},
-                {"label": "Supplier Purchase Cost", "amount_or_qty": f"${cost:.2f}", "operation": "-", "details": "Weighted average unit cost"},
-                {"label": "Net Profit Margin Floor", "amount_or_qty": f"${margin_val:.2f}", "operation": "=", "details": f"Profit margin ratio {margin_pct:.1f}%"}
-            ]
+                {
+                    "label": "Retail Selling Price",
+                    "amount_or_qty": f"${selling:.2f}",
+                    "operation": "+",
+                    "details": "Active catalog price",
+                },
+                {
+                    "label": "Supplier Purchase Cost",
+                    "amount_or_qty": f"${cost:.2f}",
+                    "operation": "-",
+                    "details": "Weighted average unit cost",
+                },
+                {
+                    "label": "Net Profit Margin Floor",
+                    "amount_or_qty": f"${margin_val:.2f}",
+                    "operation": "=",
+                    "details": f"Profit margin ratio {margin_pct:.1f}%",
+                },
+            ],
         }
 
-    else: # REVENUE
+    else:  # REVENUE
         sales = db.query(Sale).all()
         total_rev = sum(s.total_amount for s in sales)
-        items = [{"label": f"Invoice {s.invoice_number}", "amount_or_qty": f"${s.total_amount:.2f}", "operation": "+", "details": f"Customer: {s.customer_name or 'Walk-in'}"} for s in sales[:10]]
-        items.append({"label": "Total Revenue", "amount_or_qty": f"${total_rev:.2f}", "operation": "=", "details": f"Sum across {len(sales)} total sales invoices"})
+        items = [
+            {
+                "label": f"Invoice {s.invoice_number}",
+                "amount_or_qty": f"${s.total_amount:.2f}",
+                "operation": "+",
+                "details": f"Customer: {s.customer_name or 'Walk-in'}",
+            }
+            for s in sales[:10]
+        ]
+        items.append(
+            {
+                "label": "Total Revenue",
+                "amount_or_qty": f"${total_rev:.2f}",
+                "operation": "=",
+                "details": f"Sum across {len(sales)} total sales invoices",
+            }
+        )
 
         return {
             "entity_type": "REVENUE",
             "title": "Business Revenue Lineage Breakdown",
             "current_value": f"${total_rev:.2f}",
             "equation_formula": "Sum of Tax Sales Invoices = Gross Business Revenue",
-            "lineage_items": items
+            "lineage_items": items,
         }
+
 
 def create_stock_reservation(
     db: Session,
     product_id: int,
     quantity: int,
-    warehouse_id: Optional[int] = None,
-    store_id: Optional[int] = None,
-    cart_id: Optional[int] = None,
-    session_id: Optional[str] = None,
-    duration_minutes: int = 15
+    warehouse_id: int | None = None,
+    store_id: int | None = None,
+    cart_id: int | None = None,
+    session_id: str | None = None,
+    duration_minutes: int = 15,
 ) -> StockReservation:
     """
     Reserves inventory units temporarily (e.g. 15 minutes) during POS checkout/cart creation.
@@ -301,11 +381,11 @@ def create_stock_reservation(
     if available_qty < quantity:
         raise HTTPException(
             status_code=400,
-            detail=f"Insufficient available stock for reservation. Requested: {quantity}, Available: {available_qty} (Physical: {prod.stock_quantity})."
+            detail=f"Insufficient available stock for reservation. Requested: {quantity}, Available: {available_qty} (Physical: {prod.stock_quantity}).",
         )
 
     res_code = f"RES-2026-{uuid.uuid4().hex[:6].upper()}"
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     expires = now + timedelta(minutes=duration_minutes)
 
     res = StockReservation(
@@ -317,7 +397,7 @@ def create_stock_reservation(
         quantity=quantity,
         status="ACTIVE",
         created_at=now,
-        expires_at=expires
+        expires_at=expires,
     )
     db.add(res)
     db.commit()
@@ -325,34 +405,40 @@ def create_stock_reservation(
     res.reserved_quantity = res.quantity
     return res
 
+
 def release_expired_reservations(db: Session):
     """
     Checks for expired stock reservations and automatically releases reserved units back to available pool.
     """
-    now = datetime.now(timezone.utc)
-    expired_res = db.query(StockReservation).filter(
-        StockReservation.status == "ACTIVE",
-        StockReservation.expires_at <= now
-    ).all()
+    now = datetime.now(UTC)
+    expired_res = (
+        db.query(StockReservation).filter(StockReservation.status == "ACTIVE", StockReservation.expires_at <= now).all()
+    )
 
     for res in expired_res:
         res.status = "EXPIRED"
     if expired_res:
         db.commit()
 
-def get_available_stock(db: Session, product_id: int, warehouse_id: Optional[int] = None) -> int:
+
+def get_available_stock(db: Session, product_id: int, warehouse_id: int | None = None) -> int:
     release_expired_reservations(db)
     prod = db.query(Product).filter(Product.id == product_id).first()
     if not prod:
         return 0
 
-    active_res = db.query(StockReservation).filter(
-        StockReservation.product_id == product_id,
-        StockReservation.status == "ACTIVE"
-    ).all()
+    active_res = (
+        db.query(StockReservation)
+        .filter(
+            StockReservation.product_id == product_id,
+            StockReservation.status == "ACTIVE",
+        )
+        .all()
+    )
 
     total_reserved = sum(r.quantity for r in active_res)
     return max(0, prod.stock_quantity - total_reserved)
+
 
 def update_ble_location_tracking(
     db: Session,
@@ -361,14 +447,14 @@ def update_ble_location_tracking(
     expected_location: str,
     detected_location: str,
     rssi_dbm: int = -65,
-    confidence_percentage: float = 82.0
+    confidence_percentage: float = 82.0,
 ) -> BLEDeviceLocation:
     """
     Simulates / ingests BLE RSSI location tracking signals from IoT ESP32 gateways.
     Triggers physical location mismatch alert if expected_location != detected_location.
     """
     ble = db.query(BLEDeviceLocation).filter(BLEDeviceLocation.tag_id == tag_id).first()
-    has_mismatch = (expected_location.strip().lower() != detected_location.strip().lower())
+    has_mismatch = expected_location.strip().lower() != detected_location.strip().lower()
 
     if not ble:
         ble = BLEDeviceLocation(
@@ -379,7 +465,7 @@ def update_ble_location_tracking(
             rssi_dbm=rssi_dbm,
             confidence_percentage=confidence_percentage,
             has_mismatch=has_mismatch,
-            updated_at=datetime.now(timezone.utc)
+            updated_at=datetime.now(UTC),
         )
         db.add(ble)
     else:
@@ -388,7 +474,7 @@ def update_ble_location_tracking(
         ble.rssi_dbm = rssi_dbm
         ble.confidence_percentage = confidence_percentage
         ble.has_mismatch = has_mismatch
-        ble.updated_at = datetime.now(timezone.utc)
+        ble.updated_at = datetime.now(UTC)
 
     db.commit()
     db.refresh(ble)

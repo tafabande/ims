@@ -1,12 +1,14 @@
-import pytest
 import uuid
+
 from fastapi.testclient import TestClient
-from app.main import app
-from app.database import engine, get_db
-from app.models import Category, Product
 from sqlalchemy.orm import sessionmaker
 
+from app.database import engine, get_db
+from app.main import app
+from app.models import Category, Product
+
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
 
 def override_get_db():
     try:
@@ -15,8 +17,10 @@ def override_get_db():
     finally:
         db.close()
 
+
 app.dependency_overrides[get_db] = override_get_db
 client = TestClient(app)
+
 
 def test_security_middleware_network_context_injection():
     # LAN Header test
@@ -28,6 +32,7 @@ def test_security_middleware_network_context_injection():
     res_remote = client.get("/health", headers={"X-Network-Context": "REMOTE"})
     assert res_remote.status_code == 200
     assert res_remote.headers.get("X-Network-Context") == "REMOTE"
+
 
 def test_remote_context_denies_pos_sales_for_staff():
     db = TestingSessionLocal()
@@ -41,7 +46,7 @@ def test_remote_context_denies_pos_sales_for_staff():
         category_id=cat.id,
         purchase_price=10.0,
         selling_price=20.0,
-        stock_quantity=50
+        stock_quantity=50,
     )
     db.add(prod)
     db.commit()
@@ -49,17 +54,19 @@ def test_remote_context_denies_pos_sales_for_staff():
     db.close()
 
     # Attempting POS sale creation from REMOTE context as STAFF -> DENIED 403
-    remote_res = client.post("/api/sales/", json={
-        "customer_id": 1,
-        "payment_method": "CASH",
-        "items": [{"product_id": prod_id, "quantity": 1}]
-    }, headers={
-        "X-User-Role": "STAFF",
-        "X-Network-Context": "REMOTE"
-    })
+    remote_res = client.post(
+        "/api/sales/",
+        json={
+            "customer_id": 1,
+            "payment_method": "CASH",
+            "items": [{"product_id": prod_id, "quantity": 1}],
+        },
+        headers={"X-User-Role": "STAFF", "X-Network-Context": "REMOTE"},
+    )
 
     assert remote_res.status_code == 403
     assert "Zero-Trust Policy" in remote_res.json()["detail"]
+
 
 def test_lan_context_allows_pos_sales_for_staff():
     db = TestingSessionLocal()
@@ -73,7 +80,7 @@ def test_lan_context_allows_pos_sales_for_staff():
         category_id=cat.id,
         purchase_price=10.0,
         selling_price=20.0,
-        stock_quantity=50
+        stock_quantity=50,
     )
     db.add(prod)
     db.commit()
@@ -81,23 +88,24 @@ def test_lan_context_allows_pos_sales_for_staff():
     db.close()
 
     # Executing POS sale creation from LAN context as STAFF -> ALLOWED 201
-    lan_res = client.post("/api/sales/", json={
-        "customer_id": 1,
-        "payment_method": "CASH",
-        "items": [{"product_id": prod_id, "quantity": 1}]
-    }, headers={
-        "X-User-Role": "STAFF",
-        "X-Network-Context": "LAN"
-    })
+    lan_res = client.post(
+        "/api/sales/",
+        json={
+            "customer_id": 1,
+            "payment_method": "CASH",
+            "items": [{"product_id": prod_id, "quantity": 1}],
+        },
+        headers={"X-User-Role": "STAFF", "X-Network-Context": "LAN"},
+    )
 
     assert lan_res.status_code == 201
     assert "invoice_number" in lan_res.json()
 
+
 def test_remote_context_allows_manager_inventory_viewing():
     # Manager viewing products catalog/inventory from REMOTE context -> ALLOWED 200
-    res = client.get("/api/products/", headers={
-        "X-User-Role": "MANAGER",
-        "X-Network-Context": "REMOTE"
-    })
+    res = client.get(
+        "/api/products/",
+        headers={"X-User-Role": "MANAGER", "X-Network-Context": "REMOTE"},
+    )
     assert res.status_code == 200
-

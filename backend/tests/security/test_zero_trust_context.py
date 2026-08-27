@@ -1,8 +1,9 @@
-import pytest
 from fastapi.testclient import TestClient
+
 from app.main import app
 
 client = TestClient(app)
+
 
 def test_zero_trust_lan_network_context_pos_sale():
     """
@@ -11,15 +12,12 @@ def test_zero_trust_lan_network_context_pos_sale():
     """
     res = client.post(
         "/api/sales/",
-        json={
-            "customer_id": 1,
-            "payment_method": "Cash",
-            "items": []
-        },
-        headers={"X-User-Role": "STAFF", "X-Network-Context": "LAN"}
+        json={"customer_id": 1, "payment_method": "Cash", "items": []},
+        headers={"X-User-Role": "STAFF", "X-Network-Context": "LAN"},
     )
     # Validation or empty items check returns 404/400, but NOT Zero-Trust network block (403)
     assert res.status_code != 403
+
 
 def test_zero_trust_remote_staff_pos_sale_rejected():
     """
@@ -28,16 +26,13 @@ def test_zero_trust_remote_staff_pos_sale_rejected():
     """
     res = client.post(
         "/api/sales/",
-        json={
-            "customer_id": 1,
-            "payment_method": "Cash",
-            "items": []
-        },
-        headers={"X-User-Role": "STAFF", "X-Network-Context": "REMOTE"}
+        json={"customer_id": 1, "payment_method": "Cash", "items": []},
+        headers={"X-User-Role": "STAFF", "X-Network-Context": "REMOTE"},
     )
     assert res.status_code == 403
     assert "Zero-Trust Policy" in res.json()["detail"]
     assert "store LAN network proximity" in res.json()["detail"]
+
 
 def test_zero_trust_admin_remote_bypass_allowed():
     """
@@ -46,7 +41,7 @@ def test_zero_trust_admin_remote_bypass_allowed():
     """
     res = client.get(
         "/api/products/",
-        headers={"X-User-Role": "ADMIN", "X-Network-Context": "REMOTE"}
+        headers={"X-User-Role": "ADMIN", "X-Network-Context": "REMOTE"},
     )
     assert res.status_code == 200
     assert res.headers.get("X-Network-Context") == "REMOTE"

@@ -1,15 +1,19 @@
 import time
 import uuid
+
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
+
 from app.logger import log_application_event
+
 
 class RequestCorrelationMiddleware(BaseHTTPMiddleware):
     """
     Middleware that attaches a unique correlation request_id (X-Request-ID) to every HTTP request/response cycle,
     logging structured request start/end observability events.
     """
+
     async def dispatch(self, request: Request, call_next) -> Response:
         # Extract existing X-Request-ID or generate new correlation token
         request_id = request.headers.get("X-Request-ID")
@@ -29,8 +33,8 @@ class RequestCorrelationMiddleware(BaseHTTPMiddleware):
             extra_details={
                 "method": request.method,
                 "path": request.url.path,
-                "client_ip": request.client.host if request.client else "unknown"
-            }
+                "client_ip": request.client.host if request.client else "unknown",
+            },
         )
 
         response = await call_next(request)
@@ -48,8 +52,8 @@ class RequestCorrelationMiddleware(BaseHTTPMiddleware):
                 "method": request.method,
                 "path": request.url.path,
                 "status_code": response.status_code,
-                "duration_ms": duration_ms
-            }
+                "duration_ms": duration_ms,
+            },
         )
 
         return response

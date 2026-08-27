@@ -1,11 +1,14 @@
-from pydantic import BaseModel, Field, ConfigDict
-from typing import Any, Dict, List, Optional
 from datetime import datetime
+from typing import Any
+
+from pydantic import BaseModel, ConfigDict, Field
+
 
 # IAM & Auth Schemas
 class LoginRequest(BaseModel):
     username: str
     password: str
+
 
 class TokenResponse(BaseModel):
     access_token: str
@@ -13,112 +16,114 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
     expires_in: int = 900  # 15 minutes in seconds
     user_id: str
-    user_code: Optional[str] = None
-    full_name: Optional[str] = None
-    email: Optional[str] = None
+    user_code: str | None = None
+    full_name: str | None = None
+    email: str | None = None
     role: str
-    permissions: List[str]
-    session_id: Optional[str] = None
+    permissions: list[str]
+    session_id: str | None = None
 
 
 class RefreshTokenRequest(BaseModel):
     refresh_token: str
 
-class SessionResponse(BaseModel):
-    session_id: str
-    user_id: int
-    device_info: str
-    ip_address: str
-    active: bool
-    created_at: datetime
 
 # User Management Schemas
 class UserCreate(BaseModel):
     email: str
     password: str
     full_name: str
-    role: str = "STAFF" # ADMIN, MANAGER, STAFF
-    department: Optional[str] = "Warehouse"
+    role: str = "STAFF"  # ADMIN, MANAGER, STAFF
+    department: str | None = "Warehouse"
+
 
 class UserResponse(BaseModel):
     id: int
-    user_code: Optional[str] = None
+    user_code: str | None = None
     email: str
     full_name: str
     role: str
-    department: Optional[str]
+    department: str | None
     active: bool
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)
+
 
 # Organization & Employee Schemas
 class DepartmentCreate(BaseModel):
     department_code: str
     name: str
-    description: Optional[str] = None
+    description: str | None = None
+
 
 class DepartmentResponse(DepartmentCreate):
     id: int
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)
 
+
 class JobRoleCreate(BaseModel):
     role_code: str
     name: str
     department_id: int
-    description: Optional[str] = None
+    description: str | None = None
+
 
 class JobRoleResponse(JobRoleCreate):
     id: int
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)
 
+
 class EmployeeCreate(BaseModel):
     first_name: str
     last_name: str
     email: str
-    phone: Optional[str] = None
-    position: Optional[str] = "CASHIER"
-    department_id: Optional[int] = None
-    job_role_id: Optional[int] = None
-    store_id: Optional[int] = None
-    manager_id: Optional[int] = None
-    user_id: Optional[int] = None # Optional link to login User Account
-    status: str = "ACTIVE" # ACTIVE, INACTIVE, SUSPENDED, TERMINATED
+    phone: str | None = None
+    position: str | None = "CASHIER"
+    department_id: int | None = None
+    job_role_id: int | None = None
+    store_id: int | None = None
+    manager_id: int | None = None
+    user_id: int | None = None  # Optional link to login User Account
+    status: str = "ACTIVE"  # ACTIVE, INACTIVE, SUSPENDED, TERMINATED
+
 
 class EmployeeUpdate(BaseModel):
-    first_name: Optional[str] = None
-    last_name: Optional[str] = None
-    email: Optional[str] = None
-    phone: Optional[str] = None
-    position: Optional[str] = None
-    department_id: Optional[int] = None
-    job_role_id: Optional[int] = None
-    store_id: Optional[int] = None
-    manager_id: Optional[int] = None
-    user_id: Optional[int] = None
-    status: Optional[str] = None
+    first_name: str | None = None
+    last_name: str | None = None
+    email: str | None = None
+    phone: str | None = None
+    position: str | None = None
+    department_id: int | None = None
+    job_role_id: int | None = None
+    store_id: int | None = None
+    manager_id: int | None = None
+    user_id: int | None = None
+    status: str | None = None
+
 
 class EmployeeResponse(EmployeeCreate):
     id: int
     employee_code: str
-    store_name: Optional[str] = None
-    manager_name: Optional[str] = None
+    store_name: str | None = None
+    manager_name: str | None = None
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)
+
 
 class EmployeeActivityResponse(BaseModel):
     employee_id: int
     employee_code: str
     full_name: str
-    position: Optional[str] = None
-    store_id: Optional[int] = None
+    position: str | None = None
+    store_id: int | None = None
     status: str
     total_sales_count: int = 0
     total_sales_amount: float = 0.0
     total_returns_count: int = 0
     total_adjustments_count: int = 0
-    last_activity_timestamp: Optional[datetime] = None
+    last_activity_timestamp: datetime | None = None
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -126,116 +131,134 @@ class EmployeeActivityResponse(BaseModel):
 class CategoryBase(BaseModel):
     name: str
     code: str
-    description: Optional[str] = None
-    parent_id: Optional[int] = None
+    description: str | None = None
+    parent_id: int | None = None
+
 
 class CategoryCreate(CategoryBase):
     pass
 
+
 class CategoryResponse(CategoryBase):
     id: int
-    category_code: Optional[str] = None
+    category_code: str | None = None
     model_config = ConfigDict(from_attributes=True)
 
+
 class CategoryTreeResponse(CategoryResponse):
-    children: List['CategoryTreeResponse'] = []
+    children: list["CategoryTreeResponse"] = []
     model_config = ConfigDict(from_attributes=True)
+
 
 # Supplier Schemas
 class SupplierBase(BaseModel):
     name: str
-    contact_person: Optional[str] = None
-    email: Optional[str] = None
-    phone: Optional[str] = None
-    address: Optional[str] = None
+    contact_person: str | None = None
+    email: str | None = None
+    phone: str | None = None
+    address: str | None = None
+
 
 class SupplierCreate(SupplierBase):
     pass
+
 
 class SupplierResponse(SupplierBase):
     id: int
     model_config = ConfigDict(from_attributes=True)
 
+
 # Customer Schemas
 class CustomerBase(BaseModel):
     name: str
-    contact_person: Optional[str] = None
-    email: Optional[str] = None
-    phone: Optional[str] = None
+    contact_person: str | None = None
+    email: str | None = None
+    phone: str | None = None
+
 
 class CustomerCreate(CustomerBase):
     pass
+
 
 class CustomerResponse(CustomerBase):
     id: int
     model_config = ConfigDict(from_attributes=True)
 
+
 # Product Schemas
 class ProductBase(BaseModel):
     sku: str
     name: str
-    description: Optional[str] = None
+    description: str | None = None
     category_id: int
-    supplier_id: Optional[int] = None
+    supplier_id: int | None = None
     purchase_price: float = Field(ge=0)
     selling_price: float = Field(ge=0)
     stock_quantity: int = Field(ge=0, default=0)
     reserved_quantity: int = Field(ge=0, default=0)
     reorder_level: int = Field(ge=0, default=5)
     unit: str = "Units"
-    barcode: Optional[str] = None
+    barcode: str | None = None
+
 
 class ProductCreate(ProductBase):
     pass
 
+
 class ProductUpdate(BaseModel):
-    sku: Optional[str] = None
-    name: Optional[str] = None
-    description: Optional[str] = None
-    category_id: Optional[int] = None
-    supplier_id: Optional[int] = None
-    purchase_price: Optional[float] = None
-    selling_price: Optional[float] = None
-    stock_quantity: Optional[int] = None
-    reserved_quantity: Optional[int] = None
-    reorder_level: Optional[int] = None
-    unit: Optional[str] = None
-    barcode: Optional[str] = None
+    sku: str | None = None
+    name: str | None = None
+    description: str | None = None
+    category_id: int | None = None
+    supplier_id: int | None = None
+    purchase_price: float | None = None
+    selling_price: float | None = None
+    stock_quantity: int | None = None
+    reserved_quantity: int | None = None
+    reorder_level: int | None = None
+    unit: str | None = None
+    barcode: str | None = None
+
 
 class ProductResponse(ProductBase):
     id: int
-    product_code: Optional[str] = None
+    product_code: str | None = None
     active: bool
     available_quantity: int
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)
 
+
 # Inventory Transaction Schemas
 class InventoryAdjustmentRequest(BaseModel):
     product_id: int
-    quantity: int # positive for increase, negative for decrease
+    quantity: int  # positive for increase, negative for decrease
     type: str = "ADJUSTMENT"
-    reason_category: Optional[str] = "CORRECTION"
-    reference: Optional[str] = None
-    notes: Optional[str] = None
-    user_name: Optional[str] = "System Operator"
+    reason_category: str | None = "CORRECTION"
+    reference: str | None = None
+    notes: str | None = None
+    user_name: str | None = "System Operator"
+
 
 class StockReceiveRequest(BaseModel):
     product_id: int
     quantity: int = Field(gt=0)
-    po_number: Optional[str] = None
-    notes: Optional[str] = None
+    po_number: str | None = None
+    notes: str | None = None
+
 
 class StockDamageRequest(BaseModel):
     product_id: int
     quantity: int = Field(gt=0)
     notes: str = Field(min_length=3)
 
+
 class StockReturnRequest(BaseModel):
     product_id: int
     quantity: int = Field(gt=0)
-    customer_id: Optional[int] = None
-    notes: Optional[str] = None
+    customer_id: int | None = None
+    notes: str | None = None
+
 
 class InventoryTransactionResponse(BaseModel):
     id: int
@@ -244,12 +267,13 @@ class InventoryTransactionResponse(BaseModel):
     quantity: int
     quantity_before: int
     quantity_after: int
-    reason_category: Optional[str]
-    reference: Optional[str]
-    user_name: Optional[str]
-    notes: Optional[str]
+    reason_category: str | None
+    reference: str | None
+    user_name: str | None
+    notes: str | None
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)
+
 
 # Purchase Order Schemas
 class PurchaseItemCreate(BaseModel):
@@ -257,9 +281,11 @@ class PurchaseItemCreate(BaseModel):
     quantity: int = Field(gt=0)
     unit_price: float = Field(ge=0)
 
+
 class PurchaseCreate(BaseModel):
     supplier_id: int
-    items: List[PurchaseItemCreate]
+    items: list[PurchaseItemCreate]
+
 
 class PurchaseResponse(BaseModel):
     id: int
@@ -268,18 +294,21 @@ class PurchaseResponse(BaseModel):
     status: str
     total_amount: float
     created_at: datetime
-    received_at: Optional[datetime]
+    received_at: datetime | None
     model_config = ConfigDict(from_attributes=True)
+
 
 # Sale Schemas
 class SaleItemCreate(BaseModel):
     product_id: int
     quantity: int = Field(gt=0)
 
+
 class SaleCreate(BaseModel):
     customer_id: int
     payment_method: str = "Credit Card"
-    items: List[SaleItemCreate]
+    items: list[SaleItemCreate]
+
 
 class SaleResponse(BaseModel):
     id: int
@@ -289,24 +318,27 @@ class SaleResponse(BaseModel):
     payment_status: str
     payment_method: str
     created_at: datetime
-    created_by: Optional[str]
+    created_by: str | None
     model_config = ConfigDict(from_attributes=True)
+
 
 # Store & Warehouse Schemas
 class StoreCreate(BaseModel):
     store_code: str
     name: str
-    address: Optional[str] = None
-    phone: Optional[str] = None
-    email: Optional[str] = None
-    manager_id: Optional[int] = None
+    address: str | None = None
+    phone: str | None = None
+    email: str | None = None
+    manager_id: int | None = None
     status: str = "ACTIVE"
-    operating_hours: Optional[str] = "08:00 - 18:00"
+    operating_hours: str | None = "08:00 - 18:00"
+
 
 class StoreResponse(StoreCreate):
     id: int
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)
+
 
 class WarehouseCreate(BaseModel):
     warehouse_code: str
@@ -315,10 +347,12 @@ class WarehouseCreate(BaseModel):
     is_default: bool = True
     status: str = "ACTIVE"
 
+
 class WarehouseResponse(WarehouseCreate):
     id: int
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)
+
 
 # Cash Register & Shift Schemas
 class RegisterCreate(BaseModel):
@@ -327,12 +361,14 @@ class RegisterCreate(BaseModel):
     name: str
     status: str = "CLOSED"
 
+
 class RegisterResponse(RegisterCreate):
     id: int
-    current_operator_id: Optional[int] = None
+    current_operator_id: int | None = None
     current_balance: float = 0.0
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)
+
 
 class ShiftOpenRequest(BaseModel):
     employee_id: int
@@ -340,9 +376,11 @@ class ShiftOpenRequest(BaseModel):
     register_id: int
     opening_cash: float = Field(ge=0)
 
+
 class ShiftCloseRequest(BaseModel):
     actual_cash: float = Field(ge=0)
-    supervisor_id: Optional[int] = None
+    supervisor_id: int | None = None
+
 
 class ShiftResponse(BaseModel):
     id: int
@@ -351,17 +389,18 @@ class ShiftResponse(BaseModel):
     store_id: int
     register_id: int
     start_time: datetime
-    end_time: Optional[datetime] = None
+    end_time: datetime | None = None
     opening_cash: float
     sales_total: float
     refunds_total: float
     expected_cash: float
-    actual_cash: Optional[float] = None
-    variance: Optional[float] = None
+    actual_cash: float | None = None
+    variance: float | None = None
     status: str
-    supervisor_id: Optional[int] = None
+    supervisor_id: int | None = None
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)
+
 
 # Returns & Refunds Schemas
 class ReturnItemCreate(BaseModel):
@@ -370,48 +409,55 @@ class ReturnItemCreate(BaseModel):
     refund_unit_price: float = Field(ge=0)
     restockable: bool = True
 
+
 class ReturnOrderCreate(BaseModel):
     sale_id: int
-    reason_category: str = "DEFECTIVE" # DEFECTIVE, WRONG_ITEM, EXPIRED, CUSTOMER_CHANGE
+    reason_category: str = "DEFECTIVE"  # DEFECTIVE, WRONG_ITEM, EXPIRED, CUSTOMER_CHANGE
     is_damaged: bool = False
     restock_approved: bool = True
-    approved_by_emp_id: Optional[int] = None
-    items: List[ReturnItemCreate]
+    approved_by_emp_id: int | None = None
+    items: list[ReturnItemCreate]
+
 
 class ReturnItemResponse(ReturnItemCreate):
     id: int
     model_config = ConfigDict(from_attributes=True)
 
+
 class ReturnOrderResponse(BaseModel):
     id: int
     return_code: str
     sale_id: int
-    customer_id: Optional[int] = None
-    store_id: Optional[int] = None
+    customer_id: int | None = None
+    store_id: int | None = None
     total_refund_amount: float
     reason_category: str
     is_damaged: bool
     restock_approved: bool
     status: str
     created_at: datetime
-    items: List[ReturnItemResponse] = []
+    items: list[ReturnItemResponse] = []
     model_config = ConfigDict(from_attributes=True)
+
 
 # Stock Transfers Schemas
 class StockTransferItemCreate(BaseModel):
     product_id: int
     quantity: int = Field(gt=0)
 
+
 class StockTransferCreate(BaseModel):
     source_store_id: int
     destination_store_id: int
-    requested_by_emp_id: Optional[int] = None
-    notes: Optional[str] = None
-    items: List[StockTransferItemCreate]
+    requested_by_emp_id: int | None = None
+    notes: str | None = None
+    items: list[StockTransferItemCreate]
+
 
 class StockTransferItemResponse(StockTransferItemCreate):
     id: int
     model_config = ConfigDict(from_attributes=True)
+
 
 class StockTransferResponse(BaseModel):
     id: int
@@ -419,75 +465,84 @@ class StockTransferResponse(BaseModel):
     source_store_id: int
     destination_store_id: int
     status: str
-    requested_by_emp_id: Optional[int] = None
-    approved_by_emp_id: Optional[int] = None
-    notes: Optional[str] = None
+    requested_by_emp_id: int | None = None
+    approved_by_emp_id: int | None = None
+    notes: str | None = None
     created_at: datetime
-    items: List[StockTransferItemResponse] = []
+    items: list[StockTransferItemResponse] = []
     model_config = ConfigDict(from_attributes=True)
+
 
 # Stocktake Schemas
 class StocktakeItemCreate(BaseModel):
     product_id: int
     system_quantity: int
     physical_count: int
-    notes: Optional[str] = None
+    notes: str | None = None
+
 
 class StocktakeCreate(BaseModel):
     store_id: int
-    warehouse_id: Optional[int] = None
+    warehouse_id: int | None = None
     reason: str = "PERIODIC_AUDIT"
-    conducted_by_emp_id: Optional[int] = None
-    items: List[StocktakeItemCreate]
+    conducted_by_emp_id: int | None = None
+    items: list[StocktakeItemCreate]
+
 
 class StocktakeItemResponse(StocktakeItemCreate):
     id: int
     variance_quantity: int
     model_config = ConfigDict(from_attributes=True)
 
+
 class StocktakeResponse(BaseModel):
     id: int
     stocktake_code: str
     store_id: int
-    warehouse_id: Optional[int] = None
+    warehouse_id: int | None = None
     status: str
     reason: str
-    conducted_by_emp_id: Optional[int] = None
-    approved_by_emp_id: Optional[int] = None
+    conducted_by_emp_id: int | None = None
+    approved_by_emp_id: int | None = None
     created_at: datetime
-    items: List[StocktakeItemResponse] = []
+    items: list[StocktakeItemResponse] = []
     model_config = ConfigDict(from_attributes=True)
+
 
 # Promotions Schemas
 class PromotionCreate(BaseModel):
     promo_code: str
     name: str
-    discount_type: str # PERCENTAGE, FIXED_AMOUNT, BUY_X_GET_Y
+    discount_type: str  # PERCENTAGE, FIXED_AMOUNT, BUY_X_GET_Y
     value: float = Field(gt=0)
-    category_id: Optional[int] = None
-    product_id: Optional[int] = None
-    store_id: Optional[int] = None
+    category_id: int | None = None
+    product_id: int | None = None
+    store_id: int | None = None
     start_date: datetime
     end_date: datetime
+
 
 class PromotionResponse(PromotionCreate):
     id: int
     status: str
-    created_by_emp_id: Optional[int] = None
-    approved_by_emp_id: Optional[int] = None
+    created_by_emp_id: int | None = None
+    approved_by_emp_id: int | None = None
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)
+
 
 # Cart & Stock Reservation Schemas
 class CartItemReserve(BaseModel):
     product_id: int
     quantity: int = Field(gt=0)
 
+
 class CartReserveRequest(BaseModel):
     store_id: int
-    user_id: Optional[int] = None
-    items: List[CartItemReserve]
-    ttl_minutes: Optional[int] = 15
+    user_id: int | None = None
+    items: list[CartItemReserve]
+    ttl_minutes: int | None = 15
+
 
 class CartItemResponse(BaseModel):
     id: int
@@ -495,6 +550,7 @@ class CartItemResponse(BaseModel):
     quantity: int
     unit_price: float
     model_config = ConfigDict(from_attributes=True)
+
 
 class StockReservationResponse(BaseModel):
     id: int
@@ -507,22 +563,25 @@ class StockReservationResponse(BaseModel):
     expires_at: datetime
     model_config = ConfigDict(from_attributes=True)
 
+
 class CartResponse(BaseModel):
     id: int
     cart_code: str
-    user_id: Optional[int] = None
+    user_id: int | None = None
     store_id: int
     status: str
     expires_at: datetime
-    items: List[CartItemResponse] = []
-    reservations: List[StockReservationResponse] = []
+    items: list[CartItemResponse] = []
+    reservations: list[StockReservationResponse] = []
     ttl_remaining_seconds: int = 0
     model_config = ConfigDict(from_attributes=True)
 
+
 class CartCheckoutRequest(BaseModel):
     payment_method: str = "CASH"
-    fulfillment_type: str = "DELIVERY" # DELIVERY or STORE_PICKUP
-    customer_name: Optional[str] = "Walk-in Customer"
+    fulfillment_type: str = "DELIVERY"  # DELIVERY or STORE_PICKUP
+    customer_name: str | None = "Walk-in Customer"
+
 
 class StorePickupResponse(BaseModel):
     id: int
@@ -532,94 +591,104 @@ class StorePickupResponse(BaseModel):
     customer_name: str
     status: str
     created_at: datetime
-    collected_at: Optional[datetime] = None
-    collected_by_staff: Optional[str] = None
+    collected_at: datetime | None = None
+    collected_by_staff: str | None = None
     model_config = ConfigDict(from_attributes=True)
+
 
 # Setup Wizard Schemas
 class StoreWizardRequest(BaseModel):
-    name: str # e.g. "Harare Main Store"
-    phone: Optional[str] = None
-    address: Optional[str] = None
-    currency: Optional[str] = "USD"
-    timezone: Optional[str] = "Africa/Harare"
-    manager_id: Optional[int] = None
-    create_default_warehouse: Optional[bool] = True
+    name: str  # e.g. "Harare Main Store"
+    phone: str | None = None
+    address: str | None = None
+    currency: str | None = "USD"
+    timezone: str | None = "Africa/Harare"
+    manager_id: int | None = None
+    create_default_warehouse: bool | None = True
+
 
 class WarehouseWizardRequest(BaseModel):
-    name: str # e.g. "Harare Central Distribution Hub"
+    name: str  # e.g. "Harare Central Distribution Hub"
     store_id: int
-    type: Optional[str] = "MAIN" # MAIN, STORE, TRANSIT, RETURNS, QUARANTINE
-    manager_id: Optional[int] = None
+    type: str | None = "MAIN"  # MAIN, STORE, TRANSIT, RETURNS, QUARANTINE
+    manager_id: int | None = None
+
 
 class EmployeeWizardRequest(BaseModel):
     first_name: str
     last_name: str
     email: str
-    phone: Optional[str] = None
+    phone: str | None = None
     position: str = "CASHIER"
-    department_id: Optional[int] = None
-    store_id: Optional[int] = None
-    manager_id: Optional[int] = None
-    create_user_account: Optional[bool] = False
-    password: Optional[str] = "ChangeMe2026!"
+    department_id: int | None = None
+    store_id: int | None = None
+    manager_id: int | None = None
+    create_user_account: bool | None = False
+    password: str | None = "ChangeMe2026!"
+
 
 # Approval Engine Schemas
 class ApprovalRequestCreate(BaseModel):
-    request_type: str # STOCK_ADJUSTMENT, REFUND, PRICE_CHANGE, PRODUCT_DELETE, BELOW_MARGIN_SALE
-    entity_name: Optional[str] = None
-    entity_id: Optional[int] = None
-    amount: Optional[float] = None
-    notes: Optional[str] = None
-    payload_json: Optional[str] = None
+    request_type: str  # STOCK_ADJUSTMENT, REFUND, PRICE_CHANGE, PRODUCT_DELETE, BELOW_MARGIN_SALE
+    entity_name: str | None = None
+    entity_id: int | None = None
+    amount: float | None = None
+    notes: str | None = None
+    payload_json: str | None = None
+
 
 class ApprovalReviewRequest(BaseModel):
-    rejection_reason: Optional[str] = None
+    rejection_reason: str | None = None
+
 
 class ApprovalRequestResponse(BaseModel):
     id: int
     request_code: str
     request_type: str
     requester_id: int
-    approver_id: Optional[int] = None
+    approver_id: int | None = None
     status: str
     risk_level: str
-    entity_name: Optional[str] = None
-    entity_id: Optional[int] = None
-    amount: Optional[float] = None
-    notes: Optional[str] = None
-    rejection_reason: Optional[str] = None
-    payload_json: Optional[str] = None
+    entity_name: str | None = None
+    entity_id: int | None = None
+    amount: float | None = None
+    notes: str | None = None
+    rejection_reason: str | None = None
+    payload_json: str | None = None
     created_at: datetime
-    reviewed_at: Optional[datetime] = None
+    reviewed_at: datetime | None = None
     model_config = ConfigDict(from_attributes=True)
+
 
 # Reconciliation Engine Schemas
 class ReconciliationScanRequest(BaseModel):
-    store_id: Optional[int] = None
-    warehouse_id: Optional[int] = None
+    store_id: int | None = None
+    warehouse_id: int | None = None
+
 
 class ReconciliationExceptionResponse(BaseModel):
     id: int
     exception_code: str
     exception_type: str
-    store_id: Optional[int] = None
-    warehouse_id: Optional[int] = None
+    store_id: int | None = None
+    warehouse_id: int | None = None
     product_id: int
     expected_stock: int
     actual_stock: int
     variance: int
     severity: str
     status: str
-    investigation_notes: Optional[str] = None
-    resolution_type: Optional[str] = None
+    investigation_notes: str | None = None
+    resolution_type: str | None = None
     created_at: datetime
-    resolved_at: Optional[datetime] = None
+    resolved_at: datetime | None = None
     model_config = ConfigDict(from_attributes=True)
 
+
 class ExceptionResolveRequest(BaseModel):
-    resolution_type: str # REVERSAL_POSTED, DAMAGE_WRITEOFF, CORRECTION_ADJUSTMENT, SHRINKAGE_CONFIRMED
+    resolution_type: str  # REVERSAL_POSTED, DAMAGE_WRITEOFF, CORRECTION_ADJUSTMENT, SHRINKAGE_CONFIRMED
     investigation_notes: str
+
 
 # Commercial Pricing Schemas
 class PriceRuleCreate(BaseModel):
@@ -627,10 +696,11 @@ class PriceRuleCreate(BaseModel):
     cost_price: float
     selling_price: float
     min_allowed_price: float
-    min_margin_pct: Optional[float] = 10.0
-    staff_discount_limit_pct: Optional[float] = 2.0
-    manager_discount_limit_pct: Optional[float] = 5.0
-    negotiation_allowance_pct: Optional[float] = 5.0
+    min_margin_pct: float | None = 10.0
+    staff_discount_limit_pct: float | None = 2.0
+    manager_discount_limit_pct: float | None = 5.0
+    negotiation_allowance_pct: float | None = 5.0
+
 
 class PriceRuleResponse(BaseModel):
     id: int
@@ -643,14 +713,16 @@ class PriceRuleResponse(BaseModel):
     manager_discount_limit_pct: float
     negotiation_allowance_pct: float
     effective_from: datetime
-    effective_until: Optional[datetime] = None
+    effective_until: datetime | None = None
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)
+
 
 class PriceNegotiationCheckRequest(BaseModel):
     product_id: int
     offered_price: float
     user_role: str = "STAFF"
+
 
 class PriceNegotiationCheckResponse(BaseModel):
     product_id: int
@@ -660,28 +732,31 @@ class PriceNegotiationCheckResponse(BaseModel):
     requires_approval: bool
     reason: str
 
+
 # Procurement GRN & Receiving Schemas
 class GoodsReceiptItemCreate(BaseModel):
     product_id: int
     received_quantity: int
     accepted_quantity: int
-    rejected_quantity: Optional[int] = 0
-    damaged_quantity: Optional[int] = 0
+    rejected_quantity: int | None = 0
+    damaged_quantity: int | None = 0
     unit_cost: float
-    batch_number: Optional[str] = None
-    expiry_date: Optional[datetime] = None
-    storage_location: Optional[str] = None
-    rejection_reason: Optional[str] = None
-    notes: Optional[str] = None
+    batch_number: str | None = None
+    expiry_date: datetime | None = None
+    storage_location: str | None = None
+    rejection_reason: str | None = None
+    notes: str | None = None
+
 
 class GoodsReceiptCreate(BaseModel):
     po_id: int
     supplier_id: int
-    store_id: Optional[int] = None
-    warehouse_id: Optional[int] = None
-    delivery_note_ref: Optional[str] = None
-    notes: Optional[str] = None
-    items: List[GoodsReceiptItemCreate]
+    store_id: int | None = None
+    warehouse_id: int | None = None
+    delivery_note_ref: str | None = None
+    notes: str | None = None
+    items: list[GoodsReceiptItemCreate]
+
 
 class GoodsReceiptItemResponse(BaseModel):
     id: int
@@ -692,35 +767,38 @@ class GoodsReceiptItemResponse(BaseModel):
     rejected_quantity: int
     damaged_quantity: int
     unit_cost: float
-    batch_number: Optional[str] = None
-    expiry_date: Optional[datetime] = None
-    storage_location: Optional[str] = None
-    rejection_reason: Optional[str] = None
-    notes: Optional[str] = None
+    batch_number: str | None = None
+    expiry_date: datetime | None = None
+    storage_location: str | None = None
+    rejection_reason: str | None = None
+    notes: str | None = None
     model_config = ConfigDict(from_attributes=True)
+
 
 class GoodsReceiptResponse(BaseModel):
     id: int
     grn_code: str
     po_id: int
     supplier_id: int
-    store_id: Optional[int] = None
-    warehouse_id: Optional[int] = None
-    received_by_staff_id: Optional[int] = None
-    verified_by_manager_id: Optional[int] = None
+    store_id: int | None = None
+    warehouse_id: int | None = None
+    received_by_staff_id: int | None = None
+    verified_by_manager_id: int | None = None
     status: str
-    delivery_note_ref: Optional[str] = None
-    notes: Optional[str] = None
+    delivery_note_ref: str | None = None
+    notes: str | None = None
     created_at: datetime
-    verified_at: Optional[datetime] = None
-    items: List[GoodsReceiptItemResponse] = []
+    verified_at: datetime | None = None
+    items: list[GoodsReceiptItemResponse] = []
     model_config = ConfigDict(from_attributes=True)
+
 
 class SupplierReturnCreate(BaseModel):
     grn_id: int
     supplier_id: int
     reason: str
-    items: List[dict] # list of {grn_item_id, product_id, returned_quantity, return_reason}
+    items: list[dict]  # list of {grn_item_id, product_id, returned_quantity, return_reason}
+
 
 class SupplierReturnResponse(BaseModel):
     id: int
@@ -728,9 +806,10 @@ class SupplierReturnResponse(BaseModel):
     grn_id: int
     supplier_id: int
     status: str
-    reason: Optional[str] = None
+    reason: str | None = None
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)
+
 
 class ThreeWayMatchRequest(BaseModel):
     po_id: int
@@ -738,21 +817,24 @@ class ThreeWayMatchRequest(BaseModel):
     billed_quantity: int
     billed_unit_cost: float
 
+
 class ThreeWayMatchResponse(BaseModel):
     invoice_id: int
     po_id: int
-    three_way_match_status: str # MATCHED, MISMATCH_QTY, MISMATCH_COST, MISMATCH_BOTH
-    status: str # MATCHED or PAYMENT_HOLD
-    mismatch_reason: Optional[str] = None
+    three_way_match_status: str  # MATCHED, MISMATCH_QTY, MISMATCH_COST, MISMATCH_BOTH
+    status: str  # MATCHED or PAYMENT_HOLD
+    mismatch_reason: str | None = None
     ordered_qty: int
     accepted_qty: int
     billed_qty: int
     agreed_unit_cost: float
     billed_unit_cost: float
 
+
 # System Settings Schemas
 class SystemSettingUpdate(BaseModel):
     value: str
+
 
 class SystemSettingResponse(BaseModel):
     id: int
@@ -760,68 +842,75 @@ class SystemSettingResponse(BaseModel):
     value: str
     data_type: str
     category: str
-    description: Optional[str] = None
+    description: str | None = None
     updated_at: datetime
     model_config = ConfigDict(from_attributes=True)
+
 
 # Payment Method & Proof of Payment (POP) Schemas
 class PaymentMethodCreate(BaseModel):
     code: str
     name: str
-    type: Optional[str] = "MOBILE_MONEY" # CASH, MOBILE_MONEY, BANK_TRANSFER, CARD
-    merchant_number: Optional[str] = None
-    merchant_name: Optional[str] = None
-    markup_percentage: Optional[float] = 0.0
-    instructions: Optional[str] = None
-    requires_pop: Optional[bool] = True
+    type: str | None = "MOBILE_MONEY"  # CASH, MOBILE_MONEY, BANK_TRANSFER, CARD
+    merchant_number: str | None = None
+    merchant_name: str | None = None
+    markup_percentage: float | None = 0.0
+    instructions: str | None = None
+    requires_pop: bool | None = True
+
 
 class PaymentMethodResponse(BaseModel):
     id: int
     code: str
     name: str
     type: str
-    merchant_number: Optional[str] = None
-    merchant_name: Optional[str] = None
+    merchant_number: str | None = None
+    merchant_name: str | None = None
     markup_percentage: float
-    instructions: Optional[str] = None
+    instructions: str | None = None
     requires_pop: bool
     is_active: bool
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)
 
+
 class POPSubmitRequest(BaseModel):
     payment_method_id: int
-    sale_id: Optional[int] = None
+    sale_id: int | None = None
     transaction_reference: str
-    pop_file_key: Optional[str] = None
+    pop_file_key: str | None = None
     base_amount: float
 
+
 class POPReviewRequest(BaseModel):
-    rejection_reason: Optional[str] = None
+    rejection_reason: str | None = None
+
 
 class POPVerificationResponse(BaseModel):
     id: int
     pop_code: str
-    sale_id: Optional[int] = None
+    sale_id: int | None = None
     payment_method_id: int
     transaction_reference: str
-    pop_file_key: Optional[str] = None
+    pop_file_key: str | None = None
     base_amount: float
     markup_amount: float
     total_amount_paid: float
     status: str
-    rejection_reason: Optional[str] = None
-    verified_by_user_id: Optional[int] = None
+    rejection_reason: str | None = None
+    verified_by_user_id: int | None = None
     created_at: datetime
-    verified_at: Optional[datetime] = None
+    verified_at: datetime | None = None
     model_config = ConfigDict(from_attributes=True)
+
 
 # Device Trust & Session Security Schemas
 class DeviceRegisterRequest(BaseModel):
-    device_name: str # e.g. "Chrome 128 / Windows 11"
-    fingerprint_raw: str # Raw browser traits string (e.g. UserAgent|Timezone|ScreenRes|Language)
-    ip_address: Optional[str] = None
-    user_agent: Optional[str] = None
+    device_name: str  # e.g. "Chrome 128 / Windows 11"
+    fingerprint_raw: str  # Raw browser traits string (e.g. UserAgent|Timezone|ScreenRes|Language)
+    ip_address: str | None = None
+    user_agent: str | None = None
+
 
 class DeviceResponse(BaseModel):
     id: int
@@ -829,7 +918,7 @@ class DeviceResponse(BaseModel):
     user_id: int
     device_name: str
     fingerprint_hash: str
-    ip_address: Optional[str] = None
+    ip_address: str | None = None
     first_seen: datetime
     last_seen: datetime
     is_trusted: bool
@@ -837,13 +926,14 @@ class DeviceResponse(BaseModel):
     risk_score: float
     model_config = ConfigDict(from_attributes=True)
 
+
 class SessionResponse(BaseModel):
     id: int
     session_id: str
     user_id: int
-    device_id: Optional[int] = None
-    ip_address: Optional[str] = None
-    user_agent: Optional[str] = None
+    device_id: int | None = None
+    ip_address: str | None = None
+    user_agent: str | None = None
     location_summary: str
     created_at: datetime
     last_seen: datetime
@@ -851,28 +941,31 @@ class SessionResponse(BaseModel):
     is_revoked: bool
     model_config = ConfigDict(from_attributes=True)
 
+
 class RiskEvaluationRequest(BaseModel):
     session_id: str
-    action_name: str # e.g. "DELETE_PRODUCT", "APPROVE_LARGE_PO", "CHANGE_PRICE_FLOOR"
+    action_name: str  # e.g. "DELETE_PRODUCT", "APPROVE_LARGE_PO", "CHANGE_PRICE_FLOOR"
     fingerprint_raw: str
-    ip_address: Optional[str] = None
+    ip_address: str | None = None
+
 
 class RiskEvaluationResponse(BaseModel):
     session_id: str
-    risk_score: float # 0.0 to 1.0
-    risk_level: str # LOW, MEDIUM, HIGH, CRITICAL
+    risk_score: float  # 0.0 to 1.0
+    risk_level: str  # LOW, MEDIUM, HIGH, CRITICAL
     is_device_trusted: bool
-    step_up_required: bool # True if action requires MFA/Manager approval
-    reasons: List[str] = []
+    step_up_required: bool  # True if action requires MFA/Manager approval
+    reasons: list[str] = []
     model_config = ConfigDict(from_attributes=True)
+
 
 class InventoryAnomalyResponse(BaseModel):
     id: int
     anomaly_code: str
     product_id: int
-    product_sku: Optional[str] = None
-    product_name: Optional[str] = None
-    warehouse_id: Optional[int] = None
+    product_sku: str | None = None
+    product_name: str | None = None
+    warehouse_id: int | None = None
     opening_stock: int
     received_qty: int
     returns_qty: int
@@ -885,65 +978,72 @@ class InventoryAnomalyResponse(BaseModel):
     risk_score: float
     risk_level: str
     status: str
-    reasons: List[str] = []
+    reasons: list[str] = []
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)
 
+
 class EvidenceTimelineItem(BaseModel):
     timestamp: str
-    event_type: str # SALE, ADJUSTMENT, DEVICE_CHANGE, RECEIVING, ANOMALY_DETECTED
+    event_type: str  # SALE, ADJUSTMENT, DEVICE_CHANGE, RECEIVING, ANOMALY_DETECTED
     actor_name: str
     reference_code: str
     description: str
-    details: Optional[str] = None
+    details: str | None = None
+
 
 class InvestigationCaseResponse(BaseModel):
     id: int
     case_code: str
-    anomaly_id: Optional[int] = None
+    anomaly_id: int | None = None
     product_id: int
-    product_sku: Optional[str] = None
-    product_name: Optional[str] = None
-    warehouse_name: Optional[str] = None
+    product_sku: str | None = None
+    product_name: str | None = None
+    warehouse_name: str | None = None
     expected_stock: int
     actual_stock: int
     variance: int
     risk_score: float
     risk_level: str
     status: str
-    evidence_timeline: List[EvidenceTimelineItem] = []
+    evidence_timeline: list[EvidenceTimelineItem] = []
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)
 
+
 class StockReservationRequest(BaseModel):
     product_id: int
-    warehouse_id: Optional[int] = None
+    warehouse_id: int | None = None
     quantity: int
     duration_minutes: int = 15
+
 
 class StockReservationResponse(BaseModel):
     id: int
     reservation_code: str
     product_id: int
-    product_name: Optional[str] = None
+    product_name: str | None = None
     reserved_quantity: int
     status: str
     created_at: datetime
     expires_at: datetime
     model_config = ConfigDict(from_attributes=True)
 
+
 class ExplainLineageNode(BaseModel):
     label: str
     amount_or_qty: Any
-    operation: str # +, -, =, or summary
-    details: Optional[str] = None
+    operation: str  # +, -, =, or summary
+    details: str | None = None
+
 
 class LineageExplanationResponse(BaseModel):
-    entity_type: str # STOCK, REVENUE, MARGIN
+    entity_type: str  # STOCK, REVENUE, MARGIN
     title: str
     current_value: Any
     equation_formula: str
-    lineage_items: List[ExplainLineageNode] = []
+    lineage_items: list[ExplainLineageNode] = []
+
 
 class BLELocationResponse(BaseModel):
     id: int
@@ -964,50 +1064,55 @@ class BLELocationResponse(BaseModel):
 # DATA INGESTION, STAGING & IMPORT SCHEMAS
 # ==========================================
 
+
 class ImportRecordResponse(BaseModel):
     id: int
     batch_id: str
     row_number: int
     raw_data_json: str
-    normalized_data_json: Optional[str] = None
+    normalized_data_json: str | None = None
     validation_status: str
-    error_message: Optional[str] = None
-    imported_entity_id: Optional[str] = None
+    error_message: str | None = None
+    imported_entity_id: str | None = None
     model_config = ConfigDict(from_attributes=True)
+
 
 class ImportBatchResponse(BaseModel):
     id: int
     batch_id: str
     filename: str
     file_hash: str
-    file_size: Optional[int] = 0
-    uploader_user_id: Optional[int] = None
+    file_size: int | None = 0
+    uploader_user_id: int | None = None
     source_type: str
     entity_type: str
     record_count: int
     valid_count: int
     rejected_count: int
     status: str
-    column_mapping_json: Optional[str] = None
-    storage_path: Optional[str] = None
-    approval_id: Optional[int] = None
+    column_mapping_json: str | None = None
+    storage_path: str | None = None
+    approval_id: int | None = None
     created_at: datetime
-    approved_at: Optional[datetime] = None
-    approved_by_user_id: Optional[int] = None
+    approved_at: datetime | None = None
+    approved_by_user_id: int | None = None
     is_duplicate_warning: bool = False
-    previous_batch_id: Optional[str] = None
+    previous_batch_id: str | None = None
     model_config = ConfigDict(from_attributes=True)
 
+
 class ColumnMappingRequest(BaseModel):
-    entity_type: str # PRODUCTS, EMPLOYEES, CUSTOMERS, SUPPLIERS, OPENING_STOCK, PURCHASES, SALES
-    file_headers: List[str]
-    column_mapping: Dict[str, str] # e.g. {"Employee No": "employee_id", "Employee Name": "full_name"}
+    entity_type: str  # PRODUCTS, EMPLOYEES, CUSTOMERS, SUPPLIERS, OPENING_STOCK, PURCHASES, SALES
+    file_headers: list[str]
+    column_mapping: dict[str, str]  # e.g. {"Employee No": "employee_id", "Employee Name": "full_name"}
+
 
 class ImportStageRequest(BaseModel):
     entity_type: str
     filename: str
     raw_csv_content: str
-    column_mapping: Optional[Dict[str, str]] = None
+    column_mapping: dict[str, str] | None = None
+
 
 class ValidationResultResponse(BaseModel):
     batch_id: str
@@ -1016,42 +1121,48 @@ class ValidationResultResponse(BaseModel):
     rejected_records: int
     status: str
     is_duplicate: bool = False
-    duplicate_warning_message: Optional[str] = None
-    errors: List[Dict[str, Any]] = []
+    duplicate_warning_message: str | None = None
+    errors: list[dict[str, Any]] = []
+
 
 # ==========================================
 # INTEGRATION ACCOUNTS & API KEYS SCHEMAS
 # ==========================================
 
+
 class IntegrationAccountCreate(BaseModel):
     name: str
-    description: Optional[str] = None
-    scopes: List[str] = [] # e.g. ["products:read", "sales:create"]
+    description: str | None = None
+    scopes: list[str] = []  # e.g. ["products:read", "sales:create"]
+
 
 class IntegrationAccountResponse(BaseModel):
     id: int
     account_id: str
     name: str
-    description: Optional[str] = None
+    description: str | None = None
     status: str
-    scopes: List[str] = []
+    scopes: list[str] = []
     created_at: datetime
-    expires_at: Optional[datetime] = None
+    expires_at: datetime | None = None
     model_config = ConfigDict(from_attributes=True)
 
+
 class IntegrationApiKeyCreate(BaseModel):
-    name: str # Key friendly name e.g. "POS Integration Key"
+    name: str  # Key friendly name e.g. "POS Integration Key"
+
 
 class IntegrationApiKeyResponse(BaseModel):
     id: int
     account_id: str
     name: str
     prefix: str
-    plain_text_api_key: Optional[str] = None # Returned only once on key creation
+    plain_text_api_key: str | None = None  # Returned only once on key creation
     created_at: datetime
-    last_used_at: Optional[datetime] = None
-    revoked_at: Optional[datetime] = None
+    last_used_at: datetime | None = None
+    revoked_at: datetime | None = None
     model_config = ConfigDict(from_attributes=True)
+
 
 class IntegrationActivityLogResponse(BaseModel):
     id: int
@@ -1060,64 +1171,68 @@ class IntegrationActivityLogResponse(BaseModel):
     http_method: str
     status_code: int
     ip_address: str
-    error_message: Optional[str] = None
+    error_message: str | None = None
     timestamp: datetime
     model_config = ConfigDict(from_attributes=True)
+
 
 # External Integration Payload Schemas (Strict Validation for REST API Integration)
 class ExternalProductCreate(BaseModel):
     sku: str
     name: str
-    category_name: Optional[str] = "General"
-    supplier_name: Optional[str] = None
+    category_name: str | None = "General"
+    supplier_name: str | None = None
     purchase_price: float
     selling_price: float
     reorder_level: int = 10
     unit: str = "Units"
-    barcode: Optional[str] = None
+    barcode: str | None = None
+
 
 class ExternalEmployeeCreate(BaseModel):
     employee_code: str
     first_name: str
     last_name: str
     email: str
-    job_title: Optional[str] = "CASHIER"
-    department: Optional[str] = "Sales"
-    phone: Optional[str] = None
+    job_title: str | None = "CASHIER"
+    department: str | None = "Sales"
+    phone: str | None = None
+
 
 class ExternalCustomerCreate(BaseModel):
     name: str
-    email: Optional[str] = None
-    phone: Optional[str] = None
+    email: str | None = None
+    phone: str | None = None
+
 
 class ExternalSupplierCreate(BaseModel):
     name: str
-    contact_person: Optional[str] = None
-    email: Optional[str] = None
-    phone: Optional[str] = None
-    address: Optional[str] = None
+    contact_person: str | None = None
+    email: str | None = None
+    phone: str | None = None
+    address: str | None = None
+
 
 class ExternalSaleItemCreate(BaseModel):
     sku: str
     quantity: int
     unit_price: float
 
+
 class ExternalSaleCreate(BaseModel):
     external_invoice_ref: str
-    customer_name: Optional[str] = "Walk-in Customer"
+    customer_name: str | None = "Walk-in Customer"
     payment_method: str = "CASH"
-    items: List[ExternalSaleItemCreate]
+    items: list[ExternalSaleItemCreate]
+
 
 class ExternalPurchaseItemCreate(BaseModel):
     sku: str
     quantity: int
     unit_cost: float
 
+
 class ExternalPurchaseCreate(BaseModel):
     external_po_ref: str
     supplier_name: str
-    items: List[ExternalPurchaseItemCreate]
-
-
-
-
+    items: list[ExternalPurchaseItemCreate]

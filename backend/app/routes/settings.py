@@ -1,10 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from typing import List, Optional
+
 from app.database import get_db
-from app.schemas import SystemSettingUpdate, SystemSettingResponse
+from app.dependencies import UserContext, get_current_user, require_permission
+from app.schemas import SystemSettingResponse, SystemSettingUpdate
 from app.services import settings_service
-from app.dependencies import require_permission, get_current_user, UserContext
 
 router = APIRouter(prefix="/api/settings", tags=["Dynamic System & Business Settings"])
 
@@ -29,9 +29,9 @@ def get_it_admin_contact(db: Session = Depends(get_db)):
     }
 
 
-@router.get("", response_model=List[SystemSettingResponse])
+@router.get("", response_model=list[SystemSettingResponse])
 def get_system_settings(
-    category: Optional[str] = None,
+    category: str | None = None,
     db: Session = Depends(get_db),
     current_user: UserContext = Depends(get_current_user),
 ):

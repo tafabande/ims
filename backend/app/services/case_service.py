@@ -17,8 +17,9 @@ Rules:
 3. Keep business objects separate; Case references entity_type and entity_id.
 """
 
-from datetime import datetime, timezone
-from typing import List, Dict, Any, Optional
+from datetime import UTC, datetime
+from typing import Any
+
 
 class UnifiedCaseService:
     def __init__(self):
@@ -41,14 +42,30 @@ class UnifiedCaseService:
                     "receipt_id": "SAL-00182",
                     "original_sale_amount": 340.00,
                     "item_name": "Dell XPS 15 Workstation Laptop",
-                    "evidence_files": ["Receipt_SAL00182.pdf", "Photo_DamagedBox.jpg"]
+                    "evidence_files": ["Receipt_SAL00182.pdf", "Photo_DamagedBox.jpg"],
                 },
                 "created_at": "2026-08-26T10:42:00Z",
                 "updated_at": "2026-08-26T10:42:00Z",
                 "events": [
-                    { "id": 101, "event_type": "CREATED", "performed_by": "Tendai M. (EMP-00014)", "old_status": None, "new_status": "DRAFT", "comment": "Refund request draft created", "created_at": "2026-08-26T10:42:00Z" },
-                    { "id": 102, "event_type": "SUBMITTED", "performed_by": "Tendai M. (EMP-00014)", "old_status": "DRAFT", "new_status": "PENDING_REVIEW", "comment": "Submitted for Store Manager approval", "created_at": "2026-08-26T10:43:00Z" }
-                ]
+                    {
+                        "id": 101,
+                        "event_type": "CREATED",
+                        "performed_by": "Tendai M. (EMP-00014)",
+                        "old_status": None,
+                        "new_status": "DRAFT",
+                        "comment": "Refund request draft created",
+                        "created_at": "2026-08-26T10:42:00Z",
+                    },
+                    {
+                        "id": 102,
+                        "event_type": "SUBMITTED",
+                        "performed_by": "Tendai M. (EMP-00014)",
+                        "old_status": "DRAFT",
+                        "new_status": "PENDING_REVIEW",
+                        "comment": "Submitted for Store Manager approval",
+                        "created_at": "2026-08-26T10:43:00Z",
+                    },
+                ],
             },
             {
                 "id": 2,
@@ -69,13 +86,21 @@ class UnifiedCaseService:
                     "ordered_qty": 100,
                     "accepted_qty": 96,
                     "rejected_qty": 2,
-                    "missing_qty": 2
+                    "missing_qty": 2,
                 },
                 "created_at": "2026-08-26T09:15:00Z",
                 "updated_at": "2026-08-26T09:15:00Z",
                 "events": [
-                    { "id": 103, "event_type": "SUBMITTED", "performed_by": "Farai W. (EMP-00031)", "old_status": None, "new_status": "PENDING_REVIEW", "comment": "Discrepancy calculated upon receiving count", "created_at": "2026-08-26T09:15:00Z" }
-                ]
+                    {
+                        "id": 103,
+                        "event_type": "SUBMITTED",
+                        "performed_by": "Farai W. (EMP-00031)",
+                        "old_status": None,
+                        "new_status": "PENDING_REVIEW",
+                        "comment": "Discrepancy calculated upon receiving count",
+                        "created_at": "2026-08-26T09:15:00Z",
+                    }
+                ],
             },
             {
                 "id": 3,
@@ -95,13 +120,21 @@ class UnifiedCaseService:
                     "expected_cash": 200.00,
                     "actual_cash": 187.00,
                     "variance": -13.00,
-                    "staff_reason": "Incorrect opening change float provided at shift start."
+                    "staff_reason": "Incorrect opening change float provided at shift start.",
                 },
                 "created_at": "2026-08-26T08:30:00Z",
                 "updated_at": "2026-08-26T08:30:00Z",
                 "events": [
-                    { "id": 104, "event_type": "SUBMITTED", "performed_by": "Tendai M. (EMP-00014)", "old_status": None, "new_status": "PENDING_REVIEW", "comment": "Shift close float variance submitted", "created_at": "2026-08-26T08:30:00Z" }
-                ]
+                    {
+                        "id": 104,
+                        "event_type": "SUBMITTED",
+                        "performed_by": "Tendai M. (EMP-00014)",
+                        "old_status": None,
+                        "new_status": "PENDING_REVIEW",
+                        "comment": "Shift close float variance submitted",
+                        "created_at": "2026-08-26T08:30:00Z",
+                    }
+                ],
             },
             {
                 "id": 4,
@@ -119,18 +152,34 @@ class UnifiedCaseService:
                 "evidence_metadata": {
                     "transaction_id": "TXN-902184",
                     "error_code": "DB_TIMEOUT_LOCK",
-                    "affected_sku": "SKU-000482"
+                    "affected_sku": "SKU-000482",
                 },
                 "created_at": "2026-08-26T07:10:00Z",
                 "updated_at": "2026-08-26T07:10:00Z",
                 "events": [
-                    { "id": 105, "event_type": "SUBMITTED", "performed_by": "Charlie Staff", "old_status": None, "new_status": "PENDING_REVIEW", "comment": "Incident reported from front-desk POS", "created_at": "2026-08-26T07:10:00Z" },
-                    { "id": 106, "event_type": "ESCALATED", "performed_by": "Bob Manager", "old_status": "PENDING_REVIEW", "new_status": "UNDER_INVESTIGATION", "comment": "Escalated to IT Sysadmin for database ledger audit", "created_at": "2026-08-26T07:30:00Z" }
-                ]
-            }
+                    {
+                        "id": 105,
+                        "event_type": "SUBMITTED",
+                        "performed_by": "Charlie Staff",
+                        "old_status": None,
+                        "new_status": "PENDING_REVIEW",
+                        "comment": "Incident reported from front-desk POS",
+                        "created_at": "2026-08-26T07:10:00Z",
+                    },
+                    {
+                        "id": 106,
+                        "event_type": "ESCALATED",
+                        "performed_by": "Bob Manager",
+                        "old_status": "PENDING_REVIEW",
+                        "new_status": "UNDER_INVESTIGATION",
+                        "comment": "Escalated to IT Sysadmin for database ledger audit",
+                        "created_at": "2026-08-26T07:30:00Z",
+                    },
+                ],
+            },
         ]
 
-    def create_case(self, data: Dict[str, Any]) -> Dict[str, Any]:
+    def create_case(self, data: dict[str, Any]) -> dict[str, Any]:
         case_id = len(self.cases) + 1
         prefix_map = {
             "REFUND_REQUEST": "REF",
@@ -138,13 +187,13 @@ class UnifiedCaseService:
             "FLOAT_VARIANCE": "FV",
             "STOCK_ADJUSTMENT": "ADJ",
             "SYSTEM_ERROR": "INC",
-            "PRICE_OVERRIDE": "OVR"
+            "PRICE_OVERRIDE": "OVR",
         }
         prefix = prefix_map.get(data.get("case_type"), "CAS")
         case_num = f"{prefix}-2026-{Math_floor_rand(case_id)}"
-        
-        now = datetime.now(timezone.utc).isoformat()
-        
+
+        now = datetime.now(UTC).isoformat()
+
         new_case = {
             "id": case_id,
             "case_number": case_num,
@@ -169,14 +218,14 @@ class UnifiedCaseService:
                     "old_status": "DRAFT",
                     "new_status": "PENDING_REVIEW",
                     "comment": data.get("submission_comment", "Case submitted for review"),
-                    "created_at": now
+                    "created_at": now,
                 }
-            ]
+            ],
         }
         self.cases.insert(0, new_case)
         return new_case
 
-    def list_cases(self, status_filter: Optional[str] = None, type_filter: Optional[str] = None) -> List[Dict[str, Any]]:
+    def list_cases(self, status_filter: str | None = None, type_filter: str | None = None) -> list[dict[str, Any]]:
         result = self.cases
         if status_filter:
             result = [c for c in result if c["status"] == status_filter.upper()]
@@ -184,25 +233,35 @@ class UnifiedCaseService:
             result = [c for c in result if c["case_type"] == type_filter.upper()]
         return result
 
-    def get_case_by_number(self, case_number: str) -> Optional[Dict[str, Any]]:
+    def get_case_by_number(self, case_number: str) -> dict[str, Any] | None:
         for c in self.cases:
             if c["case_number"] == case_number or str(c["id"]) == case_number:
                 return c
         return None
 
-    def execute_decision(self, case_number: str, decision: str, reviewer: str, comment: str) -> Dict[str, Any]:
+    def execute_decision(self, case_number: str, decision: str, reviewer: str, comment: str) -> dict[str, Any]:
         case = self.get_case_by_number(case_number)
         if not case:
             return {"status": "ERROR", "message": f"Case {case_number} not found."}
 
         old_status = case["status"]
-        valid_decisions = ["APPROVED", "DENIED", "CONTESTED", "RETURNED", "ESCALATED", "EXECUTED"]
+        valid_decisions = [
+            "APPROVED",
+            "DENIED",
+            "CONTESTED",
+            "RETURNED",
+            "ESCALATED",
+            "EXECUTED",
+        ]
         decision_upper = decision.upper()
 
         if decision_upper not in valid_decisions:
-            return {"status": "ERROR", "message": f"Invalid decision '{decision}'. Must be one of {valid_decisions}."}
+            return {
+                "status": "ERROR",
+                "message": f"Invalid decision '{decision}'. Must be one of {valid_decisions}.",
+            }
 
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         new_status = decision_upper if decision_upper != "APPROVED" else "APPROVED"
 
         # Update case
@@ -220,7 +279,7 @@ class UnifiedCaseService:
             "old_status": old_status,
             "new_status": new_status,
             "comment": comment,
-            "created_at": now
+            "created_at": now,
         }
         case["events"].append(event_entry)
 
@@ -232,14 +291,18 @@ class UnifiedCaseService:
             "reviewer": reviewer,
             "comment": comment,
             "executed_at": now,
-            "message": f"Decision '{decision_upper}' recorded in immutable timeline for case {case['case_number']}."
+            "message": f"Decision '{decision_upper}' recorded in immutable timeline for case {case['case_number']}.",
         }
+
 
 def Math_floor_rand(id_num):
     return f"{1000 + id_num:04d}"
 
+
 def Date_now_id():
     import time
+
     return int(time.time() * 1000)
+
 
 case_service = UnifiedCaseService()

@@ -1,14 +1,17 @@
-import pytest
 import uuid
+
 from fastapi.testclient import TestClient
+
+from app.database import Base, SessionLocal, engine
 from app.main import app
-from app.database import Base, engine, SessionLocal
 from app.models import Category, Product
 
 client = TestClient(app)
 
+
 def setup_module(module):
     Base.metadata.create_all(bind=engine)
+
 
 def test_dynamic_system_settings_evaluation():
     """
@@ -21,14 +24,11 @@ def test_dynamic_system_settings_evaluation():
     client.put(
         "/api/settings/sales.max_staff_discount",
         json={"value": "2.0"},
-        headers={"X-User-Role": "MANAGER"}
+        headers={"X-User-Role": "MANAGER"},
     )
 
     # 1. Fetch system settings
-    get_res = client.get(
-        "/api/settings",
-        headers={"X-User-Role": "STAFF"}
-    )
+    get_res = client.get("/api/settings", headers={"X-User-Role": "STAFF"})
     assert get_res.status_code == 200
     settings = get_res.json()
     assert len(settings) >= 5
@@ -51,7 +51,7 @@ def test_dynamic_system_settings_evaluation():
         category_id=cat.id,
         purchase_price=80.0,
         selling_price=100.0,
-        stock_quantity=50
+        stock_quantity=50,
     )
     db.add(prod)
     db.commit()
@@ -61,12 +61,8 @@ def test_dynamic_system_settings_evaluation():
     # Staff attempting 5% discount ($95 offered price) when limit is 2.0% -> Requires Approval
     neg_initial_res = client.post(
         "/api/pricing/check-negotiation",
-        json={
-            "product_id": prod_id,
-            "offered_price": 95.0,
-            "user_role": "STAFF"
-        },
-        headers={"X-User-Role": "STAFF"}
+        json={"product_id": prod_id, "offered_price": 95.0, "user_role": "STAFF"},
+        headers={"X-User-Role": "STAFF"},
     )
     assert neg_initial_res.status_code == 200
     assert neg_initial_res.json()["requires_approval"] is True
@@ -75,7 +71,7 @@ def test_dynamic_system_settings_evaluation():
     update_res = client.put(
         "/api/settings/sales.max_staff_discount",
         json={"value": "10.0"},
-        headers={"X-User-Role": "MANAGER"}
+        headers={"X-User-Role": "MANAGER"},
     )
     assert update_res.status_code == 200
     assert update_res.json()["value"] == "10.0"
@@ -83,12 +79,8 @@ def test_dynamic_system_settings_evaluation():
     # 4. Re-check negotiation: Staff attempting 5% discount ($95 offered price) is NOW ALLOWED!
     neg_updated_res = client.post(
         "/api/pricing/check-negotiation",
-        json={
-            "product_id": prod_id,
-            "offered_price": 95.0,
-            "user_role": "STAFF"
-        },
-        headers={"X-User-Role": "STAFF"}
+        json={"product_id": prod_id, "offered_price": 95.0, "user_role": "STAFF"},
+        headers={"X-User-Role": "STAFF"},
     )
     assert neg_updated_res.status_code == 200
     assert neg_updated_res.json()["requires_approval"] is False

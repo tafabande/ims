@@ -1,18 +1,53 @@
 import os
-from fastapi import FastAPI, HTTPException, Request, Depends
+from datetime import UTC, datetime
+
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
-from sqlalchemy.orm import Session
 from sqlalchemy import text
-from datetime import datetime, timezone
-from app.database import get_db, Base, engine
-import app.models # Register all SQLAlchemy models in Base.metadata
-from app.routes import products, inventory, sales, purchases, auth, audit, uploads, users, employees, stores, shifts, returns, transfers, stocktakes, promotions, reservations, setup_wizards, approvals, reconciliation, pricing, procurement, settings, payments, sessions, integrity, import_export, integrations, imports, planning, notifications, registries, cases, work_sessions
+from sqlalchemy.orm import Session
 
-from app.middleware.rate_limiter import DistributedRateLimiterMiddleware
-from app.middleware.security import SecurityHeadersMiddleware
+import app.models  # Register all SQLAlchemy models in Base.metadata
+from app.database import Base, engine, get_db
 from app.middleware.idempotency import IdempotencyMiddleware
+from app.middleware.rate_limiter import DistributedRateLimiterMiddleware
 from app.middleware.request_correlation import RequestCorrelationMiddleware
+from app.middleware.security import SecurityHeadersMiddleware
+from app.routes import (
+    approvals,
+    audit,
+    auth,
+    cases,
+    employees,
+    import_export,
+    imports,
+    integrations,
+    integrity,
+    inventory,
+    notifications,
+    payments,
+    planning,
+    pricing,
+    procurement,
+    products,
+    promotions,
+    purchases,
+    reconciliation,
+    registries,
+    reservations,
+    returns,
+    sales,
+    sessions,
+    settings,
+    setup_wizards,
+    shifts,
+    stocktakes,
+    stores,
+    transfers,
+    uploads,
+    users,
+    work_sessions,
+)
 from app.services.cache_service import get_cache_stats
 from seed import seed_db
 
@@ -24,6 +59,7 @@ except Exception as e:
 
 from contextlib import asynccontextmanager
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     try:
@@ -32,11 +68,12 @@ async def lifespan(app: FastAPI):
         print(f"Startup database seeding notice: {e}")
     yield
 
+
 app = FastAPI(
     title="IMS Microservices & Gateway API",
     description="Production Microservices API for IMS with Domain Model Architecture, Employee Separation, Hierarchical Categories, RequestID Correlation, Structured JSON Logging & Audit Logging.",
     version="4.0.0",
-    lifespan=lifespan
+    lifespan=lifespan,
 )
 
 # 0. Request Correlation & Observability Middleware (X-Request-ID)
@@ -57,7 +94,7 @@ app.add_middleware(DistributedRateLimiterMiddleware)
 # 4. Environment-Driven Explicit CORS Configuration (No wildcard '*' with credentials)
 raw_cors_origins = os.getenv(
     "CORS_ORIGINS",
-    "http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173,http://127.0.0.1:3000"
+    "http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173,http://127.0.0.1:3000",
 )
 cors_origins = [origin.strip() for origin in raw_cors_origins.split(",") if origin.strip()]
 
@@ -88,7 +125,6 @@ app.include_router(planning.router)
 app.include_router(notifications.router)
 app.include_router(cases.router)
 app.include_router(registries.router)
-
 
 
 app.include_router(stocktakes.router)
@@ -123,15 +159,16 @@ def read_root():
         "persistence": "PostgreSQL Source-of-Truth",
         "cache": "Redis Cache-Aside Layer",
         "security": "WAF -> NGINX -> Redis RateLimiter -> Idempotency -> Explicit CORS -> FastAPI -> PostgreSQL",
-        "docs_url": "/docs"
+        "docs_url": "/docs",
     }
+
 
 @app.get("/health/live")
 def health_live():
     """
     Kubernetes / Docker Liveness Probe: Confirms the process is running and responding.
     """
-    return {"status": "ALIVE", "timestamp": datetime.now(timezone.utc).isoformat()}
+    return {"status": "ALIVE", "timestamp": datetime.now(UTC).isoformat()}
 
 
 @app.get("/health/ready")
@@ -154,6 +191,7 @@ def health_ready(db: Session = Depends(get_db)):
     # Redis check
     try:
         import redis as _redis
+
         redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
         r = _redis.from_url(redis_url, socket_connect_timeout=2)
         r.ping()
@@ -162,11 +200,10 @@ def health_ready(db: Session = Depends(get_db)):
         checks["redis"] = "UNREACHABLE"
         all_ok = False
 
-    status_code = 200 if all_ok else 503
     result = {
         "status": "READY" if all_ok else "NOT_READY",
         "checks": checks,
-        "timestamp": datetime.now(timezone.utc).isoformat()
+        "timestamp": datetime.now(UTC).isoformat(),
     }
 
     if not all_ok:
@@ -185,7 +222,7 @@ def health_check():
         "gateway": "NGINX API Gateway",
         "cors": f"Explicit ({len(cors_origins)} origins configured)",
         "environment": os.getenv("ENVIRONMENT", "development"),
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
     }
 
 
@@ -199,8 +236,8 @@ def health_operational():
     return {
         "status": "OPERATIONAL",
         "note": "SLO/SLI metrics, disaster recovery status, and secrets management evidence "
-                "should be sourced from monitoring infrastructure and CI artifacts, not runtime endpoints.",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "should be sourced from monitoring infrastructure and CI artifacts, not runtime endpoints.",
+        "timestamp": datetime.now(UTC).isoformat(),
     }
 
 
@@ -212,8 +249,8 @@ def release_readiness():
     return {
         "status": "NOT_EVALUATED",
         "message": "Release readiness is determined by CI pipeline results, security scan artifacts, "
-                   "and external gate checks — not by a runtime self-assessment endpoint. "
-                   "See CI workflow outputs for the latest evidence.",
+        "and external gate checks — not by a runtime self-assessment endpoint. "
+        "See CI workflow outputs for the latest evidence.",
     }
 
 
@@ -223,4 +260,3 @@ def cache_statistics():
     Real-time Redis Cache-Aside Hit/Miss ratio telemetry endpoint
     """
     return get_cache_stats()
-

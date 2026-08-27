@@ -1,7 +1,9 @@
 import os
-from sqlmodel import SQLModel, create_engine, Session, select
-from sqlalchemy.orm import sessionmaker, declarative_base
-from sqlalchemy import text
+
+from sqlalchemy import event, text
+from sqlalchemy.engine import Engine
+from sqlalchemy.orm import declarative_base, sessionmaker
+from sqlmodel import create_engine
 
 # Default to SQLite for local development, fallback to PostgreSQL if DATABASE_URL is set
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./ims.db")
@@ -9,8 +11,7 @@ DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./ims.db")
 _ENVIRONMENT = os.getenv("ENVIRONMENT", "development").lower()
 if _ENVIRONMENT == "production" and DATABASE_URL.startswith("sqlite"):
     raise RuntimeError(
-        "FATAL: SQLite is not supported in production. "
-        "Set DATABASE_URL to a PostgreSQL connection string."
+        "FATAL: SQLite is not supported in production. Set DATABASE_URL to a PostgreSQL connection string."
     )
 
 if DATABASE_URL.startswith("sqlite"):
@@ -18,8 +19,6 @@ if DATABASE_URL.startswith("sqlite"):
 else:
     engine = create_engine(DATABASE_URL)
 
-from sqlalchemy import event
-from sqlalchemy.engine import Engine
 
 @event.listens_for(Engine, "connect")
 def set_sqlite_pragma(dbapi_connection, connection_record):
@@ -31,8 +30,10 @@ def set_sqlite_pragma(dbapi_connection, connection_record):
         cursor.execute("PRAGMA busy_timeout=10000;")
         cursor.close()
 
+
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
+
 
 def get_db():
     db = SessionLocal()
@@ -41,7 +42,8 @@ def get_db():
     finally:
         db.close()
 
-def set_session_rls_context(db, location_id: str = None, org_id: str = None):
+
+def set_session_rls_context(db, location_id: str | None = None, org_id: str | None = None):
     """
     Sets PostgreSQL Row-Level Security (RLS) session variables for multi-tenant / multi-warehouse isolation.
     Executed inside an active database transaction session.
@@ -51,6 +53,7 @@ def set_session_rls_context(db, location_id: str = None, org_id: str = None):
             db.execute(text("SET LOCAL app.location_id = :loc"), {"loc": str(location_id)})
         if org_id:
             db.execute(text("SET LOCAL app.org_id = :org"), {"org": str(org_id)})
+
 
 # Auto-migrate missing columns for SQLite local dev
 with engine.connect() as conn:
@@ -67,12 +70,10 @@ with engine.connect() as conn:
         "ALTER TABLE inventory_transactions ADD COLUMN work_session_id INTEGER;",
         "ALTER TABLE inventory_transactions ADD COLUMN work_session_code VARCHAR(50);",
         "ALTER TABLE cases ADD COLUMN work_session_id INTEGER;",
-        "ALTER TABLE cases ADD COLUMN work_session_code VARCHAR(50);"
+        "ALTER TABLE cases ADD COLUMN work_session_code VARCHAR(50);",
     ]:
         try:
             conn.execute(text(stmt))
             conn.commit()
         except Exception:
             pass
-
-

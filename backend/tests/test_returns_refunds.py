@@ -1,12 +1,14 @@
-import pytest
 import uuid
+
 from fastapi.testclient import TestClient
-from app.main import app
-from app.database import engine, get_db
-from app.models import Category, Product, Customer, Sale, SaleItem
 from sqlalchemy.orm import sessionmaker
 
+from app.database import engine, get_db
+from app.main import app
+from app.models import Category, Customer, Product, Sale, SaleItem
+
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
 
 def override_get_db():
     try:
@@ -15,8 +17,10 @@ def override_get_db():
     finally:
         db.close()
 
+
 app.dependency_overrides[get_db] = override_get_db
 client = TestClient(app)
+
 
 def test_pos_return_restock_and_damage_writeoff():
     db = TestingSessionLocal()
@@ -32,7 +36,7 @@ def test_pos_return_restock_and_damage_writeoff():
         category_id=cat.id,
         purchase_price=30.0,
         selling_price=50.0,
-        stock_quantity=20
+        stock_quantity=20,
     )
     db.add(prod)
     db.commit()
@@ -41,7 +45,7 @@ def test_pos_return_restock_and_damage_writeoff():
         invoice_number=f"INV-TEST-{uuid.uuid4().hex[:4]}",
         customer_id=cust.id,
         total_amount=100.0,
-        payment_status="PAID"
+        payment_status="PAID",
     )
     db.add(sale)
     db.commit()
@@ -54,16 +58,29 @@ def test_pos_return_restock_and_damage_writeoff():
     db.close()
 
     # Process Return Order: 1 Restockable item + 1 Damaged item
-    res = client.post("/api/returns", json={
-        "sale_id": sale_id,
-        "reason_category": "DEFECTIVE",
-        "is_damaged": True,
-        "restock_approved": True,
-        "items": [
-            {"product_id": prod_id, "quantity": 1, "refund_unit_price": 50.0, "restockable": True},
-            {"product_id": prod_id, "quantity": 1, "refund_unit_price": 50.0, "restockable": False}
-        ]
-    })
+    res = client.post(
+        "/api/returns",
+        json={
+            "sale_id": sale_id,
+            "reason_category": "DEFECTIVE",
+            "is_damaged": True,
+            "restock_approved": True,
+            "items": [
+                {
+                    "product_id": prod_id,
+                    "quantity": 1,
+                    "refund_unit_price": 50.0,
+                    "restockable": True,
+                },
+                {
+                    "product_id": prod_id,
+                    "quantity": 1,
+                    "refund_unit_price": 50.0,
+                    "restockable": False,
+                },
+            ],
+        },
+    )
     assert res.status_code == 201
     ret_order = res.json()
     assert ret_order["total_refund_amount"] == 100.0

@@ -1,28 +1,35 @@
-import secrets
 import json
-from datetime import datetime, timezone
-from typing import List, Optional, Dict, Any, Tuple
-from sqlalchemy.orm import Session
-from fastapi import HTTPException, Security, Depends, status
-from fastapi.security.api_key import APIKeyHeader
+import secrets
+from datetime import UTC, datetime
+from typing import Any
 
-from app.models import IntegrationAccount, IntegrationApiKey, IntegrationActivityLog, Product, Category, Employee, Customer, Supplier, Sale, SaleItem, Purchase, PurchaseItem
+from fastapi import Depends, HTTPException, status
+from fastapi.security.api_key import APIKeyHeader
+from sqlalchemy.orm import Session
+
 from app.database import get_db
+from app.models import (
+    Category,
+    Employee,
+    IntegrationAccount,
+    IntegrationActivityLog,
+    IntegrationApiKey,
+    Product,
+)
 from app.services.iam_service import hash_password, verify_password
 
 API_KEY_HEADER = APIKeyHeader(name="X-API-Key", auto_error=False)
 
 
 def generate_integration_account(
-    db: Session,
-    name: str,
-    description: Optional[str] = None,
-    scopes: List[str] = []
-) -> Tuple[IntegrationAccount, str]:
+    db: Session, name: str, description: str | None = None, scopes: list[str] | None = None
+) -> tuple[IntegrationAccount, str]:
     """
     Creates an IntegrationAccount (e.g. INT-2026-00012) and generates a secret API Key.
     Returns (account, plain_text_secret_key). The key is shown ONLY ONCE.
     """
+    if scopes is None:
+        scopes = []
     account_id = f"INT-2026-{secrets.token_hex(4).upper()}"
     raw_secret = f"ims_live_{secrets.token_urlsafe(32)}"
     key_hash = hash_password(raw_secret)
@@ -34,7 +41,7 @@ def generate_integration_account(
         description=description,
         status="ACTIVE",
         scopes_json=json.dumps(scopes),
-        created_at=datetime.now(timezone.utc)
+        created_at=datetime.now(UTC),
     )
     db.add(account)
     db.flush()
@@ -44,7 +51,7 @@ def generate_integration_account(
         api_key_hash=key_hash,
         prefix=prefix,
         name=f"Primary API Key for {name}",
-        created_at=datetime.now(timezone.utc)
+        created_at=datetime.now(UTC),
     )
     db.add(key_record)
 
@@ -54,7 +61,9 @@ def generate_integration_account(
     return account, raw_secret
 
 
-def create_integration_account(db: Session, name: str, scopes: List[str] = []) -> IntegrationAccount:
+def create_integration_account(db: Session, name: str, scopes: list[str] | None = None) -> IntegrationAccount:
+    if scopes is None:
+        scopes = []
     account, _ = generate_integration_account(db, name=name, scopes=scopes)
     return account
 
@@ -73,7 +82,7 @@ def generate_api_key_for_account(db: Session, account_id: str, key_name: str):
         api_key_hash=key_hash,
         prefix=prefix,
         name=key_name,
-        created_at=datetime.now(timezone.utc)
+        created_at=datetime.now(UTC),
     )
     db.add(key_record)
     db.commit()
@@ -81,21 +90,22 @@ def generate_api_key_for_account(db: Session, account_id: str, key_name: str):
     return key_record, raw_secret
 
 
-def verify_integration_api_key(db: Session, api_key: str, required_scope: Optional[str] = None):
+def verify_integration_api_key(db: Session, api_key: str, required_scope: str | None = None):
     """
     Authenticates an incoming X-API-Key header against active IntegrationAccount records.
     """
     if not api_key:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Missing 'X-API-Key' authentication header for system integration."
+            detail="Missing 'X-API-Key' authentication header for system integration.",
         )
 
     prefix = api_key[:12]
-    candidate_keys = db.query(IntegrationApiKey).filter(
-        IntegrationApiKey.prefix == prefix,
-        IntegrationApiKey.revoked_at == None
-    ).all()
+    candidate_keys = (
+        db.query(IntegrationApiKey)
+        .filter(IntegrationApiKey.prefix == prefix, IntegrationApiKey.revoked_at.is_(None))
+        .all()
+    )
 
     matched_key = None
     for k in candidate_keys:
@@ -106,18 +116,22 @@ def verify_integration_api_key(db: Session, api_key: str, required_scope: Option
     if not matched_key:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or revoked Integration API Key."
+            detail="Invalid or revoked Integration API Key.",
         )
 
-    account = db.query(IntegrationAccount).filter(
-        IntegrationAccount.account_id == matched_key.account_id,
-        IntegrationAccount.status == "ACTIVE"
-    ).first()
+    account = (
+        db.query(IntegrationAccount)
+        .filter(
+            IntegrationAccount.account_id == matched_key.account_id,
+            IntegrationAccount.status == "ACTIVE",
+        )
+        .first()
+    )
 
     if not account:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Integration account is suspended or revoked."
+            detail="Integration account is suspended or revoked.",
         )
 
     if required_scope:
@@ -128,28 +142,27 @@ def verify_integration_api_key(db: Session, api_key: str, required_scope: Option
         if required_scope not in scopes and "*" not in scopes:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Integration Account '{account.account_id}' lacks required scope '{required_scope}'."
+                detail=f"Integration Account '{account.account_id}' lacks required scope '{required_scope}'.",
             )
 
-    matched_key.last_used_at = datetime.now(timezone.utc)
+    matched_key.last_used_at = datetime.now(UTC)
     db.commit()
 
     return account
 
 
-
 def require_integration_scope(required_scope: str):
     def scope_checker(
-        api_key: Optional[str] = Depends(API_KEY_HEADER),
-        db: Session = Depends(get_db)
+        api_key: str | None = Depends(API_KEY_HEADER), db: Session = Depends(get_db)
     ) -> IntegrationAccount:
         if not api_key:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Missing 'X-API-Key' header."
+                detail="Missing 'X-API-Key' header.",
             )
         account, _ = verify_integration_api_key(db, api_key, required_scope)
         return account
+
     return scope_checker
 
 
@@ -160,7 +173,7 @@ def log_integration_activity(
     method: str,
     status_code: int,
     ip_address: str = "127.0.0.1",
-    error_message: Optional[str] = None
+    error_message: str | None = None,
 ):
     """Logs integration access and errors for security audit trail."""
     log = IntegrationActivityLog(
@@ -170,18 +183,18 @@ def log_integration_activity(
         status_code=status_code,
         ip_address=ip_address,
         error_message=error_message,
-        timestamp=datetime.now(timezone.utc)
+        timestamp=datetime.now(UTC),
     )
     db.add(log)
     db.commit()
 
 
 # Domain Handlers for REST API Integration Ingestion
-def ingest_external_product(db: Session, payload: Dict[str, Any], account: IntegrationAccount) -> Product:
+def ingest_external_product(db: Session, payload: dict[str, Any], account: IntegrationAccount) -> Product:
     sku = payload.get("sku", "").strip()
     if not sku:
         raise HTTPException(status_code=400, detail="SKU is required.")
-    
+
     existing = db.query(Product).filter(Product.sku == sku).first()
     if existing:
         existing.name = payload.get("name", existing.name)
@@ -206,7 +219,7 @@ def ingest_external_product(db: Session, payload: Dict[str, Any], account: Integ
         selling_price=float(payload.get("selling_price", 0.0)),
         reorder_level=int(payload.get("reorder_level", 10)),
         unit=payload.get("unit", "Units"),
-        barcode=payload.get("barcode")
+        barcode=payload.get("barcode"),
     )
     db.add(p)
     db.commit()
@@ -214,7 +227,7 @@ def ingest_external_product(db: Session, payload: Dict[str, Any], account: Integ
     return p
 
 
-def ingest_external_employee(db: Session, payload: Dict[str, Any], account: IntegrationAccount) -> Employee:
+def ingest_external_employee(db: Session, payload: dict[str, Any], account: IntegrationAccount) -> Employee:
     code = payload.get("employee_code", "").strip()
     existing = db.query(Employee).filter(Employee.employee_code == code).first()
     if existing:
@@ -227,7 +240,7 @@ def ingest_external_employee(db: Session, payload: Dict[str, Any], account: Inte
         email=payload.get("email"),
         phone=payload.get("phone"),
         position=payload.get("job_title", "CASHIER"),
-        status="ACTIVE"
+        status="ACTIVE",
     )
     db.add(emp)
     db.commit()

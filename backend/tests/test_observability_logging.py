@@ -1,9 +1,10 @@
-import pytest
 from fastapi.testclient import TestClient
-from app.main import app
+
 from app.logger import sanitize_data
+from app.main import app
 
 client = TestClient(app)
+
 
 def test_request_correlation_id_generated_header():
     """
@@ -14,6 +15,7 @@ def test_request_correlation_id_generated_header():
     assert "x-request-id" in response.headers
     assert response.headers["x-request-id"].startswith("req-")
 
+
 def test_request_correlation_id_custom_header_preserved():
     """
     Test that client-supplied X-Request-ID is preserved and propagated back in response header.
@@ -22,6 +24,7 @@ def test_request_correlation_id_custom_header_preserved():
     response = client.get("/", headers={"X-Request-ID": custom_id})
     assert response.status_code == 200
     assert response.headers["x-request-id"] == custom_id
+
 
 def test_sensitive_credential_redaction_sanitizer():
     """
@@ -32,7 +35,7 @@ def test_sensitive_credential_redaction_sanitizer():
         "password": "supersecretpassword123!",
         "hashed_password": "$2b$12$hashvalue",
         "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-        "action": "LOGIN_SUCCESS"
+        "action": "LOGIN_SUCCESS",
     }
 
     cleaned = sanitize_data(payload)

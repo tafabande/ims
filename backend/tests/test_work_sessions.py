@@ -1,31 +1,38 @@
-import pytest
 from fastapi.testclient import TestClient
-from app.main import app
+
 from app.database import SessionLocal
+from app.main import app
 from app.models import WorkSession
 
 client = TestClient(app)
 
+
 def test_work_session_lifecycle_and_float_reconciliation():
     # Pre-clean any leftover active sessions for user_id = 1
     db = SessionLocal()
-    db.query(WorkSession).filter(WorkSession.user_id == 1, WorkSession.status.in_(["ACTIVE", "PAUSED", "OPEN", "CLOSING"])).update({"status": "CLOSED"})
+    db.query(WorkSession).filter(
+        WorkSession.user_id == 1,
+        WorkSession.status.in_(["ACTIVE", "PAUSED", "OPEN", "CLOSING"]),
+    ).update({"status": "CLOSED"})
     db.commit()
     db.close()
 
     # 1. Start Work Session
-    start_resp = client.post("/work-sessions/start", params={
-        "session_type": "SALES",
-        "location_name": "Harare Store #01",
-        "device_id": "POS-03",
-        "opening_float": 500.0,
-        "user_id": 1
-    })
+    start_resp = client.post(
+        "/work-sessions/start",
+        params={
+            "session_type": "SALES",
+            "location_name": "Harare Store #01",
+            "device_id": "POS-03",
+            "opening_float": 500.0,
+            "user_id": 1,
+        },
+    )
     assert start_resp.status_code == 200
     data = start_resp.json()
     assert data["status"] == "SUCCESS"
     session_id = data["session"]["id"]
-    session_code = data["session"]["session_code"]
+    data["session"]["session_code"]
     assert data["session"]["opening_float"] == 500.0
 
     # 2. Pause Session
@@ -40,10 +47,10 @@ def test_work_session_lifecycle_and_float_reconciliation():
 
     # 4. Close Session & Calculate Variance (-$30.00 Shortage)
     # Opening: 500.00, Sales: 0.00, Refunds: 0.00 -> Expected: 500.00. Actual Counted: 470.00 -> Variance: -30.00
-    close_resp = client.post(f"/work-sessions/{session_id}/close", params={
-        "actual_counted_cash": 470.0,
-        "notes": "Cash shortage -$30.00"
-    })
+    close_resp = client.post(
+        f"/work-sessions/{session_id}/close",
+        params={"actual_counted_cash": 470.0, "notes": "Cash shortage -$30.00"},
+    )
     assert close_resp.status_code == 200
     reconciliation = close_resp.json()["reconciliation"]
     assert reconciliation["opening_float"] == 500.0

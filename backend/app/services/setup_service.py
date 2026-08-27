@@ -1,10 +1,14 @@
-import uuid
-from typing import Optional
-from sqlalchemy.orm import Session
 from fastapi import HTTPException
-from app.models import Store, Warehouse, Employee, User
-from app.schemas import StoreWizardRequest, WarehouseWizardRequest, EmployeeWizardRequest
+from sqlalchemy.orm import Session
+
+from app.models import Employee, Store, User, Warehouse
+from app.schemas import (
+    EmployeeWizardRequest,
+    StoreWizardRequest,
+    WarehouseWizardRequest,
+)
 from app.services.iam_service import get_password_hash
+
 
 def create_store_wizard(db: Session, data: StoreWizardRequest) -> Store:
     """
@@ -30,7 +34,7 @@ def create_store_wizard(db: Session, data: StoreWizardRequest) -> Store:
         phone=data.phone,
         manager_id=data.manager_id,
         status="ACTIVE",
-        operating_hours="08:00 - 18:00"
+        operating_hours="08:00 - 18:00",
     )
     db.add(store)
     db.flush()
@@ -43,13 +47,14 @@ def create_store_wizard(db: Session, data: StoreWizardRequest) -> Store:
             name=f"{data.name} Main Warehouse",
             store_id=store.id,
             is_default=True,
-            status="ACTIVE"
+            status="ACTIVE",
         )
         db.add(wh)
 
     db.commit()
     db.refresh(store)
     return store
+
 
 def create_warehouse_wizard(db: Session, data: WarehouseWizardRequest) -> Warehouse:
     """
@@ -68,7 +73,7 @@ def create_warehouse_wizard(db: Session, data: WarehouseWizardRequest) -> Wareho
         name=data.name,
         store_id=data.store_id,
         is_default=False,
-        status="ACTIVE"
+        status="ACTIVE",
     )
     db.add(wh)
     db.commit()
@@ -93,7 +98,7 @@ def create_employee_wizard(db: Session, data: EmployeeWizardRequest) -> Employee
         department_id=data.department_id,
         store_id=data.store_id,
         manager_id=data.manager_id,
-        status="ACTIVE"
+        status="ACTIVE",
     )
     db.add(emp)
     db.flush()
@@ -115,7 +120,7 @@ def create_employee_wizard(db: Session, data: EmployeeWizardRequest) -> Employee
                 hashed_password=hashed_pwd,
                 full_name=f"{data.first_name} {data.last_name}",
                 role=role,
-                active=True
+                active=True,
             )
 
             db.add(user)

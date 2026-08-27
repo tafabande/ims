@@ -1,7 +1,5 @@
-import pytest
-from app.database import SessionLocal, engine, Base
-from app.models import Category, Product, InventoryTransaction
-
+from app.database import SessionLocal
+from app.models import Category, InventoryTransaction, Product
 
 
 def test_ledger_immutability_and_snapshots():
@@ -12,6 +10,7 @@ def test_ledger_immutability_and_snapshots():
     """
     db = SessionLocal()
     import uuid
+
     cat_code = f"CAT-LED-{uuid.uuid4().hex[:6]}"
     cat = Category(name="Ledger Hardware", code=cat_code)
     db.add(cat)
@@ -24,7 +23,7 @@ def test_ledger_immutability_and_snapshots():
         category_id=cat.id,
         purchase_price=500.0,
         selling_price=800.0,
-        stock_quantity=10
+        stock_quantity=10,
     )
 
     db.add(prod)
@@ -40,7 +39,7 @@ def test_ledger_immutability_and_snapshots():
         reason_category="STOCK_COUNT",
         reference="REF-AUDIT-001",
         user_name="AuditOfficer",
-        notes="Initial stock verification audit"
+        notes="Initial stock verification audit",
     )
     db.add(tx)
     db.commit()

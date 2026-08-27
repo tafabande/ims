@@ -1,10 +1,12 @@
 import hashlib
 import uuid
-from datetime import datetime, timedelta, timezone
-from typing import List, Optional, Tuple
+from datetime import UTC, datetime, timedelta
+
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
-from app.models import UserDevice, UserSession, User
+
+from app.models import UserDevice, UserSession
+
 
 def compute_fingerprint_hash(raw_traits: str) -> str:
     """
@@ -13,31 +15,29 @@ def compute_fingerprint_hash(raw_traits: str) -> str:
     """
     return hashlib.sha256(raw_traits.encode("utf-8")).hexdigest()
 
+
 def register_or_get_device(
     db: Session,
     user_id: int,
     device_name: str,
     raw_fingerprint: str,
-    ip_address: Optional[str] = None,
-    user_agent: Optional[str] = None
+    ip_address: str | None = None,
+    user_agent: str | None = None,
 ) -> UserDevice:
     """
     Registers a new device or updates last_seen on existing device fingerprint.
     """
     fp_hash = compute_fingerprint_hash(raw_fingerprint)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     # Check if user already has a device matching this fingerprint
-    device = db.query(UserDevice).filter(
-        UserDevice.user_id == user_id,
-        UserDevice.fingerprint_hash == fp_hash
-    ).first()
+    device = db.query(UserDevice).filter(UserDevice.user_id == user_id, UserDevice.fingerprint_hash == fp_hash).first()
 
     if device:
         if device.is_revoked:
             raise HTTPException(
                 status_code=403,
-                detail="Access denied: This device has been explicitly revoked by security policy."
+                detail="Access denied: This device has been explicitly revoked by security policy.",
             )
         device.last_seen = now
         if ip_address:
@@ -60,26 +60,27 @@ def register_or_get_device(
         is_trusted=True,
         is_revoked=False,
         risk_score=0.0,
-        created_at=now
+        created_at=now,
     )
     db.add(new_device)
     db.commit()
     db.refresh(new_device)
     return new_device
 
+
 def create_user_session(
     db: Session,
     user_id: int,
     device_id: int,
     raw_token: str,
-    ip_address: Optional[str] = None,
-    user_agent: Optional[str] = None,
-    location_summary: str = "Harare Main Hub"
+    ip_address: str | None = None,
+    user_agent: str | None = None,
+    location_summary: str = "Harare Main Hub",
 ) -> UserSession:
     """
     Creates a tracked server-side session linked to a specific user & device.
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     token_hash = hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
     ses_code = f"SES-2026-{uuid.uuid4().hex[:6].upper()}"
     expires_at = now + timedelta(days=7)
@@ -95,20 +96,21 @@ def create_user_session(
         created_at=now,
         last_seen=now,
         expires_at=expires_at,
-        is_revoked=False
+        is_revoked=False,
     )
     db.add(session)
     db.commit()
     db.refresh(session)
     return session
 
+
 def evaluate_session_risk(
     db: Session,
     session_id: str,
     action_name: str,
     raw_fingerprint: str,
-    current_ip: Optional[str] = None
-) -> Tuple[float, str, bool, bool, List[str]]:
+    current_ip: str | None = None,
+) -> tuple[float, str, bool, bool, list[str]]:
     """
     Risk-Based Authentication Engine:
     Evaluates session integrity, device fingerprint match, IP subnet change, and operational sensitivity.
@@ -121,12 +123,12 @@ def evaluate_session_risk(
     if session.is_revoked:
         raise HTTPException(status_code=401, detail="Session has been revoked.")
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     # Convert naive datetimes from DB if needed
     session_expires = session.expires_at
     if session_expires.tzinfo is None:
-        session_expires = session_expires.replace(tzinfo=timezone.utc)
+        session_expires = session_expires.replace(tzinfo=UTC)
 
     if session_expires < now:
         raise HTTPException(status_code=401, detail="Session has expired.")
@@ -159,7 +161,7 @@ def evaluate_session_risk(
         "DELETE_PRODUCT": 0.30,
         "APPROVE_LARGE_PO": 0.25,
         "CHANGE_PRICE_FLOOR": 0.35,
-        "ADJUST_STOCK_LARGE": 0.30
+        "ADJUST_STOCK_LARGE": 0.30,
     }
 
     if action_name in HIGH_RISK_ACTIONS:
@@ -183,17 +185,20 @@ def evaluate_session_risk(
 
     return risk_score, risk_level, is_device_trusted, step_up_required, reasons
 
-def list_active_sessions(db: Session, user_id: Optional[int] = None) -> List[UserSession]:
+
+def list_active_sessions(db: Session, user_id: int | None = None) -> list[UserSession]:
     query = db.query(UserSession).filter(UserSession.is_revoked == False)
     if user_id:
         query = query.filter(UserSession.user_id == user_id)
     return query.order_by(UserSession.last_seen.desc()).all()
 
-def list_user_devices(db: Session, user_id: Optional[int] = None) -> List[UserDevice]:
+
+def list_user_devices(db: Session, user_id: int | None = None) -> list[UserDevice]:
     query = db.query(UserDevice)
     if user_id:
         query = query.filter(UserDevice.user_id == user_id)
     return query.order_by(UserDevice.last_seen.desc()).all()
+
 
 def revoke_session(db: Session, session_id: str, revoker_user_id: int) -> UserSession:
     session = db.query(UserSession).filter(UserSession.session_id == session_id).first()
@@ -201,10 +206,11 @@ def revoke_session(db: Session, session_id: str, revoker_user_id: int) -> UserSe
         raise HTTPException(status_code=404, detail="Session not found.")
 
     session.is_revoked = True
-    session.revoked_at = datetime.now(timezone.utc)
+    session.revoked_at = datetime.now(UTC)
     db.commit()
     db.refresh(session)
     return session
+
 
 def revoke_device(db: Session, device_id: str, revoker_user_id: int) -> UserDevice:
     device = db.query(UserDevice).filter(UserDevice.device_id == device_id).first()
@@ -215,11 +221,10 @@ def revoke_device(db: Session, device_id: str, revoker_user_id: int) -> UserDevi
     device.is_trusted = False
 
     # Revoke all active sessions linked to this device
-    active_sessions = db.query(UserSession).filter(
-        UserSession.device_id == device.id,
-        UserSession.is_revoked == False
-    ).all()
-    now = datetime.now(timezone.utc)
+    active_sessions = (
+        db.query(UserSession).filter(UserSession.device_id == device.id, UserSession.is_revoked == False).all()
+    )
+    now = datetime.now(UTC)
     for s in active_sessions:
         s.is_revoked = True
         s.revoked_at = now

@@ -1,14 +1,16 @@
-import pytest
 import uuid
+
 from fastapi.testclient import TestClient
+
+from app.database import Base, engine
 from app.main import app
-from app.database import Base, engine, SessionLocal
-from app.models import PaymentMethod, POPVerification
 
 client = TestClient(app)
 
+
 def setup_module(module):
     Base.metadata.create_all(bind=engine)
+
 
 def test_payment_methods_and_pop_verification_flow():
     """
@@ -19,10 +21,7 @@ def test_payment_methods_and_pop_verification_flow():
     - Manager verifying POP in queue (PENDING_VERIFICATION -> VERIFIED).
     """
     # 1. Fetch pre-seeded payment methods
-    get_res = client.get(
-        "/api/payments/methods",
-        headers={"X-User-Role": "STAFF"}
-    )
+    get_res = client.get("/api/payments/methods", headers={"X-User-Role": "STAFF"})
     assert get_res.status_code == 200
     methods = get_res.json()
     assert len(methods) >= 4
@@ -43,9 +42,9 @@ def test_payment_methods_and_pop_verification_flow():
             "merchant_name": "Delta Express Store",
             "markup_percentage": 3.0,
             "instructions": "Dial *151*2*2# Enter Merchant Code 89012",
-            "requires_pop": True
+            "requires_pop": True,
         },
-        headers={"X-User-Role": "MANAGER"}
+        headers={"X-User-Role": "MANAGER"},
     )
     assert create_res.status_code == 201
     pm_data = create_res.json()
@@ -59,9 +58,9 @@ def test_payment_methods_and_pop_verification_flow():
             "payment_method_id": pm_id,
             "transaction_reference": tx_ref,
             "base_amount": 100.0,
-            "pop_file_key": f"pop_receipt_{uuid.uuid4().hex[:6]}.pdf"
+            "pop_file_key": f"pop_receipt_{uuid.uuid4().hex[:6]}.pdf",
         },
-        headers={"X-User-Role": "STAFF"}
+        headers={"X-User-Role": "STAFF"},
     )
     assert pop_res.status_code == 201
     pop_data = pop_res.json()
@@ -74,15 +73,12 @@ def test_payment_methods_and_pop_verification_flow():
     # 4. Manager verifies POP in queue -> Status becomes VERIFIED
     queue_res = client.get(
         "/api/payments/verification-queue?status_filter=PENDING_VERIFICATION",
-        headers={"X-User-Role": "MANAGER"}
+        headers={"X-User-Role": "MANAGER"},
     )
     assert queue_res.status_code == 200
     queue = queue_res.json()
     assert any(p["id"] == pop_id for p in queue)
 
-    verify_res = client.post(
-        f"/api/payments/verify/{pop_id}",
-        headers={"X-User-Role": "MANAGER"}
-    )
+    verify_res = client.post(f"/api/payments/verify/{pop_id}", headers={"X-User-Role": "MANAGER"})
     assert verify_res.status_code == 200
     assert verify_res.json()["status"] == "VERIFIED"

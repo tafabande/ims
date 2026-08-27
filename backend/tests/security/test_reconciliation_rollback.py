@@ -1,8 +1,13 @@
 import pytest
-from app.database import SessionLocal, engine, Base
-from app.models import Category, Product
-from app.services.inventory_service import process_stock_adjustment, reconcile_inventory_balance
 from fastapi import HTTPException
+
+from app.database import SessionLocal
+from app.models import Category, Product
+from app.services.inventory_service import (
+    process_stock_adjustment,
+    reconcile_inventory_balance,
+)
+
 
 def test_inventory_reconciliation_chain_validation():
     """
@@ -12,6 +17,7 @@ def test_inventory_reconciliation_chain_validation():
     """
     db = SessionLocal()
     import uuid
+
     cat_code = f"CAT-REC-{uuid.uuid4().hex[:6]}"
     cat = Category(name="Reconcile Hardware", code=cat_code)
     db.add(cat)
@@ -23,7 +29,7 @@ def test_inventory_reconciliation_chain_validation():
         category_id=cat.id,
         purchase_price=100.0,
         selling_price=150.0,
-        stock_quantity=20
+        stock_quantity=20,
     )
     db.add(prod)
     db.commit()
@@ -37,7 +43,7 @@ def test_inventory_reconciliation_chain_validation():
         tx_type="PURCHASE",
         reference=f"PO-REC-{uuid.uuid4().hex[:4]}",
         user_name="StockClerk",
-        notes="Inbound stock receipt"
+        notes="Inbound stock receipt",
     )
     db.commit()
 
@@ -49,7 +55,7 @@ def test_inventory_reconciliation_chain_validation():
         tx_type="SALE",
         reference=f"INV-REC-{uuid.uuid4().hex[:4]}",
         user_name="POSOperator",
-        notes="Counter sale"
+        notes="Counter sale",
     )
     db.commit()
 
@@ -62,6 +68,7 @@ def test_inventory_reconciliation_chain_validation():
     assert report["current_stock"] == 25
     db.close()
 
+
 def test_transaction_rollback_on_handled_error():
     """
     Transactional Integrity Test:
@@ -70,6 +77,7 @@ def test_transaction_rollback_on_handled_error():
     """
     db = SessionLocal()
     import uuid
+
     cat_code = f"CAT-ROL-{uuid.uuid4().hex[:6]}"
     cat = Category(name="Rollback Tech", code=cat_code)
     db.add(cat)
@@ -81,7 +89,7 @@ def test_transaction_rollback_on_handled_error():
         category_id=cat.id,
         purchase_price=200.0,
         selling_price=300.0,
-        stock_quantity=10
+        stock_quantity=10,
     )
 
     db.add(prod)
@@ -97,7 +105,7 @@ def test_transaction_rollback_on_handled_error():
             tx_type="SALE",
             reference="INV-FAIL-01",
             user_name="Tester",
-            notes="Invalid stock deduction"
+            notes="Invalid stock deduction",
         )
 
     assert exc_info.value.status_code == 400
