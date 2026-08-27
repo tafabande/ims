@@ -5,10 +5,12 @@ from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 
+# Attempt to connect to Redis with bounded connection timeout
 try:
     import redis
     redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
-    redis_client = redis.Redis.from_url(redis_url, decode_responses=True)
+    redis_client = redis.Redis.from_url(redis_url, decode_responses=True, socket_connect_timeout=0.2, socket_timeout=0.2)
+    redis_client.ping()
 except Exception:
     redis_client = None
 
@@ -61,25 +63,33 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
         # Cache successful response for 24 hours
         if 200 <= response.status_code < 300:
             try:
-                # Read response body stream
-                response_body = [section async for section in response.body_iterator]
-                response.body_iterator = iterate_in_threadpool(response_body)
-                body_bytes = b"".join(response_body)
-                
+                body_bytes = b""
+                if hasattr(response, "body") and response.body:
+                    body_bytes = response.body
+                elif hasattr(response, "body_iterator"):
+                    iterator = response.body_iterator
+                    if hasattr(iterator, "__aiter__"):
+                        async for chunk in iterator:
+                            body_bytes += chunk if isinstance(chunk, bytes) else str(chunk).encode()
+                    else:
+                        for chunk in iterator:
+                            body_bytes += chunk if isinstance(chunk, bytes) else str(chunk).encode()
+
                 try:
-                    payload = json.loads(body_bytes.decode())
-                    cache_payload = {
-                        "status_code": response.status_code,
-                        "content": payload
-                    }
-                    if redis_client:
-                        try:
-                            redis_client.set(cache_key, json.dumps(cache_payload), ex=IDEMPOTENCY_TTL_SECONDS)
-                        except Exception:
-                            pass
-                    MEMORY_IDEMPOTENCY_STORE[cache_key] = cache_payload
+                    payload = json.loads(body_bytes.decode("utf-8"))
                 except Exception:
-                    pass
+                    payload = body_bytes.decode("utf-8", errors="replace")
+
+                cache_payload = {
+                    "status_code": response.status_code,
+                    "content": payload
+                }
+                if redis_client:
+                    try:
+                        redis_client.set(cache_key, json.dumps(cache_payload), ex=IDEMPOTENCY_TTL_SECONDS)
+                    except Exception:
+                        pass
+                MEMORY_IDEMPOTENCY_STORE[cache_key] = cache_payload
 
                 return Response(
                     content=body_bytes,

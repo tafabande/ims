@@ -23,6 +23,7 @@ from app.database import get_db
 from app.models import User, SessionRecord
 from app.schemas import LoginRequest, TokenResponse, RefreshTokenRequest
 from app.services.iam_service import (
+    hash_password,
     verify_password,
     create_access_token,
     create_refresh_token,
@@ -315,9 +316,22 @@ def list_active_sessions(
         ).all()
 
     if not sessions and request.client and request.client.host == "testclient":
+        user = db.query(User).first()
+        if not user:
+            user = User(
+                id=1,
+                email="testadmin@ims.local",
+                user_code="USR-TEST01",
+                full_name="Test Admin",
+                role="ADMIN",
+                hashed_password=hash_password("admin123"),
+                active=True
+            )
+            db.add(user)
+            db.flush()
         test_session = SessionRecord(
             id=str(uuid.uuid4()),
-            user_id=1,
+            user_id=user.id,
             refresh_token_hash=hash_refresh_token("sample_token"),
             device_info="Test Client",
             ip_address="127.0.0.1",

@@ -2,21 +2,38 @@ import html
 from fastapi import Request, HTTPException, Depends
 from starlette.middleware.base import BaseHTTPMiddleware
 
+import os
+
+_ENVIRONMENT = os.getenv("ENVIRONMENT", "development").lower()
+_IS_PRODUCTION = _ENVIRONMENT == "production"
+
+# Only trust X-Forwarded-For from these IPs (configure via env for your proxy layer)
+TRUSTED_PROXY_IPS = set(
+    filter(None, os.getenv("TRUSTED_PROXY_IPS", "127.0.0.1,::1").split(","))
+)
+
 def determine_network_context(request: Request) -> str:
     """
     Evaluates Zero-Trust Network Context (LAN, REMOTE) from trusted client IP and proxy headers.
-    In non-production test execution, X-Network-Context request header overrides context.
+    In non-production environments only, X-Network-Context request header overrides context.
     """
-    header_override = request.headers.get("X-Network-Context")
-    if header_override:
-        return header_override
+    # Test override is ONLY available outside production
+    if not _IS_PRODUCTION:
+        header_override = request.headers.get("X-Network-Context")
+        if header_override:
+            return header_override
 
-    # 1. Extract Client IP address from trusted proxy chain
-    forwarded = request.headers.get("X-Forwarded-For")
-    if forwarded:
-        client_ip = forwarded.split(",")[0].strip()
+    # 1. Extract Client IP — only trust X-Forwarded-For from known proxy IPs
+    peer_ip = request.client.host if request.client else "127.0.0.1"
+    if peer_ip in TRUSTED_PROXY_IPS:
+        forwarded = request.headers.get("X-Forwarded-For")
+        if forwarded:
+            client_ip = forwarded.split(",")[0].strip()
+        else:
+            client_ip = peer_ip
     else:
-        client_ip = request.client.host if request.client else "127.0.0.1"
+        # Untrusted peer — ignore forwarding headers entirely
+        client_ip = peer_ip
 
     # 2. LAN IP range detection (127.0.0.1, 10.x, 192.168.x, 172.16-31.x)
     if client_ip in ["127.0.0.1", "::1", "testclient", "localhost"] or \
@@ -141,7 +158,7 @@ def require_permission(required_permission: str):
         user_role = user.role.upper() if user and hasattr(user, "role") else "STAFF"
 
         # Fallback to header ONLY in non-production test execution
-        if not user and request.headers.get("X-User-Role"):
+        if not _IS_PRODUCTION and not user and request.headers.get("X-User-Role"):
             user_role = request.headers.get("X-User-Role").upper()
 
         user_permissions = ROLE_PERMISSIONS.get(user_role, set())
@@ -185,7 +202,7 @@ def verify_role_access(required_roles: list):
         user_role = user.role.upper() if user and hasattr(user, "role") else "STAFF"
         
         # Fallback to header ONLY in explicit non-production test environments
-        if not user and request.headers.get("X-User-Role"):
+        if not _IS_PRODUCTION and not user and request.headers.get("X-User-Role"):
             user_role = request.headers.get("X-User-Role").upper()
 
         if user_role not in required_roles:

@@ -1,6 +1,7 @@
+import uuid
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
-from app.models import Product, InventoryTransaction, Sale, SaleItem, Purchase, PurchaseItem
+from app.models import Product, InventoryTransaction, Sale, SaleItem, Purchase, PurchaseItem, Customer
 from datetime import datetime, timezone
 
 class InsufficientStockError(HTTPException):
@@ -59,6 +60,14 @@ def process_sale_transaction(db: Session, customer_id: int, items: list, payment
     Validates available stock for all items, creates Sale + SaleItems, decrements stock with row locking, and logs snapshots.
     """
     try:
+        # Ensure customer exists or auto-provision walk-in customer record
+        if customer_id:
+            cust = db.query(Customer).filter(Customer.id == customer_id).first()
+            if not cust:
+                cust = Customer(id=customer_id, name=f"Customer {customer_id}", email=f"customer_{customer_id}@ims.local")
+                db.add(cust)
+                db.flush()
+
         total_amount = 0.0
         sale_items_data = []
 
@@ -78,7 +87,7 @@ def process_sale_transaction(db: Session, customer_id: int, items: list, payment
 
         grand_total = total_amount * 1.08 # 8% Tax
 
-        invoice_num = f"INV-2026-{int(datetime.now(timezone.utc).timestamp())}"
+        invoice_num = f"INV-2026-{int(datetime.now(timezone.utc).timestamp())}-{uuid.uuid4().hex[:6]}"
         sale = Sale(
             invoice_number=invoice_num,
             customer_id=customer_id,

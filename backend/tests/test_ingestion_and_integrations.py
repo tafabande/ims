@@ -5,7 +5,7 @@ from sqlalchemy.orm import sessionmaker
 
 from app.main import app
 from app.database import Base, get_db
-from app.models import Product, Employee, ImportBatch, IntegrationAccount, IntegrationApiKey
+from app.models import Product, Employee, ImportBatch, IntegrationAccount, IntegrationApiKey, User
 from app.services import ingestion_service, integration_service
 
 SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
@@ -29,6 +29,14 @@ client = TestClient(app)
 @pytest.fixture(autouse=True)
 def setup_db():
     Base.metadata.create_all(bind=engine)
+    db = TestingSessionLocal()
+    try:
+        if not db.query(User).filter(User.id == 1).first():
+            admin = User(id=1, email="admin@test.com", user_code="USR-001", full_name="Admin", hashed_password="hash", role="ADMIN")
+            db.add(admin)
+            db.commit()
+    finally:
+        db.close()
     yield
     Base.metadata.drop_all(bind=engine)
 

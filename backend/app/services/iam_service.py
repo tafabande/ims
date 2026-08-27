@@ -19,8 +19,28 @@ except ImportError:
     except ImportError:
         HAS_JWT = False
 
-# Secret Configs
-SECRET_KEY = os.getenv("SECRET_KEY", "ims_enterprise_secure_production_jwt_signing_key_2026_x9f4a8b7c2d1e0f3")
+# Secret Configs — Production requires real secrets; development uses safe fallbacks.
+_ENVIRONMENT = os.getenv("ENVIRONMENT", "development").lower()
+_IS_PRODUCTION = _ENVIRONMENT == "production"
+
+# Known insecure defaults that must never be used in production
+_INSECURE_DEFAULTS = {
+    "ims_enterprise_secure_production_jwt_signing_key_2026_x9f4a8b7c2d1e0f3",
+    "ims_production_secret_key_change_me_in_prod",
+    "local_dev_only_not_for_production",
+    "CHANGE_ME_GENERATE_WITH_python_secrets_token_hex_64",
+    "your_jwt_secret_key_here",
+    "",
+}
+
+SECRET_KEY = os.getenv("SECRET_KEY", "" if _IS_PRODUCTION else "local_dev_only_not_for_production")
+
+if _IS_PRODUCTION and (not SECRET_KEY or SECRET_KEY in _INSECURE_DEFAULTS or len(SECRET_KEY) < 32):
+    raise RuntimeError(
+        "FATAL: SECRET_KEY is missing, too short (< 32 chars), or matches a known insecure default. "
+        "Generate a production key with: python -c \"import secrets; print(secrets.token_hex(64))\""
+    )
+
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 15 # Short-lived access token
 REFRESH_TOKEN_EXPIRE_DAYS = 7    # Long-lived refresh session
@@ -127,7 +147,10 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
         pass
     
     # Fallback for legacy PBKDF2 hex strings
-    salt = os.getenv("PASSWORD_SALT", "ims_secure_salt_2026").encode('utf-8')
+    _salt_value = os.getenv("PASSWORD_SALT", "" if _IS_PRODUCTION else "local_dev_only_not_for_production")
+    if _IS_PRODUCTION and (not _salt_value or _salt_value in {"ims_secure_salt_2026", "local_dev_only_not_for_production", "CHANGE_ME_GENERATE_WITH_python_secrets_token_hex_32", ""}):
+        raise RuntimeError("FATAL: PASSWORD_SALT is missing or matches a known insecure default in production.")
+    salt = _salt_value.encode('utf-8')
     derived = hashlib.pbkdf2_hmac('sha256', plain_password.encode('utf-8'), salt, 100_000).hex()
     return hmac.compare_digest(derived, hashed_password)
 

@@ -6,6 +6,13 @@ from sqlalchemy import text
 # Default to SQLite for local development, fallback to PostgreSQL if DATABASE_URL is set
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./ims.db")
 
+_ENVIRONMENT = os.getenv("ENVIRONMENT", "development").lower()
+if _ENVIRONMENT == "production" and DATABASE_URL.startswith("sqlite"):
+    raise RuntimeError(
+        "FATAL: SQLite is not supported in production. "
+        "Set DATABASE_URL to a PostgreSQL connection string."
+    )
+
 if DATABASE_URL.startswith("sqlite"):
     engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 else:

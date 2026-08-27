@@ -137,129 +137,84 @@ def health_live():
 @app.get("/health/ready")
 def health_ready(db: Session = Depends(get_db)):
     """
-    Kubernetes / Docker Readiness Probe: Confirms DB and backend services are ready to accept traffic.
+    Kubernetes / Docker Readiness Probe: Confirms DB and Redis are ready to accept traffic.
+    Returns 503 if any required dependency is unreachable.
     """
+    checks = {}
+    all_ok = True
+
+    # Database check
     try:
         db.execute(text("SELECT 1"))
-        return {
-            "status": "READY",
-            "database": "CONNECTED",
-            "schema_version": "v4.2.0-prod",
-            "timestamp": datetime.now(timezone.utc).isoformat()
-        }
+        checks["database"] = "CONNECTED"
     except Exception as e:
-        raise HTTPException(status_code=503, detail=f"Database readiness check failed: {str(e)}")
+        checks["database"] = f"UNREACHABLE: {e}"
+        all_ok = False
+
+    # Redis check
+    try:
+        import redis as _redis
+        redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+        r = _redis.from_url(redis_url, socket_connect_timeout=2)
+        r.ping()
+        checks["redis"] = "CONNECTED"
+    except Exception:
+        checks["redis"] = "UNREACHABLE"
+        all_ok = False
+
+    status_code = 200 if all_ok else 503
+    result = {
+        "status": "READY" if all_ok else "NOT_READY",
+        "checks": checks,
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
+
+    if not all_ok:
+        raise HTTPException(status_code=503, detail=result)
+    return result
 
 
 @app.get("/health")
 def health_check():
     """
-    Health check endpoint for Docker & DevOps monitoring, SLA telemetry & Release Scorecard
+    Health check endpoint for Docker & DevOps monitoring.
+    Reports only live-checkable information — no hard-coded SLO claims.
     """
     return {
         "status": "healthy",
         "gateway": "NGINX API Gateway",
-        "domain_model": "Active (Canonical SKU Tree, Separation of HR Employee & System User)",
-        "schema_version": "v4.2.0-prod",
-        "concurrency_lock": "PostgreSQL FOR UPDATE (Active)",
-        "idempotency_engine": "24-Hour Key Deduplication Engine (Active)",
         "cors": f"Explicit ({len(cors_origins)} origins configured)",
-        "rate_limiter": "Redis Distributed Rate Limiter (Active)",
-        "cache": "Redis Cache-Aside (Active)",
-        "database": "PostgreSQL Source of Truth (Connected)",
-        "disaster_resilience": {
-            "rpo_target": "≤ 15 minutes",
-            "rto_target": "≤ 60 minutes",
-            "pitr_status": "Active (Automated WAL Archiving)",
-            "last_restore_verification": "2026-08-25T12:00:00Z (PASS - 100% Reconciliation Match)"
-        },
-        "secrets_management": {
-            "provider": "Environment Injection / Vault KMS",
-            "secrets_separated": True,
-            "key_rotation": "Enforced (90 Days)"
-        },
-        "release_maturity_scorecard": {
-            "CR-01_RBAC_Tenant_Isolation": "PASSED 🟢",
-            "CR-02_Mass_Assignment_Protection": "PASSED 🟢",
-            "CR-03_Stock_Concurrency_Locking": "PASSED 🟢",
-            "CR-04_Auth_Session_Security": "PASSED 🟢",
-            "CR-05_CSRF_XSS_Security_Headers": "PASSED 🟢",
-            "CR-06_Untrusted_Upload_Pipeline": "PASSED 🟢",
-            "CR-07_Idempotency_Deduplication": "PASSED 🟢",
-            "CR-08_Observability_CorrelationID": "PASSED 🟢",
-            "CR-09_Performance_Indexing_Pagination": "PASSED 🟢",
-            "CR-10_SKU_Hierarchy_Model": "PASSED 🟢",
-            "CR-11_Backup_PITR_Resilience": "PASSED 🟢",
-            "CR-12_Secrets_Key_Management": "PASSED 🟢",
-            "CR-13_Database_Migration_Safety": "PASSED 🟢",
-            "CR-14_Inventory_Reconciliation_Engine": "PASSED 🟢"
-        },
-        "microservices": ["auth", "users", "employees", "inventory", "sales", "purchases", "audit", "uploads", "imports", "integrations"]
+        "environment": os.getenv("ENVIRONMENT", "development"),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
 
 @app.get("/health/operational")
 def health_operational():
     """
-    Operational Health & Service Level Objectives (SLO/SLI) Telemetry Endpoint
+    Operational Health Endpoint.
+    SLO/SLI telemetry should be sourced from a monitoring system (e.g. Prometheus/Grafana),
+    not from hard-coded values in application code.
     """
     return {
         "status": "OPERATIONAL",
-        "gateway": "NGINX API Gateway",
-        "cache": "Redis Cache-Aside Layer",
-        "rate_limiter": "Redis Distributed Rate Limiter",
-        "slo_sli_telemetry": {
-            "availability_sli": "99.98%",
-            "availability_slo_target": "≥ 99.95%",
-            "latency_p95_sli": "142ms",
-            "latency_p95_slo_target": "< 200ms",
-            "error_rate_sli": "0.02%",
-            "error_rate_slo_target": "< 0.05%",
-            "error_budget_remaining": "96.4%"
-        },
-        "disaster_resilience": {
-            "rpo_target": "≤ 15 minutes",
-            "rto_target": "≤ 60 minutes",
-            "pitr_status": "Active (Automated WAL Archiving)",
-            "last_restore_verification": "2026-08-25T12:00:00Z (PASS - 100% Reconciliation Match)"
-        },
-        "secrets_management": {
-            "provider": "Environment Injection / Vault KMS",
-            "secrets_separated": True,
-            "key_rotation": "Enforced (90 Days)"
-        }
+        "note": "SLO/SLI metrics, disaster recovery status, and secrets management evidence "
+                "should be sourced from monitoring infrastructure and CI artifacts, not runtime endpoints.",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
     }
-
-
 
 
 @app.get("/release/readiness")
 def release_readiness():
     """
-    Release Readiness Evaluation Endpoint: Evaluates evidence across Infrastructure, Security, Database, Resilience, and Business Transaction Controls.
+    Release readiness is assessed via CI artifacts and external gate checks, not runtime endpoints.
     """
     return {
-        "release": "READY_FOR_GO_LIVE",
-        "scorecard": {
-            "BRC-01_Product_Governance": "PASS 🟢",
-            "BRC-02_Purchasing_Reconciliation": "PASS 🟢",
-            "BRC-03_Refund_Validation_Dispositions": "PASS 🟢",
-            "BRC-04_Canonical_Entity_IDs": "PASS 🟢",
-            "BRC-05_Symmetrical_Approval_State_Machine": "PASS 🟢",
-            "BRC-06_Commercial_Pricing_Governance": "PASS 🟢",
-            "BRC-07_Live_Dashboard_Data_Integrity": "PASS 🟢",
-            "BRC-08_API_Authorization_403_Audit": "PASS 🟢",
-            "BRC-09_Security_Alerting_Risk_Scoring": "PASS 🟢",
-            "BRC-10_Role_Switching_Impersonation_Governance": "PASS 🟢"
-        },
-        "infrastructure": "PASS 🟢",
-        "security": "PASS 🟢",
-        "database": "PASS 🟢",
-        "resilience": "PASS 🟢",
-        "business_transaction_controls": "PASS 🟢",
-        "critical_failures": []
+        "status": "NOT_EVALUATED",
+        "message": "Release readiness is determined by CI pipeline results, security scan artifacts, "
+                   "and external gate checks — not by a runtime self-assessment endpoint. "
+                   "See CI workflow outputs for the latest evidence.",
     }
-
 
 
 @app.get("/cache/stats")
@@ -268,3 +223,4 @@ def cache_statistics():
     Real-time Redis Cache-Aside Hit/Miss ratio telemetry endpoint
     """
     return get_cache_stats()
+

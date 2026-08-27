@@ -28,17 +28,21 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r backend/requirements.txt
-          pip install pytest pytest-cov
+          pip install pytest pytest-cov pip-audit
+
+      - name: Backend Import Smoke Test
+        run: |
+          cd backend
+          python -c "from app.main import app; print('FastAPI app imported successfully')"
+
+      - name: Backend Dependency Audit
+        run: |
+          pip-audit -r backend/requirements.txt
 
       - name: Run Backend Pytest Suite
         run: |
           cd backend
           python -m pytest -v --tb=short
-
-      - name: Verify Health Readiness Probe Endpoint
-        run: |
-          cd backend
-          python -c "import app.main; print('FastAPI Application Schema & Routes Loaded Successfully')"
 
   frontend-build-and-lint:
     name: Frontend Warm Design System & Production Build
@@ -62,7 +66,7 @@ jobs:
       - name: Run Frontend Linter (Oxlint)
         run: |
           cd frontend
-          npm run lint || true
+          npm run lint
 
       - name: Verify Production Vite Bundle Build
         run: |
@@ -80,6 +84,13 @@ jobs:
       - name: Validate Docker Compose Configuration
         run: |
           docker compose config
+        env:
+          POSTGRES_USER: ci_user
+          POSTGRES_PASSWORD: ci_password
+          POSTGRES_DB: ci_db
+          SECRET_KEY: ci_test_secret_key_not_for_production
+          PASSWORD_SALT: ci_test_salt_not_for_production
+          ENVIRONMENT: development
 
       - name: Verify Environment Template Parity
         run: |

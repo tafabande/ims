@@ -3,7 +3,7 @@ import uuid
 from fastapi.testclient import TestClient
 from app.main import app
 from app.database import Base, engine, SessionLocal
-from app.models import Category, Product, ApprovalRequest, ReconciliationException, PriceRule
+from app.models import Category, Product, ApprovalRequest, ReconciliationException, PriceRule, User
 
 client = TestClient(app)
 
@@ -17,6 +17,14 @@ def test_approval_engine_four_eyes_principle():
     - Requester attempting to self-approve -> 403 Violation.
     - Independent approver -> 200 Approved.
     """
+    db = SessionLocal()
+    for uid in [1, 2]:
+        if not db.query(User).filter(User.id == uid).first():
+            u = User(id=uid, email=f"user_{uid}@ims.local", user_code=f"USR-{uid:04d}", full_name=f"User {uid}", role="MANAGER" if uid == 2 else "STAFF", hashed_password="mock", active=True)
+            db.add(u)
+    db.commit()
+    db.close()
+
     # 1. Submit Request
     response = client.post(
         "/api/approvals/request",

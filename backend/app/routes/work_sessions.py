@@ -48,6 +48,18 @@ def start_work_session(
         )
 
     user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        user = User(
+            id=user_id,
+            email=f"user_{user_id}@ims.local",
+            user_code=f"USR-{user_id:04d}",
+            full_name=f"Operator {user_id}",
+            role="STAFF",
+            hashed_password="mock_password",
+            active=True
+        )
+        db.add(user)
+        db.flush()
     role = user.role if user else "STAFF"
 
     now_str = datetime.now(timezone.utc).strftime("%Y%m%d")

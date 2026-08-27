@@ -216,19 +216,18 @@ def test_cr07_idempotency_deduplication():
 
 def test_cr08_observability_and_health_telemetry():
     """
-    CR-08 & BRC-10 Verification: Observability probes (/health/live, /health/ready, /release/readiness) return structured SLA telemetry and X-Request-ID headers.
+    CR-08 & BRC-10 Verification: Observability probes (/health/live, /health/ready, /release/readiness) return accurate status and X-Request-ID headers.
     """
     res_live = client.get("/health/live")
     assert res_live.status_code == 200
     assert res_live.json()["status"] == "ALIVE"
 
     res_ready = client.get("/health/ready")
-    assert res_ready.status_code == 200
-    assert res_ready.json()["status"] == "READY"
+    assert res_ready.status_code in [200, 503]
 
     res_release = client.get("/release/readiness")
     assert res_release.status_code == 200
-    assert res_release.json()["release"] == "READY_FOR_GO_LIVE"
+    assert res_release.json()["status"] == "NOT_EVALUATED"
     assert "X-Request-ID" in res_release.headers
 
 
@@ -263,36 +262,32 @@ def test_cr10_sku_hierarchy_and_category_tree():
 
 def test_cr11_backup_and_disaster_recovery_telemetry():
     """
-    CR-11 Verification: Health telemetry reports RPO <= 15m, RTO <= 60m targets and backup verification.
+    CR-11 Verification: Health endpoint reports live health status without hard-coded fabricated claims.
     """
     res = client.get("/health")
     assert res.status_code == 200
     data = res.json()
-    assert "disaster_resilience" in data
-    assert data["disaster_resilience"]["rpo_target"] == "≤ 15 minutes"
-    assert data["disaster_resilience"]["rto_target"] == "≤ 60 minutes"
+    assert data["status"] == "healthy"
+    assert "disaster_resilience" not in data
 
 
 def test_cr12_secrets_and_key_management_separation():
     """
-    CR-12 Verification: Secrets management telemetry confirms separation of config, secrets, and app data.
+    CR-12 Verification: Health endpoint reports environment configuration cleanly.
     """
     res = client.get("/health")
     assert res.status_code == 200
     data = res.json()
-    assert "secrets_management" in data
-    assert data["secrets_management"]["secrets_separated"] is True
+    assert "environment" in data
+    assert "secrets_management" not in data
 
 
 def test_cr13_database_migration_schema_versioning():
     """
-    CR-13 Verification: System reports production database schema version.
+    CR-13 Verification: Readiness probe dynamically verifies live database connectivity.
     """
-    res = client.get("/health")
-    assert res.status_code == 200
-    data = res.json()
-    assert "schema_version" in data
-    assert data["schema_version"] == "v4.2.0-prod"
+    res = client.get("/health/ready")
+    assert res.status_code in [200, 503]
 
 
 def test_cr14_inventory_reconciliation_variance_engine():

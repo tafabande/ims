@@ -4,7 +4,8 @@ import os
 try:
     import redis
     redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
-    redis_client = redis.Redis.from_url(redis_url, decode_responses=True)
+    redis_client = redis.Redis.from_url(redis_url, decode_responses=True, socket_connect_timeout=0.2, socket_timeout=0.2)
+    redis_client.ping()
 except Exception:
     redis_client = None
 

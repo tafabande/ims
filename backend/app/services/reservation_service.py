@@ -127,7 +127,14 @@ def checkout_cart_reservation(
 
     # Ensure default customer exists or create walk-in
     customer = db.query(Customer).first()
-    customer_id = customer.id if customer else 1
+    if not customer:
+        customer = Customer(
+            name="Walk-in Customer",
+            email="walkin@ims.local"
+        )
+        db.add(customer)
+        db.flush()
+    customer_id = customer.id
 
     sale_invoice = f"INV-2026-{uuid.uuid4().hex[:6].upper()}"
     sale = Sale(
