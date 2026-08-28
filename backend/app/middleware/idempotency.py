@@ -102,6 +102,8 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                         )
                     except Exception:
                         pass
+                if len(MEMORY_IDEMPOTENCY_STORE) > 1000:
+                    MEMORY_IDEMPOTENCY_STORE.clear()
                 MEMORY_IDEMPOTENCY_STORE[cache_key] = cache_payload
 
                 return Response(

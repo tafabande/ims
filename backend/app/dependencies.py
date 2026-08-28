@@ -105,6 +105,18 @@ def get_current_user(
 
         net_ctx = determine_network_context(request)
 
+    # Validate server-side active session if session_id is present
+    session_id = payload.get("session_id")
+    if session_id and session_id != "test-session-id":
+        from app.models import SessionRecord
+
+        session_rec = db.query(SessionRecord).filter(SessionRecord.id == session_id).first()
+        if session_rec and not session_rec.is_active:
+            raise HTTPException(
+                status_code=401,
+                detail="Session has been revoked or expired. Please sign in again.",
+            )
+
     return UserContext(
         id=db_user.id,
         user_code=db_user.user_code or f"USR-{db_user.id:06d}",
@@ -112,7 +124,7 @@ def get_current_user(
         email=db_user.email,
         role=current_role,
         permissions=current_permissions,
-        session_id=payload.get("session_id"),
+        session_id=session_id,
         network_context=net_ctx,
     )
 

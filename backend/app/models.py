@@ -37,6 +37,19 @@ class User(Base):
     employee = relationship("Employee", back_populates="user", uselist=False)
 
 
+class AuditLogRecord(Base):
+    __tablename__ = "audit_log_records"
+
+    id = Column(Integer, primary_key=True, index=True)
+    event_id = Column(String(50), unique=True, index=True, nullable=False)
+    user_name = Column(String(255), nullable=False)
+    action = Column(String(100), nullable=False)
+    client_ip = Column(String(50), nullable=False)
+    status = Column(String(50), default="SUCCESS")
+    details = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
 class Department(Base):
     __tablename__ = "departments"
 

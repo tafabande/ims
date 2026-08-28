@@ -1,4 +1,5 @@
 import importlib
+import os
 
 import pytest
 from fastapi import HTTPException
@@ -76,6 +77,30 @@ def test_production_get_current_user_validates_real_bearer_token():
     db.close()
 
 
+def test_revoked_session_id_in_jwt_is_rejected():
+    """
+    Session Security & Revocation Test:
+    Verify that if a session ID embedded in a JWT access token is marked is_active=False
+    in the database, protected endpoints reject requests with HTTP 401.
+    """
+    client = TestClient(app)
+    login_res = client.post("/auth/login", json={"username": "admin", "password": "adminpassword"})
+    assert login_res.status_code == 200
+    token = login_res.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    sessions_res = client.get("/auth/sessions", headers=headers)
+    assert sessions_res.status_code == 200
+    session_id = sessions_res.json()[0]["session_id"]
+
+    revoke_res = client.post(f"/auth/revoke-session/{session_id}", headers=headers)
+    assert revoke_res.status_code == 200
+
+    protected_res = client.get("/auth/sessions", headers=headers)
+    assert protected_res.status_code == 401
+    assert "revoked or expired" in protected_res.json()["detail"].lower()
+
+
 def test_seed_db_fails_closed_in_production_environment(monkeypatch):
     """
     Production Security Lifecycle Test:
@@ -129,3 +154,13 @@ def test_integration_scope_json_decoding_and_eval_injection_defense():
     db.delete(malicious_account)
     db.commit()
     db.close()
+
+
+def test_alembic_migrations_directory_structure_exists():
+    """
+    Database Lifecycle & Migration Test:
+    Verify that alembic.ini and versioned alembic migration files exist in backend root.
+    """
+    assert os.path.exists("alembic.ini")
+    assert os.path.exists("alembic/env.py")
+    assert os.path.exists("alembic/versions/001_initial_schema.py")

@@ -50,13 +50,26 @@ class DistributedRateLimiterMiddleware(BaseHTTPMiddleware):
         if not _IS_PRODUCTION and client_ip in ["testclient", "localhost"]:
             return await call_next(request)
 
-        user_header = request.headers.get("X-User-Id", client_ip)
+        # Derive identity safely: use verified Bearer token sub if present, otherwise trusted client IP
+        identity = client_ip
+        auth_header = request.headers.get("Authorization") or ""
+        if auth_header.startswith("Bearer "):
+            token = auth_header[7:].strip()
+            try:
+                from app.services import iam_service
+
+                payload = iam_service.decode_access_token(token)
+                sub = payload.get("sub")
+                if sub:
+                    identity = f"usr_{sub}"
+            except Exception:
+                pass
 
         policy = ROUTE_LIMITS.get(path, ROUTE_LIMITS["default"])
         max_limit = policy["limit"]
         window_seconds = policy["window"]
 
-        key = f"rate_limit:{path}:{user_header}"
+        key = f"rate_limit:{path}:{identity}"
         now = int(time.time())
 
         current_count = 0

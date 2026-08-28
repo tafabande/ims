@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
@@ -21,7 +21,7 @@ def expire_stale_reservations(db: Session):
     """
     Sweeps and invalidates expired active stock reservations, restoring available inventory.
     """
-    now = datetime.utcnow()
+    now = datetime.now(UTC).replace(tzinfo=None)
     stale_reservations = (
         db.query(StockReservation).filter(StockReservation.status == "ACTIVE", StockReservation.expires_at <= now).all()
     )
@@ -52,7 +52,7 @@ def create_cart_reservation(
     """
     expire_stale_reservations(db)
 
-    now = datetime.utcnow()
+    now = datetime.now(UTC).replace(tzinfo=None)
     expires_at = now + timedelta(minutes=ttl_minutes)
     cart_code = f"CART-2026-{uuid.uuid4().hex[:6].upper()}"
 

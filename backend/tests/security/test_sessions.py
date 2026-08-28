@@ -44,8 +44,10 @@ def test_revoke_session_invalidates_session():
     assert revoke_res.status_code == 200
     assert revoke_res.json()["status"] == "revoked"
 
-    # Verify active=False
-    updated_sessions = client.get("/auth/sessions", headers=headers).json()
+    # Re-authenticate to obtain a new active session token and verify target_id active is False
+    login_res2 = client.post("/auth/login", json={"username": "admin", "password": "adminpassword"})
+    headers2 = {"Authorization": f"Bearer {login_res2.json()['access_token']}"}
+    updated_sessions = client.get("/auth/sessions", headers=headers2).json()
     revoked = next(s for s in updated_sessions if s["session_id"] == target_id)
     assert revoked["active"] is False
 
