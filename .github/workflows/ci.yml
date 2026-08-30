@@ -27,8 +27,7 @@ jobs:
       - name: Install Backend Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r backend/requirements.txt
-          pip install pytest pytest-cov pip-audit ruff httpx
+          pip install -r backend/requirements-dev.txt
 
       - name: Backend Import Smoke Test
         run: |
@@ -44,6 +43,19 @@ jobs:
       - name: Backend Dependency Audit
         run: |
           pip-audit -r backend/requirements.txt
+
+      - name: Verify Alembic Migrations on PostgreSQL
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ims_ci
+          ENVIRONMENT: production
+          SECRET_KEY: ci_only_secret_key_with_more_than_32_characters
+          PASSWORD_SALT: ci_only_password_salt
+        run: |
+          cd backend
+          alembic upgrade head
+          python -c "from app.database import engine; from sqlalchemy import inspect; tables=inspect(engine).get_table_names(); assert 'users' in tables and 'products' in tables, tables"
+          alembic downgrade base
+          alembic upgrade head
 
       - name: Run Backend Pytest Suite
         run: |
@@ -98,7 +110,23 @@ jobs:
           PASSWORD_SALT: ci_test_salt_not_for_production
           ENVIRONMENT: development
 
+      - name: Build Production Container Images
+        run: |
+          docker build -t ims-backend-ci ./backend
+          docker build -t ims-frontend-ci ./frontend
+
       - name: Verify Environment Template Parity
         run: |
           test -f .env.example || { echo "Missing .env.example template"; exit 1; }
           echo "Production environment templates verified."
+
+  secret-scan:
+    name: Repository Secret Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

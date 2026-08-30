@@ -8,7 +8,9 @@ Create Date: 2026-08-28 00:00:00.000000
 from typing import Sequence, Union
 
 from alembic import op
-import sqlalchemy as sa
+
+import app.models  # noqa: F401
+from app.database import Base
 
 # revision identifiers, used by Alembic.
 revision: str = "001_initial_schema"
@@ -18,10 +20,10 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # Initial baseline schema migration definition
-    # In production, alembic upgrade head executes all versioned migrations.
-    pass
+    bind = op.get_bind()
+    Base.metadata.create_all(bind=bind, checkfirst=True)
 
 
 def downgrade() -> None:
-    pass
+    bind = op.get_bind()
+    Base.metadata.drop_all(bind=bind, checkfirst=True)

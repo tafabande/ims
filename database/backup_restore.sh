@@ -8,10 +8,13 @@
 set -euo pipefail
 
 BACKUP_DIR="${BACKUP_DIR:-/var/backups/ims}"
-CONTAINER_NAME="${CONTAINER_NAME:-ims_postgres}"
+PGHOST="${PGHOST:-postgres}"
+PGPORT="${PGPORT:-5432}"
 POSTGRES_USER="${POSTGRES_USER:-ims_user}"
 POSTGRES_DB="${POSTGRES_DB:-ims_db}"
 RETENTION_DAYS="${RETENTION_DAYS:-30}"
+ENVIRONMENT="${ENVIRONMENT:-production}"
+BACKUP_S3_URI="${BACKUP_S3_URI:-}"
 
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 BACKUP_FILE="${BACKUP_DIR}/ims_db_backup_${TIMESTAMP}.sql.gz"
@@ -21,14 +24,14 @@ mkdir -p "${BACKUP_DIR}"
 
 echo "========================================================================="
 echo " Starting Enterprise IMS Automated Database Backup"
-echo " Target Container : ${CONTAINER_NAME}"
+echo " PostgreSQL Host  : ${PGHOST}:${PGPORT}"
 echo " Database Name    : ${POSTGRES_DB}"
 echo " Timestamp        : ${TIMESTAMP}"
 echo " SLA Targets      : RPO ≤ 15m | RTO ≤ 60m"
 echo "========================================================================="
 
-# 1. Execute SQL dump with schema & data integrity from PostgreSQL container
-if ! docker exec "${CONTAINER_NAME}" pg_dump -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" --clean --if-exists | gzip > "${BACKUP_FILE}"; then
+# 1. Execute SQL dump with schema & data integrity
+if ! pg_dump -h "${PGHOST}" -p "${PGPORT}" -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" --clean --if-exists | gzip > "${BACKUP_FILE}"; then
     echo "ERROR: PostgreSQL database backup dump failed!" >&2
     exit 1
 fi
@@ -44,8 +47,20 @@ if [ -n "${BACKUP_ENCRYPTION_KEY:-}" ]; then
     rm -f "${BACKUP_FILE}"
     FINAL_FILE="${ENCRYPTED_FILE}"
     echo "Encrypted Archive Created: ${FINAL_FILE}"
+elif [ "${ENVIRONMENT}" = "production" ]; then
+    echo "ERROR: BACKUP_ENCRYPTION_KEY is required in production." >&2
+    rm -f "${BACKUP_FILE}"
+    exit 1
 else
-    echo "Notice: BACKUP_ENCRYPTION_KEY not set. Archive stored unencrypted."
+    echo "Notice: development backup stored unencrypted."
+fi
+
+if [ -n "${BACKUP_S3_URI}" ]; then
+    aws s3 cp "${FINAL_FILE}" "${BACKUP_S3_URI%/}/$(basename "${FINAL_FILE}")" --only-show-errors
+    echo "Off-site upload completed: ${BACKUP_S3_URI}"
+elif [ "${ENVIRONMENT}" = "production" ]; then
+    echo "ERROR: BACKUP_S3_URI is required for production off-site backups." >&2
+    exit 1
 fi
 
 # 3. Retention Lifecycle Policy: Purge backups older than RETENTION_DAYS
@@ -66,7 +81,7 @@ echo "2. Decrypt Archive (if encrypted):"
 echo "   openssl enc -d -aes-256-cbc -pbkdf2 -in ${FINAL_FILE} -out /tmp/restored.sql.gz -pass pass:\$BACKUP_ENCRYPTION_KEY"
 echo ""
 echo "3. Restore Database:"
-echo "   gunzip -c /tmp/restored.sql.gz | docker exec -i ${CONTAINER_NAME} psql -U ${POSTGRES_USER} -d ${POSTGRES_DB}"
+echo "   gunzip -c /tmp/restored.sql.gz | psql -h ${PGHOST} -p ${PGPORT} -U ${POSTGRES_USER} -d ${POSTGRES_DB}"
 echo ""
 echo "4. Restart Application Stack:"
 echo "   docker compose start backend"

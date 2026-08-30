@@ -161,6 +161,8 @@ def test_alembic_migrations_directory_structure_exists():
     Database Lifecycle & Migration Test:
     Verify that alembic.ini and versioned alembic migration files exist in backend root.
     """
-    assert os.path.exists("alembic.ini")
-    assert os.path.exists("alembic/env.py")
-    assert os.path.exists("alembic/versions/001_initial_schema.py")
+    base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+    assert os.path.exists(os.path.join(base_dir, "alembic.ini")) or os.path.exists("alembic.ini")
+    assert os.path.exists(os.path.join(base_dir, "alembic", "env.py")) or os.path.exists("alembic/env.py")
+    assert os.path.exists(os.path.join(base_dir, "alembic", "versions", "001_initial_schema.py")) or os.path.exists("alembic/versions/001_initial_schema.py")
+

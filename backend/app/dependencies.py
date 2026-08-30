@@ -15,7 +15,7 @@ from fastapi import Depends, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
-from app.database import get_db
+from app.database import get_db, set_session_rls_context
 from app.models import User
 from app.services import iam_service
 
@@ -98,6 +98,14 @@ def get_current_user(
     current_role = (db_user.role or "STAFF").upper()
     current_permissions = iam_service.ROLE_PERMISSIONS.get(current_role, [])
 
+    employee = getattr(db_user, "employee", None)
+    location_id = str(employee.store_id) if employee and employee.store_id else None
+    set_session_rls_context(
+        db,
+        location_id=location_id,
+        org_id=__import__("os").getenv("ORGANIZATION_ID", "default"),
+    )
+
     # Derive Zero-Trust Network Context from request state or trusted IP determination
     net_ctx = getattr(request.state, "network_context", None)
     if not net_ctx:
@@ -111,7 +119,7 @@ def get_current_user(
         from app.models import SessionRecord
 
         session_rec = db.query(SessionRecord).filter(SessionRecord.id == session_id).first()
-        if session_rec and not session_rec.is_active:
+        if not session_rec or not session_rec.is_active:
             raise HTTPException(
                 status_code=401,
                 detail="Session has been revoked or expired. Please sign in again.",

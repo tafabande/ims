@@ -5,6 +5,8 @@ from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 
+from app.middleware.security import get_client_ip
+
 _ENVIRONMENT = os.getenv("ENVIRONMENT", "development").lower()
 _IS_PRODUCTION = _ENVIRONMENT == "production"
 
@@ -44,7 +46,7 @@ class DistributedRateLimiterMiddleware(BaseHTTPMiddleware):
         ]:
             return await call_next(request)
 
-        client_ip = request.client.host if request.client else "127.0.0.1"
+        client_ip = get_client_ip(request)
 
         # Bypass rate limiter for test suites and automation harnesses in non-production
         if not _IS_PRODUCTION and client_ip in ["testclient", "localhost"]:
@@ -81,6 +83,12 @@ class DistributedRateLimiterMiddleware(BaseHTTPMiddleware):
                 ttl = redis_client.ttl(key)
             except Exception:
                 current_count, ttl = self._fallback_counter(key, window_seconds, now)
+        elif _IS_PRODUCTION:
+            return JSONResponse(
+                status_code=503,
+                content={"detail": "Rate-limiting service unavailable. Request rejected safely."},
+                headers={"Retry-After": "5"},
+            )
         else:
             current_count, ttl = self._fallback_counter(key, window_seconds, now)
 

@@ -49,7 +49,55 @@ DEFAULT_SYSTEM_SETTINGS = [
         "category": "security",
         "description": "User token session timeout duration in seconds (15 mins = 900s)",
     },
-    # IT Administration Contact (shown on login page, error screens, audit events)
+    {
+        "key": "sales.refund_approval_threshold",
+        "value": "100.0",
+        "data_type": "float",
+        "category": "workflows",
+        "description": "Monetary refund limit ($) requiring Store Manager approval",
+    },
+    {
+        "key": "purchases.approval_threshold",
+        "value": "500.0",
+        "data_type": "float",
+        "category": "workflows",
+        "description": "Purchase Order amount ($) requiring high-risk approval",
+    },
+    {
+        "key": "escalation.auto_escalate_hours",
+        "value": "24",
+        "data_type": "int",
+        "category": "escalations",
+        "description": "Hours before an unreviewed operational case is auto-escalated",
+    },
+    {
+        "key": "notifications.quiet_mode",
+        "value": "true",
+        "data_type": "bool",
+        "category": "notifications",
+        "description": "Enforce quiet notification mode (subtle glows instead of loud red badges)",
+    },
+    {
+        "key": "announcement.text",
+        "value": "Operations Control Active: High-value refunds require manager authorization.",
+        "data_type": "string",
+        "category": "announcements",
+        "description": "System-wide broadcast message shown to logged-in users",
+    },
+    {
+        "key": "announcement.enabled",
+        "value": "true",
+        "data_type": "bool",
+        "category": "announcements",
+        "description": "Toggle system announcement header banner",
+    },
+    {
+        "key": "work_session.default_float",
+        "value": "150.0",
+        "data_type": "float",
+        "category": "sessions",
+        "description": "Mandatory starting cash float ($) for POS shift registration",
+    },
     {
         "key": "IT_ADMIN_EMAIL",
         "value": "admin@ims.co.zw",
@@ -175,3 +223,21 @@ def list_settings(db: Session, category: str | None = None) -> list[SystemSettin
 
 def list_all_settings(db: Session) -> list[SystemSetting]:
     return list_settings(db)
+
+
+def bulk_update_settings(db: Session, updates: dict[str, Any], updated_by: str | None = None) -> list[SystemSetting]:
+    """
+    Bulk update system configuration settings key-value pairs.
+    """
+    modified = []
+    for key, value in updates.items():
+        setting = db.query(SystemSetting).filter(SystemSetting.key == key).first()
+        if setting:
+            setting.value = str(value)
+            setting.updated_at = datetime.now(UTC)
+            modified.append(setting)
+    db.commit()
+    for s in modified:
+        db.refresh(s)
+    return modified
+

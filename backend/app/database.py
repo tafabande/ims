@@ -17,7 +17,13 @@ if _ENVIRONMENT == "production" and DATABASE_URL.startswith("sqlite"):
 if DATABASE_URL.startswith("sqlite"):
     engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 else:
-    engine = create_engine(DATABASE_URL)
+    engine = create_engine(
+        DATABASE_URL,
+        pool_pre_ping=True,
+        pool_size=int(os.getenv("DB_POOL_SIZE", "10")),
+        max_overflow=int(os.getenv("DB_MAX_OVERFLOW", "20")),
+        pool_recycle=int(os.getenv("DB_POOL_RECYCLE_SECONDS", "1800")),
+    )
 
 
 @event.listens_for(Engine, "connect")
@@ -50,9 +56,9 @@ def set_session_rls_context(db, location_id: str | None = None, org_id: str | No
     """
     if engine.dialect.name == "postgresql":
         if location_id:
-            db.execute(text("SET LOCAL app.location_id = :loc"), {"loc": str(location_id)})
+            db.execute(text("SELECT set_config('app.location_id', :loc, true)"), {"loc": str(location_id)})
         if org_id:
-            db.execute(text("SET LOCAL app.org_id = :org"), {"org": str(org_id)})
+            db.execute(text("SELECT set_config('app.org_id', :org, true)"), {"org": str(org_id)})
 
 
 # Auto-migrate missing columns for SQLite local dev

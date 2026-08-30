@@ -102,8 +102,12 @@ def login(credentials: LoginRequest, request: Request, db: Session = Depends(get
         )
         db.add(session_record)
         db.commit()
-    except Exception:
+    except Exception as err:
         db.rollback()
+        raise HTTPException(
+            status_code=503,
+            detail="Authentication service could not create a secure server-side session.",
+        ) from err
 
     return TokenResponse(
         access_token=access_token,

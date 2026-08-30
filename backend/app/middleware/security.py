@@ -1,5 +1,7 @@
 import datetime
+import hmac
 import html
+import ipaddress
 import logging
 import os
 
@@ -14,6 +16,22 @@ _IS_PRODUCTION = _ENVIRONMENT == "production"
 TRUSTED_PROXY_IPS = set(filter(None, os.getenv("TRUSTED_PROXY_IPS", "127.0.0.1,::1").split(",")))
 
 
+def get_client_ip(request: Request) -> str:
+    peer_ip = request.client.host if request.client else "127.0.0.1"
+    if peer_ip not in TRUSTED_PROXY_IPS:
+        return peer_ip
+
+    forwarded = request.headers.get("X-Forwarded-For")
+    if not forwarded:
+        return peer_ip
+
+    candidate = forwarded.split(",")[0].strip()
+    try:
+        return str(ipaddress.ip_address(candidate))
+    except ValueError:
+        return peer_ip
+
+
 def determine_network_context(request: Request) -> str:
     """
     Evaluates Zero-Trust Network Context (LAN, REMOTE) from trusted client IP and proxy headers.
@@ -26,16 +44,7 @@ def determine_network_context(request: Request) -> str:
             return header_override
 
     # 1. Extract Client IP — only trust X-Forwarded-For from known proxy IPs
-    peer_ip = request.client.host if request.client else "127.0.0.1"
-    if peer_ip in TRUSTED_PROXY_IPS:
-        forwarded = request.headers.get("X-Forwarded-For")
-        if forwarded:
-            client_ip = forwarded.split(",")[0].strip()
-        else:
-            client_ip = peer_ip
-    else:
-        # Untrusted peer — ignore forwarding headers entirely
-        client_ip = peer_ip
+    client_ip = get_client_ip(request)
 
     # 2. LAN IP range detection (127.0.0.1, 10.x, 192.168.x, 172.16-31.x)
     if (
@@ -57,7 +66,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         if request.method in ["POST", "PUT", "DELETE", "PATCH"]:
             csrf_cookie = request.cookies.get("csrf_token")
             csrf_header = request.headers.get("X-CSRF-Token")
-            if csrf_cookie and csrf_header and csrf_cookie != csrf_header:
+            if csrf_cookie and (not csrf_header or not hmac.compare_digest(csrf_cookie, csrf_header)):
                 return JSONResponse(
                     status_code=403,
                     content={"detail": "CSRF Token Mismatch. State-changing request blocked."},

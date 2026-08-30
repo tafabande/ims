@@ -56,3 +56,17 @@ def update_system_setting(
     Audit trail: logs the responsible user.
     """
     return settings_service.update_setting(db, key, setting_data.value, updated_by=current_user.email)
+
+
+@router.post("/bulk", response_model=list[SystemSettingResponse])
+def bulk_update_system_settings(
+    payload: dict[str, str],
+    db: Session = Depends(get_db),
+    current_user: UserContext = Depends(require_permission("system.config")),
+):
+    """
+    Bulk update multiple operational settings from the Operations Control Center.
+    Restricted strictly to users with system.config permission.
+    """
+    return settings_service.bulk_update_settings(db, payload, updated_by=current_user.email)
+

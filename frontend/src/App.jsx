@@ -38,6 +38,7 @@ const IntegrityIntelligenceView = lazy(() => import('./components/integrity/Inte
 const DataIntakeView = lazy(() => import('./components/ingestion/DataIntakeView'));
 const PlanningView = lazy(() => import('./components/planning/PlanningView'));
 const AttentionCenterView = lazy(() => import('./components/attention/AttentionCenterView'));
+const OperationsControlCenterView = lazy(() => import('./components/cms/OperationsControlCenterView'));
 
 /**
  * Route permission map — defines which permission a user needs to access each tab.
@@ -46,6 +47,7 @@ const AttentionCenterView = lazy(() => import('./components/attention/AttentionC
 const ROUTE_PERMISSIONS = {
   dashboard: 'inventory.view',
   attention: 'attention.view',
+  control_center: 'system.config',
   stores: 'system.config',
   shifts: 'shifts.manage',
   returns: 'sales.refund',
@@ -389,6 +391,10 @@ export default function App() {
 
             {activeTab === 'reports' && (
               <ReportsView currentRole={currentRole} currentUser={user} onShowToast={handleShowToast} />
+            )}
+
+            {activeTab === 'control_center' && (
+              <OperationsControlCenterView currentUser={user} onShowToast={handleShowToast} />
             )}
 
             {activeTab === 'users' && (

@@ -1,8 +1,9 @@
 import os
+import time
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from sqlalchemy import text
@@ -80,7 +81,12 @@ app = FastAPI(
     description="Production Microservices API for IMS with Domain Model Architecture, Employee Separation, Hierarchical Categories, RequestID Correlation, Structured JSON Logging & Audit Logging.",
     version="4.0.0",
     lifespan=lifespan,
+    docs_url=None if _IS_PRODUCTION else "/docs",
+    redoc_url=None if _IS_PRODUCTION else "/redoc",
+    openapi_url=None if _IS_PRODUCTION else "/openapi.json",
 )
+
+_STARTED_AT = time.monotonic()
 
 # 0. Request Correlation & Observability Middleware (X-Request-ID)
 app.add_middleware(RequestCorrelationMiddleware)
@@ -113,7 +119,6 @@ app.add_middleware(
 )
 
 # Register Microservice Route Handlers
-app.include_router(work_sessions.router)
 app.include_router(auth.router)
 app.include_router(users.router)
 app.include_router(employees.router)
@@ -266,3 +271,17 @@ def cache_statistics():
     Real-time Redis Cache-Aside Hit/Miss ratio telemetry endpoint
     """
     return get_cache_stats()
+
+
+@app.get("/metrics", include_in_schema=False)
+def metrics():
+    uptime = max(0.0, time.monotonic() - _STARTED_AT)
+    body = (
+        "# HELP ims_up Application process availability.\n"
+        "# TYPE ims_up gauge\n"
+        "ims_up 1\n"
+        "# HELP ims_process_uptime_seconds Process uptime in seconds.\n"
+        "# TYPE ims_process_uptime_seconds gauge\n"
+        f"ims_process_uptime_seconds {uptime:.3f}\n"
+    )
+    return Response(content=body, media_type="text/plain; version=0.0.4")

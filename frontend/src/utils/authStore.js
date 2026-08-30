@@ -11,7 +11,7 @@
 
 import React, { createContext, useContext, useReducer, useEffect, useCallback } from 'react';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_BASE = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
 
 // ─── Storage Keys ─────────────────────────────────────────────────────────────
 const STORAGE_KEYS = {

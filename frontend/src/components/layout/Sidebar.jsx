@@ -94,6 +94,7 @@ export default function Sidebar({ activeTab, setActiveTab, currentUser, onLogout
     {
       title: 'ADMINISTRATION',
       items: [
+        { id: 'control_center', label: 'Operations Control Center', icon: Sliders, perm: 'system.config' },
         { id: 'users', label: 'User & RBAC Control', icon: UserCog, perm: 'users.manage' },
         { id: 'audit', label: 'Security Audit Logs', icon: ShieldAlert, perm: 'audit.view' },
       ],
@@ -145,6 +146,8 @@ export default function Sidebar({ activeTab, setActiveTab, currentUser, onLogout
                 const IconComponent = item.icon;
                 const isActive = activeTab === item.id;
 
+                const isNeedsAttention = item.id === 'attention';
+
                 return (
                   <button
                     key={item.id}
@@ -157,15 +160,15 @@ export default function Sidebar({ activeTab, setActiveTab, currentUser, onLogout
                       width: '100%',
                       padding: '8px 10px',
                       borderRadius: 'var(--radius-xs)',
-                      border: 'none',
-                      background: isActive ? 'var(--color-paper-2)' : 'transparent',
+                      border: isNeedsAttention ? '1px solid rgba(59, 130, 246, 0.4)' : 'none',
+                      background: isActive ? 'var(--color-paper-2)' : isNeedsAttention ? 'rgba(59, 130, 246, 0.05)' : 'transparent',
                       color: isActive ? 'var(--color-accent)' : 'var(--color-ink)',
-                      fontWeight: isActive ? 700 : 500,
+                      fontWeight: isActive || isNeedsAttention ? 700 : 500,
                       fontSize: '0.8125rem',
                       cursor: 'pointer',
                       textAlign: 'left',
                       transition: 'all 0.15s ease',
-                      boxShadow: isActive ? 'inset 2px 0 0 var(--color-accent)' : 'none',
+                      boxShadow: isActive ? 'inset 2px 0 0 var(--color-accent)' : isNeedsAttention ? '0 0 6px rgba(59, 130, 246, 0.2)' : 'none',
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>

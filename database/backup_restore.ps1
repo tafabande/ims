@@ -6,7 +6,7 @@
 
 param(
     [string]$BackupDir = "$PSScriptRoot\backups",
-    [string]$ContainerName = "ims_postgres",
+    [string]$ContainerName = "ims-postgres-db",
     [string]$PostgresUser = "ims_user",
     [string]$PostgresDb = "ims_db",
     [int]$RetentionDays = 30,
@@ -46,6 +46,15 @@ try {
     }
 
     Write-Host "Backup file successfully created: $CompressedFile" -ForegroundColor Green
+
+    if (-not $EncryptionKey) {
+        throw "BACKUP_ENCRYPTION_KEY is required. Refusing to keep an unencrypted backup."
+    }
+
+    $EncryptedFile = "$CompressedFile.enc"
+    openssl enc -aes-256-cbc -salt -pbkdf2 -in $CompressedFile -out $EncryptedFile -pass "pass:$EncryptionKey"
+    Remove-Item -LiteralPath $CompressedFile -Force
+    $CompressedFile = $EncryptedFile
 
     # 3. Apply Retention Cleanup
     Write-Host "[3/3] Enforcing retention policy ($RetentionDays days)..." -ForegroundColor Gray

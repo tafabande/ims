@@ -14,7 +14,7 @@
 
 import { STORAGE_KEYS_REF } from './authStore.js';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_BASE = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
 
 const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 const NON_RETRYABLE_STATUSES = new Set([400, 403, 404, 409, 422]);
