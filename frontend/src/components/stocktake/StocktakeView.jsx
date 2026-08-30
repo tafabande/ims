@@ -1,12 +1,27 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ClipboardList, CheckCircle2, AlertTriangle, Play, FileSpreadsheet } from 'lucide-react';
+import { apiGet } from '../../utils/apiClient';
 
 export default function StocktakeView({ onShowToast }) {
   const [stocktakes, setStocktakes] = useState([]);
+  const [branches, setBranches] = useState([
+    { id: 1, name: 'Harare Flagship Store (STR-HRE-001)' },
+    { id: 2, name: 'Bulawayo Branch (STR-BYO-001)' }
+  ]);
+
+  useEffect(() => {
+    apiGet('/stores')
+      .then(res => {
+        if (Array.isArray(res) && res.length > 0) {
+          setBranches(res.map(s => ({ id: s.id, name: `${s.name} (${s.store_code || s.id})` })));
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({
-    store_name: 'Harare Flagship Store (STR-HRE-001)',
+    store_name: branches[0]?.name || 'Harare Flagship Store (STR-HRE-001)',
     reason: 'PERIODIC_AUDIT',
     product_name: 'Dell XPS 15 9530',
     system_qty: 10,
@@ -143,8 +158,9 @@ export default function StocktakeView({ onShowToast }) {
                   onChange={e => setFormData({ ...formData, store_name: e.target.value })}
                   style={{ width: '100%', padding: '8px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-rule)', background: 'var(--color-paper-2)', color: 'var(--color-ink)' }}
                 >
-                  <option value="Harare Flagship Store (STR-HRE-001)">Harare Flagship Store (STR-HRE-001)</option>
-                  <option value="Bulawayo Branch (STR-BYO-001)">Bulawayo Branch (STR-BYO-001)</option>
+                  {branches.map(b => (
+                    <option key={b.id} value={b.name}>{b.name}</option>
+                  ))}
                 </select>
               </div>
               <div>

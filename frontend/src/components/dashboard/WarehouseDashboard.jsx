@@ -18,10 +18,21 @@ export default function WarehouseDashboard({
 }) {
   const lowStockItems = products.filter(p => p.stock_quantity <= p.reorder_level && p.stock_quantity > 0);
   const outOfStockItems = products.filter(p => p.stock_quantity === 0);
-  const pendingPurchases = purchases.filter(p => p.status === 'PENDING' || p.status === 'ORDERED').length || 4;
+  const pendingPurchases = purchases.filter(p => p.status === 'PENDING' || p.status === 'ORDERED').length;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      
+      {/* Question Heading: What needs to physically move? */}
+      <div style={{ background: 'var(--color-paper-surface)', border: '1px solid var(--color-rule)', borderRadius: 'var(--radius-md)', padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <div style={{ fontSize: '0.7rem', fontWeight: 800, fontFamily: 'monospace', color: 'var(--color-accent)' }}>LOGISTICS & WAREHOUSE DESK</div>
+          <h2 style={{ fontSize: '1.2rem', fontWeight: 800, margin: '2px 0 0 0', color: 'var(--color-ink)' }}>What needs to physically move?</h2>
+        </div>
+        <button className="btn btn-primary" onClick={() => onNavigate('transfers')} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <Truck size={16} /> Open Stock Transfers →
+        </button>
+      </div>
       
       {/* Warehouse Today's Workload KPI Grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>

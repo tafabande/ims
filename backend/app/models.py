@@ -1303,5 +1303,37 @@ class SessionEvent(Base):
     entity_id = Column(String(100), nullable=True)
     metadata_json = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
-
     work_session = relationship("WorkSession", back_populates="events")
+
+
+class NotificationRecord(Base):
+    __tablename__ = "notification_records"
+
+    id = Column(Integer, primary_key=True, index=True)
+    notification_code = Column(String(50), unique=True, index=True, nullable=False)
+    type = Column(String(50), nullable=False, default="ONE_TO_ONE")  # ONE_TO_ONE, ONE_TO_MANY, BROADCAST
+    target_type = Column(String(50), nullable=True)  # USER, ROLE, LOCATION, DEPARTMENT, TEAM, ORGANISATION
+    target_value = Column(String(100), nullable=True)  # e.g. STAFF, HARARE-WH-A
+    title = Column(String(255), nullable=False)
+    message = Column(Text, nullable=False)
+    severity = Column(String(50), nullable=False, default="INFO")  # INFO, SUCCESS, WARNING, ERROR, CRITICAL
+    resource_type = Column(String(50), nullable=True)  # CASE, WORK_SESSION, PURCHASE_ORDER, SALE
+    resource_id = Column(String(100), nullable=True)  # e.g. REF-2026-0042
+    created_by = Column(String(100), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    recipients = relationship("NotificationRecipientRecord", back_populates="notification", cascade="all, delete-orphan")
+
+
+class NotificationRecipientRecord(Base):
+    __tablename__ = "notification_recipient_records"
+
+    id = Column(Integer, primary_key=True, index=True)
+    notification_id = Column(Integer, ForeignKey("notification_records.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(String(100), nullable=False, index=True)
+    delivered_at = Column(DateTime, default=datetime.utcnow)
+    read_at = Column(DateTime, nullable=True)
+    dismissed_at = Column(DateTime, nullable=True)
+
+    notification = relationship("NotificationRecord", back_populates="recipients")
+

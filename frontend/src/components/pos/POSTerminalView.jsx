@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ShoppingCart,
   Search,
@@ -11,6 +11,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import ReceiptModal from '../sales/ReceiptModal';
+import { apiGet } from '../../utils/apiClient';
 
 export default function POSTerminalView({
   products = [],
@@ -18,7 +19,7 @@ export default function POSTerminalView({
   sales = [],
   onProcessSale,
   onShowToast,
-  gateways = [
+  gateways: propGateways = [
     { id: 'cash', name: 'Cash (USD / ZiG)', type: 'CASH', surchargePct: 0.0, enabled: true, usage: 'BOTH' },
     { id: 'ecocash', name: 'EcoCash Mobile Money', type: 'MOBILE_WALLET', surchargePct: 2.5, enabled: true, usage: 'BOTH' },
     { id: 'telecash', name: 'Telecash Mobile', type: 'MOBILE_WALLET', surchargePct: 2.0, enabled: true, usage: 'CUSTOMER' },
@@ -28,20 +29,47 @@ export default function POSTerminalView({
     { id: 'zipit', name: 'Inter-Bank ZIPIT Transfer', type: 'BANK_INTERBANK', surchargePct: 1.0, enabled: true, usage: 'BOTH' },
     { id: 'rtgs', name: 'RTGS Electronic Bank Transfer', type: 'BANK_DOMESTIC', surchargePct: 0.5, enabled: true, usage: 'BOTH' }
   ],
-  salesPolicy = {
-    maxCashierDiscountPct: 5.0,
-    highValueApprovalThreshold: 1000.00,
+  salesPolicy: propSalesPolicy = {
+    maxCashierDiscountPct: 2.0,
+    highValueApprovalThreshold: 100.00,
     standardTaxRatePct: 10.0,
     zigExchangeRate: 13.50,
     allowNegativeStockSale: false
   },
   onPendingApprovalSubmit
 }) {
+  const [gateways, setGateways] = useState(propGateways);
+  const [salesPolicy, setSalesPolicy] = useState(propSalesPolicy);
+
+  useEffect(() => {
+    apiGet('/sales/policy')
+      .then(policy => {
+        if (policy) setSalesPolicy(prev => ({ ...prev, ...policy }));
+      })
+      .catch(() => {});
+
+    apiGet('/payments/methods')
+      .then(methods => {
+        if (Array.isArray(methods) && methods.length > 0) {
+          const mapped = methods.map(m => ({
+            id: m.code || `method_${m.id}`,
+            name: m.name,
+            type: m.type,
+            surchargePct: m.markup_percentage || 0,
+            enabled: m.active ?? true,
+            usage: 'BOTH'
+          }));
+          setGateways(mapped);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   const [activeTab, setActiveTab] = useState('pos'); // 'pos' | 'history'
   const [searchTerm, setSearchTerm] = useState('');
   const [cart, setCart] = useState([]);
   const [customerId, setCustomerId] = useState(customers[0]?.id || 1);
-  const [selectedGatewayId, setSelectedGatewayId] = useState('cash');
+  const [selectedGatewayId, setSelectedGatewayId] = useState(gateways[0]?.id || 'cash');
   const [activeInvoice, setActiveInvoice] = useState(null);
   const [validationError, setValidationError] = useState('');
 

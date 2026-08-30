@@ -175,18 +175,14 @@ def require_permission(permission: str):
             or (req_dot in ["inventory.read", "inventory.view"] and "inventory.view" in user_perms_dot)
             or (
                 req_dot in ["reports.read", "reports.view"]
-                and (
-                    "reports.view" in user_perms_dot
-                    or "reports.read" in user_perms_dot
-                    or user.role in ["MANAGER", "APP_ADMIN", "SYSADMIN"]
-                )
+                and ("reports.view" in user_perms_dot or "reports.read" in user_perms_dot)
             )
             or (
                 req_dot.startswith("purchases.")
                 and (
                     "purchases.view" in user_perms_dot
                     or "purchases.approve" in user_perms_dot
-                    or user.role in ["MANAGER", "APP_ADMIN", "SYSADMIN"]
+                    or "purchases.create" in user_perms_dot
                 )
             )
             or (
@@ -195,14 +191,9 @@ def require_permission(permission: str):
             )
             or (
                 req_dot.startswith("system.")
-                and (
-                    "system.config" in user_perms_dot
-                    or "stores.manage" in user_perms_dot
-                    or user.role in ["APP_ADMIN", "SYSADMIN", "MANAGER"]
-                )
+                and ("system.config" in user_perms_dot or "stores.manage" in user_perms_dot)
             )
             or (req_dot.startswith("users.") and "users.manage" in user_perms_dot)
-            or (user.role in ["ADMIN", "APP_ADMIN", "SYSADMIN"] and (req_dot.startswith(("users.", "system."))))
         )
 
         if not has_perm:

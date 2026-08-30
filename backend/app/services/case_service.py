@@ -182,12 +182,19 @@ class UnifiedCaseService:
     def create_case(self, data: dict[str, Any]) -> dict[str, Any]:
         case_id = len(self.cases) + 1
         prefix_map = {
+            "REFUND_APPROVAL": "REF",
             "REFUND_REQUEST": "REF",
             "RECEIVING_DISCREPANCY": "DISC",
             "FLOAT_VARIANCE": "FV",
+            "CASH_VARIANCE": "FV",
             "STOCK_ADJUSTMENT": "ADJ",
             "SYSTEM_ERROR": "INC",
             "PRICE_OVERRIDE": "OVR",
+            "STOCK_TRANSFER_EXCEPTION": "TRX",
+            "DAMAGED_GOODS": "DMG",
+            "MISSING_STOCK": "MIS",
+            "FAILED_TRANSACTION": "FLT",
+            "WORK_SESSION_EXCEPTION": "WSX",
         }
         prefix = prefix_map.get(data.get("case_type"), "CAS")
         case_num = f"{prefix}-2026-{Math_floor_rand(case_id)}"
@@ -244,6 +251,12 @@ class UnifiedCaseService:
         if not case:
             return {"status": "ERROR", "message": f"Case {case_number} not found."}
 
+        if case["status"] in ["APPROVED", "DENIED", "EXECUTED", "CLOSED"]:
+            return {
+                "status": "ERROR",
+                "message": f"Case '{case_number}' is already resolved ({case['status']}) and cannot be modified.",
+            }
+
         old_status = case["status"]
         valid_decisions = [
             "APPROVED",
@@ -282,6 +295,23 @@ class UnifiedCaseService:
             "created_at": now,
         }
         case["events"].append(event_entry)
+
+        # Trigger notification dispatch to creator / relevant role
+        try:
+            from app.services.notification_service import notification_service
+            severity = "SUCCESS" if decision_upper in ["APPROVED", "EXECUTED"] else "WARNING" if decision_upper == "DENIED" else "INFO"
+            notification_service.create_notification(
+                notif_type="ONE_TO_ONE",
+                title=f"Case {case['case_number']} {decision_upper}",
+                message=f"Case #{case['case_number']} ({case.get('case_type')}) was marked {decision_upper} by {reviewer}. Notes: {comment}",
+                severity=severity,
+                recipient_id=case.get("created_by"),
+                recipient_role="STAFF",
+                case_id=case["case_number"],
+                action_url="/attention"
+            )
+        except Exception as e:
+            print(f"Notification notice: {e}")
 
         return {
             "status": "SUCCESS",

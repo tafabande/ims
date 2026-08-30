@@ -15,11 +15,34 @@ export default function Navbar({
   onLogout,
 }) {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [showNotificationsMenu, setShowNotificationsMenu] = useState(false);
+  const [notificationsList, setNotificationsList] = useState([]);
 
+  useEffect(() => {
+    import('../../utils/apiClient').then(({ apiGet }) => {
+      apiGet('/notifications')
+        .then(res => {
+          if (Array.isArray(res)) setNotificationsList(res);
+        })
+        .catch(() => {});
+    });
+  }, []);
+
+  const unreadCount = notificationsList.filter(n => !n.read_at).length;
   const displayName = currentUser?.fullName || currentUser?.full_name || 'User';
   const displayEmail = currentUser?.email || '';
   const displayRole = currentUser?.role || 'STAFF';
   const userCode = currentUser?.userCode || currentUser?.user_code || '';
+
+  const handleMarkAllRead = () => {
+    import('../../utils/apiClient').then(({ apiPost }) => {
+      apiPost('/notifications/read-all', {})
+        .then(() => {
+          setNotificationsList(prev => prev.map(n => ({ ...n, read_at: new Date().toISOString() })));
+        })
+        .catch(() => {});
+    });
+  };
 
   return (
     <header
@@ -64,13 +87,13 @@ export default function Navbar({
 
       {/* Right Controls */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-        {/* Low Stock Alert */}
-        {lowStockCount > 0 && (
+        {/* Central Notification Bell Indicator & Drawer */}
+        <div style={{ position: 'relative' }}>
           <button
-            onClick={onNavigateToLowStock}
+            onClick={() => setShowNotificationsMenu(!showNotificationsMenu)}
             style={{
               background: 'var(--color-paper-2)',
-              border: '1px solid var(--color-rule)',
+              border: unreadCount > 0 ? '1px solid rgba(59, 130, 246, 0.4)' : '1px solid var(--color-rule)',
               borderRadius: 'var(--radius-sm)',
               padding: '6px 12px',
               color: 'var(--color-ink)',
@@ -80,15 +103,75 @@ export default function Navbar({
               gap: '8px',
               fontSize: '0.8125rem',
               fontWeight: 600,
+              boxShadow: unreadCount > 0 ? '0 0 8px rgba(59, 130, 246, 0.2)' : 'none'
             }}
-            title="View Low Stock Alerts"
+            title="System Operational Notifications"
           >
-            <Bell size={16} color="var(--color-accent)" />
-            <span className="badge badge-warning" style={{ padding: '1px 6px', borderRadius: '4px' }}>
-              {lowStockCount} LOW
-            </span>
+            <Bell size={16} color={unreadCount > 0 ? '#3b82f6' : 'var(--color-ink-muted)'} />
+            {unreadCount > 0 && (
+              <span style={{ background: '#3b82f6', color: '#ffffff', borderRadius: '10px', padding: '1px 6px', fontSize: '0.7rem', fontWeight: 800 }}>
+                {unreadCount}
+              </span>
+            )}
           </button>
-        )}
+
+          {showNotificationsMenu && (
+            <div
+              style={{
+                position: 'absolute',
+                top: 'calc(100% + 8px)',
+                right: 0,
+                width: '340px',
+                background: 'var(--color-paper)',
+                border: '1px solid var(--color-rule)',
+                borderRadius: 'var(--radius-md)',
+                boxShadow: 'var(--shadow-lg)',
+                padding: '12px',
+                zIndex: 100,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '8px'
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '8px', borderBottom: '1px solid var(--color-rule)' }}>
+                <span style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--color-ink)', fontFamily: 'var(--font-mono)' }}>Notifications</span>
+                {unreadCount > 0 && (
+                  <button onClick={handleMarkAllRead} style={{ background: 'none', border: 'none', color: 'var(--color-accent)', fontSize: '0.75rem', cursor: 'pointer', fontWeight: 700 }}>
+                    Mark all read
+                  </button>
+                )}
+              </div>
+
+              <div style={{ maxHeight: '280px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                {notificationsList.length === 0 ? (
+                  <div style={{ fontSize: '0.8rem', color: 'var(--color-ink-muted)', padding: '12px', textAlign: 'center' }}>
+                    No notifications right now.
+                  </div>
+                ) : (
+                  notificationsList.map(n => (
+                    <div
+                      key={n.id}
+                      style={{
+                        padding: '10px',
+                        borderRadius: 'var(--radius-xs)',
+                        background: n.read_at ? 'var(--color-paper-2)' : 'rgba(59, 130, 246, 0.08)',
+                        borderLeft: n.read_at ? '2px solid transparent' : '2px solid #3b82f6',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '2px'
+                      }}
+                    >
+                      <div style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--color-ink)' }}>
+                        {n.read_at ? '○' : '●'} {n.title}
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--color-ink-muted)' }}>{n.message}</div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Theme Toggle */}
         <button

@@ -15,6 +15,13 @@ DEFAULT_SYSTEM_SETTINGS = [
         "description": "Maximum negotiation discount % allowed for counter staff without manager approval",
     },
     {
+        "key": "sales.zig_exchange_rate",
+        "value": "13.50",
+        "data_type": "float",
+        "category": "sales",
+        "description": "Official exchange rate (1 USD = X ZiG) for store currency conversion",
+    },
+    {
         "key": "sales.max_manager_discount",
         "value": "5.0",
         "data_type": "float",

@@ -20,13 +20,13 @@ import {
   Percent
 } from 'lucide-react';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip } from 'recharts';
+import { apiGet } from '../../utils/apiClient';
 
 export default function PlanningView({ currentRole, onShowToast }) {
   const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'performance' | 'forecast' | 'inventory_outlook' | 'targets'
   const [showMethodModal, setShowMethodModal] = useState(false);
 
-  // Master Planning Dataset
-  const historicalData = {
+  const [historicalData, setHistoricalData] = useState({
     quarters: [
       { period: "Q3 '25", revenue: 195000, margin_pct: 20.8, refund_rate: 3.8, stock_accuracy: 98.7 },
       { period: "Q4 '25", revenue: 228000, margin_pct: 21.2, refund_rate: 3.2, stock_accuracy: 98.9 },
@@ -36,9 +36,9 @@ export default function PlanningView({ currentRole, onShowToast }) {
     ],
     qoq_growth_pct: 12.2,
     yoy_growth_pct: 22.6
-  };
+  });
 
-  const forecastData = {
+  const [forecastData, setForecastData] = useState({
     q4_target: 280000,
     q4_forecast: 266500,
     current_trajectory: 239000,
@@ -48,7 +48,30 @@ export default function PlanningView({ currentRole, onShowToast }) {
     velocity_pct_needed: 5.1,
     projected_shortfall_units: 180,
     reorder_recommended_units: 280
-  };
+  });
+
+  useEffect(() => {
+    apiGet('/planning/historical')
+      .then(res => {
+        if (res && res.quarters) setHistoricalData(res);
+      })
+      .catch(() => {});
+
+    apiGet('/planning/forecasts')
+      .then(res => {
+        if (res && res.revenue_forecast) {
+          setForecastData(prev => ({
+            ...prev,
+            q4_target: res.revenue_forecast.target_value,
+            q4_forecast: res.revenue_forecast.forecast_value,
+            gap_amount: Math.abs(res.revenue_forecast.gap_value),
+            projected_shortfall_units: res.inventory_shortfall_forecast?.projected_shortfall_units || 180,
+            reorder_recommended_units: res.inventory_shortfall_forecast?.reorder_recommendation_units || 280
+          }));
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const inventoryOutlookItems = [
     { sku: 'CAT6-300M', name: 'CAT6 Cable Roll 300m', current: 42, forecast_net: -18, recommended: 80, priority: 'CRITICAL' },
@@ -58,11 +81,11 @@ export default function PlanningView({ currentRole, onShowToast }) {
   ];
 
   const planPerformanceMatrix = [
-    { metric: 'Q3 Revenue', target: '$235,000', actual_forecast: '$239,000', status: 'Ahead', color: '#10b981' },
-    { metric: 'Q3 Gross Margin', target: '22.0%', actual_forecast: '23.0%', status: 'Ahead', color: '#10b981' },
-    { metric: 'Q4 Revenue Target', target: '$280,000', actual_forecast: '$266,500', status: 'At Risk', color: '#f59e0b' },
-    { metric: 'Inventory Stock Accuracy', target: '≥ 99.0%', actual_forecast: '99.4%', status: 'Ahead', color: '#10b981' },
-    { metric: 'Customer Refund Rate', target: '< 3.0%', actual_forecast: '2.7%', status: 'Ahead', color: '#10b981' }
+    { metric: 'Q3 Revenue', target: '$235,000', actual_forecast: `$${(historicalData.quarters[historicalData.quarters.length - 1]?.revenue || 239000).toLocaleString()}`, status: 'Ahead', color: '#10b981' },
+    { metric: 'Q3 Gross Margin', target: '22.0%', actual_forecast: `${historicalData.quarters[historicalData.quarters.length - 1]?.margin_pct || 23.0}%`, status: 'Ahead', color: '#10b981' },
+    { metric: 'Q4 Revenue Target', target: `$${(forecastData.q4_target || 280000).toLocaleString()}`, actual_forecast: `$${(forecastData.q4_forecast || 266500).toLocaleString()}`, status: 'At Risk', color: '#f59e0b' },
+    { metric: 'Inventory Stock Accuracy', target: '≥ 99.0%', actual_forecast: `${historicalData.quarters[historicalData.quarters.length - 1]?.stock_accuracy || 99.4}%`, status: 'Ahead', color: '#10b981' },
+    { metric: 'Customer Refund Rate', target: '< 3.0%', actual_forecast: `${historicalData.quarters[historicalData.quarters.length - 1]?.refund_rate || 2.7}%`, status: 'Ahead', color: '#10b981' }
   ];
 
   return (

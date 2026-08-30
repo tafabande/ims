@@ -24,6 +24,7 @@ import {
   ResponsiveContainer, 
   CartesianGrid 
 } from 'recharts';
+import { apiGet } from '../../utils/apiClient';
 
 export default function AdminDashboard({ 
   users = [], 
@@ -49,23 +50,29 @@ export default function AdminDashboard({
 
   const [activeGraphTab, setActiveGraphTab] = useState('RESOURCES'); // 'RESOURCES' | 'LATENCY'
 
-  // Live Auto-Refresh Simulation Interval
+  // Live Auto-Refresh API Fetch Interval
   useEffect(() => {
-    const interval = setInterval(() => {
-      const now = new Date();
-      const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
-      
-      const newCpu = Math.floor(18 + Math.random() * 26);
-      const newRam = parseFloat((3.1 + Math.random() * 0.8).toFixed(1));
-      const newLatency = Math.floor(12 + Math.random() * 22);
-      const newDbPool = Math.floor(11 + Math.random() * 10);
+    const fetchTelemetry = () => {
+      apiGet('/integrity/telemetry')
+        .then(data => {
+          if (data) {
+            setTelemetryStream(prev => {
+              const nextPoint = {
+                time: data.timestamp || new Date().toLocaleTimeString(),
+                cpu: data.cpu_usage_pct,
+                ram: data.ram_usage_gb,
+                latency: data.latency_ms,
+                dbPool: data.active_db_connections
+              };
+              return [...prev.slice(1), nextPoint];
+            });
+          }
+        })
+        .catch(() => {});
+    };
 
-      setTelemetryStream(prev => {
-        const next = [...prev.slice(1), { time: timeStr, cpu: newCpu, ram: newRam, latency: newLatency, dbPool: newDbPool }];
-        return next;
-      });
-    }, 2500);
-
+    fetchTelemetry();
+    const interval = setInterval(fetchTelemetry, 3000);
     return () => clearInterval(interval);
   }, []);
 
@@ -74,6 +81,17 @@ export default function AdminDashboard({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       
+      {/* Question Heading: Is the organisation/system operating correctly? */}
+      <div style={{ background: 'var(--color-paper-surface)', border: '1px solid var(--color-rule)', borderRadius: 'var(--radius-md)', padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <div style={{ fontSize: '0.7rem', fontWeight: 800, fontFamily: 'monospace', color: 'var(--color-accent)' }}>SYSTEM & ORGANISATION INFRASTRUCTURE</div>
+          <h2 style={{ fontSize: '1.2rem', fontWeight: 800, margin: '2px 0 0 0', color: 'var(--color-ink)' }}>Is the organisation/system operating correctly?</h2>
+        </div>
+        <button className="btn btn-primary" onClick={() => onNavigate('cms')} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <Settings size={16} /> Operations Control Center →
+        </button>
+      </div>
+
       {/* Server Telemetry & Performance KPI Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px' }}>
         

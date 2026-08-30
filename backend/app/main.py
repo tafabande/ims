@@ -21,6 +21,7 @@ from app.routes import (
     auth,
     cases,
     employees,
+    health,
     import_export,
     imports,
     integrations,
@@ -135,6 +136,7 @@ app.include_router(transfers.router)
 app.include_router(planning.router)
 app.include_router(notifications.router)
 app.include_router(cases.router)
+app.include_router(health.router)
 app.include_router(registries.router)
 
 

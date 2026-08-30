@@ -107,10 +107,18 @@ export default function App() {
     localStorage.setItem('ims_theme', theme);
   }, [theme]);
 
+function userCan(user, permission) {
+  if (!user) return false;
+  if (Array.isArray(user.permissions) && user.permissions.length > 0) {
+    return user.permissions.includes(permission);
+  }
+  return can(user.role, permission);
+}
+
   // Fetch low stock count from API (not from local state)
   useEffect(() => {
     if (!isAuthenticated || !user) return;
-    if (!can(user.role, 'inventory.view')) return;
+    if (!userCan(user, 'inventory.view')) return;
     apiGet('/products?low_stock=true&limit=1')
       .then((data) => setLowStockCount(data?.low_stock_count ?? data?.total ?? 0))
       .catch(() => {});
@@ -127,8 +135,8 @@ export default function App() {
   // Tab navigation guard — redirect if user lacks permission
   const handleSetActiveTab = useCallback((tab) => {
     const requiredPerm = ROUTE_PERMISSIONS[tab];
-    if (requiredPerm && user && !can(user.role, requiredPerm)) {
-      handleShowToast('error', 'Access Denied', `Your role (${user.role}) does not have access to this section.`);
+    if (requiredPerm && user && !userCan(user, requiredPerm)) {
+      handleShowToast('error', 'Access Denied', `Your user context does not have access to this section.`);
       return;
     }
     setActiveTab(tab);

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   ShieldCheck, 
   Sliders, 
@@ -16,6 +16,7 @@ import {
   Activity
 } from 'lucide-react';
 import ShiftCalendarWidget from './ShiftCalendarWidget';
+import { apiGet } from '../../utils/apiClient';
 
 export default function ManagerDashboard({ 
   products = [], 
@@ -24,6 +25,25 @@ export default function ManagerDashboard({
   onNavigate 
 }) {
   const [showIntelligence, setShowIntelligence] = useState(false);
+  const [activeTillCount, setActiveTillCount] = useState(1);
+  const [pendingCases, setPendingCases] = useState([]);
+
+  useEffect(() => {
+    apiGet('/work-sessions/active')
+      .then(data => {
+        if (data) setActiveTillCount(1);
+        else setActiveTillCount(0);
+      })
+      .catch(() => setActiveTillCount(0));
+
+    apiGet('/cases')
+      .then(res => {
+        if (Array.isArray(res)) {
+          setPendingCases(res.filter(c => c.status === 'PENDING' || c.status === 'PENDING_REVIEW'));
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const totalProducts = products.length;
   const lowStockItems = products.filter(p => p.stock_quantity <= p.reorder_level && p.stock_quantity > 0);
@@ -55,51 +75,41 @@ export default function ManagerDashboard({
               LEVEL 1 • ACTION REQUIRED
             </div>
             <h2 style={{ fontSize: '1.2rem', fontWeight: 800, margin: '2px 0 0 0', color: 'var(--color-ink)' }}>
-              Operational Items Awaiting Your Decision
+              What requires my decision?
             </h2>
           </div>
-          <span style={{ fontSize: '0.75rem', padding: '4px 10px', borderRadius: '12px', background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', fontWeight: 800, fontFamily: 'var(--font-mono)' }}>
-            3 Action Required
+          <span style={{ fontSize: '0.75rem', padding: '4px 10px', borderRadius: '12px', background: pendingCases.length > 0 ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.15)', color: pendingCases.length > 0 ? '#ef4444' : '#10b981', fontWeight: 800, fontFamily: 'var(--font-mono)' }}>
+            {pendingCases.length} Action Required
           </span>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '12px' }}>
           
-          <div style={{ background: 'var(--color-paper-2)', padding: '14px', borderRadius: 'var(--radius-xs)', border: '1px solid var(--color-rule)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                <span style={{ fontSize: '0.7rem', fontFamily: 'var(--font-mono)', color: 'var(--color-ink-muted)', fontWeight: 700 }}>REFUND REQUEST</span>
-                <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#ef4444' }}>$340.00</span>
-              </div>
-              <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--color-ink)' }}>Customer Refund Request</div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--color-ink-muted)', marginTop: '2px' }}>REF-2026-0042 • Cashier: Sarah M.</div>
+          {pendingCases.length === 0 ? (
+            <div style={{ background: 'var(--color-paper-2)', padding: '16px', borderRadius: 'var(--radius-xs)', border: '1px solid var(--color-rule)', color: 'var(--color-ink-muted)', fontSize: '0.85rem' }}>
+              ✓ Clear Queue. No operational cases awaiting managerial decision right now.
             </div>
-            <button 
-              className="btn btn-secondary" 
-              onClick={() => onNavigate('attention')}
-              style={{ marginTop: '12px', fontSize: '0.75rem', width: '100%', padding: '6px' }}
-            >
-              Review Refund Request →
-            </button>
-          </div>
-
-          <div style={{ background: 'var(--color-paper-2)', padding: '14px', borderRadius: 'var(--radius-xs)', border: '1px solid var(--color-rule)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                <span style={{ fontSize: '0.7rem', fontFamily: 'var(--font-mono)', color: 'var(--color-ink-muted)', fontWeight: 700 }}>RECEIVING DISCREPANCY</span>
-                <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#ef4444' }}>-2 Units Missing</span>
+          ) : (
+            pendingCases.map(c => (
+              <div key={c.id || c.case_number} style={{ background: 'var(--color-paper-2)', padding: '14px', borderRadius: 'var(--radius-xs)', border: '1px solid var(--color-rule)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                    <span style={{ fontSize: '0.7rem', fontFamily: 'var(--font-mono)', color: 'var(--color-ink-muted)', fontWeight: 700 }}>{c.case_type}</span>
+                    <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#ef4444' }}>${(c.amount || 0).toFixed(2)}</span>
+                  </div>
+                  <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--color-ink)' }}>{c.subject || c.case_number}</div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--color-ink-muted)', marginTop: '2px' }}>{c.case_number} • By: {c.created_by}</div>
+                </div>
+                <button 
+                  className="btn btn-secondary" 
+                  onClick={() => onNavigate('attention')}
+                  style={{ marginTop: '12px', fontSize: '0.75rem', width: '100%', padding: '6px' }}
+                >
+                  Review Operational Case →
+                </button>
               </div>
-              <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--color-ink)' }}>Delivery Shortage PO-00431</div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--color-ink-muted)', marginTop: '2px' }}>DISC-2026-0087 • Supplier: XYZ Tech</div>
-            </div>
-            <button 
-              className="btn btn-secondary" 
-              onClick={() => onNavigate('attention')}
-              style={{ marginTop: '12px', fontSize: '0.75rem', width: '100%', padding: '6px' }}
-            >
-              Resolve Discrepancy →
-            </button>
-          </div>
+            ))
+          )}
 
           <div style={{ background: 'var(--color-paper-2)', padding: '14px', borderRadius: 'var(--radius-xs)', border: '1px solid var(--color-rule)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
             <div>
@@ -136,7 +146,7 @@ export default function ManagerDashboard({
           <div style={{ background: 'var(--color-paper-surface)', border: '1px solid var(--color-rule)', borderRadius: 'var(--radius-sm)', padding: '16px' }}>
             <div style={{ fontSize: '0.7rem', fontFamily: 'var(--font-mono)', color: 'var(--color-ink-muted)', fontWeight: 700 }}>ACTIVE WORK SESSIONS</div>
             <div style={{ fontSize: '1.7rem', fontWeight: 800, fontFamily: 'var(--font-mono)', margin: '4px 0 2px 0', color: 'var(--color-ink)' }}>
-              7 <span style={{ fontSize: '0.85rem', color: 'var(--color-signal-green)', fontWeight: 600 }}>Active Tills</span>
+              {activeTillCount} <span style={{ fontSize: '0.85rem', color: 'var(--color-signal-green)', fontWeight: 600 }}>Active Tills</span>
             </div>
             <div style={{ fontSize: '0.75rem', color: 'var(--color-ink-muted)' }}>Store POS Registers Running</div>
           </div>

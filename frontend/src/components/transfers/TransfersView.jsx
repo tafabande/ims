@@ -1,8 +1,23 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ArrowRightLeft, Building2, CheckCircle2, ArrowRight, Package, X } from 'lucide-react';
-import { DEV_14_BRANCHES } from '../../data/historical70YearsData';
+import { apiGet } from '../../utils/apiClient';
 
 export default function TransfersView({ onShowToast, currentRole = 'MANAGER' }) {
+  const [branches, setBranches] = useState([
+    { id: 1, name: 'Harare Flagship Store (STR-HRE-01)' },
+    { id: 2, name: 'Bulawayo Commercial Branch (STR-BYO-02)' }
+  ]);
+
+  useEffect(() => {
+    apiGet('/stores')
+      .then(res => {
+        if (Array.isArray(res) && res.length > 0) {
+          setBranches(res.map(s => ({ id: s.id, name: `${s.name} (${s.store_code || s.id})` })));
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   const [transfers, setTransfers] = useState([
     {
       id: 1,
@@ -30,8 +45,8 @@ export default function TransfersView({ onShowToast, currentRole = 'MANAGER' }) 
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({
-    source_store: DEV_14_BRANCHES[0].name,
-    destination_store: DEV_14_BRANCHES[1].name,
+    source_store: branches[0]?.name || 'Harare Flagship Store (STR-HRE-01)',
+    destination_store: branches[1]?.name || 'Bulawayo Commercial Branch (STR-BYO-02)',
     product_name: 'USB-C 65W Universal Power Adapter',
     quantity: 10,
     notes: 'Inter-branch stock requisition'
@@ -139,7 +154,7 @@ export default function TransfersView({ onShowToast, currentRole = 'MANAGER' }) 
                   onChange={e => setFormData({ ...formData, source_store: e.target.value })}
                   style={{ width: '100%', padding: '8px', borderRadius: 'var(--radius-xs)', border: '1px solid var(--color-rule)', background: 'var(--color-canvas)', color: 'var(--color-text)', fontSize: '13px' }}
                 >
-                  {DEV_14_BRANCHES.map(b => (
+                  {branches.map(b => (
                     <option key={b.id} value={b.name}>{b.name}</option>
                   ))}
                 </select>
@@ -152,7 +167,7 @@ export default function TransfersView({ onShowToast, currentRole = 'MANAGER' }) 
                   onChange={e => setFormData({ ...formData, destination_store: e.target.value })}
                   style={{ width: '100%', padding: '8px', borderRadius: 'var(--radius-xs)', border: '1px solid var(--color-rule)', background: 'var(--color-canvas)', color: 'var(--color-text)', fontSize: '13px' }}
                 >
-                  {DEV_14_BRANCHES.map(b => (
+                  {branches.map(b => (
                     <option key={b.id} value={b.name}>{b.name}</option>
                   ))}
                 </select>

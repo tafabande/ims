@@ -99,7 +99,13 @@ def configure_product_pricing(
     return rule
 
 
-def check_price_negotiation(db: Session, product_id: int, offered_price: float, user_role: str = "STAFF") -> dict:
+def check_price_negotiation(
+    db: Session,
+    product_id: int,
+    offered_price: float,
+    user_role: str = "STAFF",
+    user_permissions: list[str] | None = None,
+) -> dict:
     product = db.query(Product).filter(Product.id == product_id).first()
     if not product:
         raise HTTPException(status_code=404, detail="Product not found.")
@@ -121,15 +127,21 @@ def check_price_negotiation(db: Session, product_id: int, offered_price: float, 
     requires_approval = False
     reason = "Offered price is within authorized negotiation bounds."
 
+    # Determine authority level based on permissions or role
+    has_mgr_authority = (
+        (user_permissions and ("sales.approve_large" in user_permissions or "sales.policy" in user_permissions))
+        or (user_role.upper() in ["MANAGER", "APP_ADMIN", "ADMIN", "SYSADMIN"])
+    )
+
     if offered_price < min_allowed_price:
         allowed_for_role = False
         requires_approval = True
         reason = f"BLOCKED: Offered price (${offered_price:.2f}) is below minimum allowed price floor (${min_allowed_price:.2f}). Approval request required."
-    elif user_role == "STAFF" and discount_pct > staff_limit_pct:
+    elif not has_mgr_authority and discount_pct > staff_limit_pct:
         allowed_for_role = False
         requires_approval = True
         reason = f"EXCEEDS STAFF LIMIT: Discount ({discount_pct:.1f}%) exceeds staff negotiation limit ({staff_limit_pct}%). Manager approval required."
-    elif user_role == "MANAGER" and discount_pct > manager_limit_pct:
+    elif has_mgr_authority and discount_pct > manager_limit_pct:
         allowed_for_role = False
         requires_approval = True
         reason = f"EXCEEDS MANAGER LIMIT: Discount ({discount_pct:.1f}%) exceeds manager limit ({manager_limit_pct}%). Executive approval required."

@@ -7,9 +7,22 @@ export default function ReportsView({ products, sales, purchases, categories, on
   const retailValuation = products.reduce((acc, p) => acc + (p.stock_quantity * p.selling_price), 0);
   const potentialProfit = retailValuation - costValuation;
 
-  const totalSalesRevenue = sales.reduce((acc, s) => acc + s.total_amount, 0);
-  const totalPurchaseExpenses = purchases.reduce((acc, p) => acc + p.total_amount, 0);
-  const grossProfit = totalSalesRevenue - (totalSalesRevenue * 0.7); // Estimated COGS @ 70%
+  const totalSalesRevenue = sales.reduce((acc, s) => acc + (s.total_amount || 0), 0);
+  const totalPurchaseExpenses = purchases.reduce((acc, p) => acc + (p.total_amount || 0), 0);
+
+  // Calculate actual COGS based on product cost basis
+  const totalCOGS = sales.reduce((acc, sale) => {
+    if (Array.isArray(sale.items) && sale.items.length > 0) {
+      const saleCost = sale.items.reduce((itemAcc, item) => {
+        const prod = products.find(p => p.id === item.product_id || p.name === item.name);
+        const unitCost = prod?.purchase_price ?? (item.price ? item.price * 0.75 : 0);
+        return itemAcc + (unitCost * (item.qty || item.quantity || 1));
+      }, 0);
+      return acc + saleCost;
+    }
+    return acc + ((sale.total_amount || 0) * 0.75);
+  }, 0);
+  const grossProfit = Math.max(0, totalSalesRevenue - totalCOGS);
 
   const lowStockItems = products.filter(p => p.stock_quantity <= p.reorder_level);
 

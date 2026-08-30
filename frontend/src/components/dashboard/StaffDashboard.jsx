@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Award, 
   Clock, 
@@ -10,21 +10,52 @@ import {
   CheckCircle2, 
   ShieldAlert,
   ArrowRight,
-  TrendingUp
+  TrendingUp,
+  AlertTriangle
 } from 'lucide-react';
+import { apiGet } from '../../utils/apiClient';
 
 export default function StaffDashboard({ 
   sales = [], 
-  salesPolicy = { zigExchangeRate: 13.50, standardTaxRatePct: 10, maxCashierDiscountPct: 5, highValueApprovalThreshold: 1000 },
+  salesPolicy = { zigExchangeRate: 13.50, standardTaxRatePct: 10, maxCashierDiscountPct: 2.0, highValueApprovalThreshold: 100.0 },
   onNavigate 
 }) {
+  const [activeSession, setActiveSession] = useState(null);
+  const [myCases, setMyCases] = useState([]);
+
+  useEffect(() => {
+    apiGet('/work-sessions/active')
+      .then(sess => setActiveSession(sess || null))
+      .catch(() => setActiveSession(null));
+
+    apiGet('/cases')
+      .then(res => {
+        if (Array.isArray(res)) setMyCases(res);
+      })
+      .catch(() => {});
+  }, []);
+
   const todaySalesTotal = sales.reduce((acc, s) => acc + (s.total_amount || 0), 0);
   const todaySalesCount = sales.length;
   const recentSales = sales.slice(0, 5);
 
+  const openingFloat = activeSession?.opening_cash || 150.00;
+  const tillStatusText = activeSession ? `Register ${activeSession.register_name || 'Till 01'} Active` : 'No Active Session';
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       
+      {/* Question Heading: What do I need to do? */}
+      <div style={{ background: 'var(--color-paper-surface)', border: '1px solid var(--color-rule)', borderRadius: 'var(--radius-md)', padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <div style={{ fontSize: '0.7rem', fontWeight: 800, fontFamily: 'monospace', color: 'var(--color-accent)' }}>STAFF OPERATIONAL DESK</div>
+          <h2 style={{ fontSize: '1.2rem', fontWeight: 800, margin: '2px 0 0 0', color: 'var(--color-ink)' }}>What do I need to do?</h2>
+        </div>
+        <button className="btn btn-primary" onClick={() => onNavigate('pos')} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <ShoppingCart size={16} /> Open POS Checkout →
+        </button>
+      </div>
+
       {/* Front-Desk Cashier Shift KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px' }}>
         
@@ -44,7 +75,7 @@ export default function StaffDashboard({
             ${todaySalesTotal.toFixed(2)}
           </div>
           <div style={{ fontSize: '11px', color: 'var(--color-ink-muted)' }}>
-            {(todaySalesTotal * salesPolicy.zigExchangeRate).toFixed(2)} ZiG • <strong>{todaySalesCount}</strong> Receipts Completed
+            {(todaySalesTotal * (salesPolicy?.zigExchangeRate || 13.5)).toFixed(2)} ZiG • <strong>{todaySalesCount}</strong> Receipts Completed
           </div>
         </div>
 
@@ -60,12 +91,12 @@ export default function StaffDashboard({
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--color-accent)', fontSize: '12px', fontWeight: '700', fontFamily: 'monospace' }}>
             <Clock size={16} /> REGISTER TILL STATUS
           </div>
-          <div style={{ fontSize: '1.3rem', fontWeight: '800', fontFamily: 'monospace', margin: '8px 0 4px 0', color: '#10b981', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10b981', display: 'inline-block' }}></span>
-            Till 01 Active
+          <div style={{ fontSize: '1.2rem', fontWeight: '800', fontFamily: 'monospace', margin: '8px 0 4px 0', color: activeSession ? '#10b981' : '#f59e0b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: activeSession ? '#10b981' : '#f59e0b', display: 'inline-block' }}></span>
+            {tillStatusText}
           </div>
           <div style={{ fontSize: '11px', color: 'var(--color-ink-muted)' }}>
-            Opening Cash Float: <strong>$200.00 USD</strong>
+            Opening Cash Float: <strong>${openingFloat.toFixed(2)} USD</strong>
           </div>
         </div>
 
@@ -81,11 +112,11 @@ export default function StaffDashboard({
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#f59e0b', fontSize: '12px', fontWeight: '700', fontFamily: 'monospace' }}>
             <Coffee size={16} /> CASHIER SHIFT SCHEDULE
           </div>
-          <div style={{ fontSize: '1.3rem', fontWeight: '800', fontFamily: 'monospace', margin: '8px 0 4px 0', color: 'var(--color-ink)' }}>
+          <div style={{ fontSize: '1.2rem', fontWeight: '800', fontFamily: 'monospace', margin: '8px 0 4px 0', color: 'var(--color-ink)' }}>
             08:00 - 16:30
           </div>
           <div style={{ fontSize: '11px', color: 'var(--color-ink-muted)' }}>
-            📍 Main Store Register • Terminal #1
+            📍 {activeSession?.store_name || 'Main Store Register'}
           </div>
         </div>
 

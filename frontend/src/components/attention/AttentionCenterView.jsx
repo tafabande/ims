@@ -30,6 +30,7 @@ import {
   TrendingUp
 } from 'lucide-react';
 import { can } from '../../utils/permissions';
+import { apiGet } from '../../utils/apiClient';
 
 export default function AttentionCenterView({ onShowToast, currentRole = 'MANAGER', onNavigate }) {
   // Case Filtering & Search State
