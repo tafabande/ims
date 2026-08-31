@@ -10,19 +10,10 @@
  */
 
 import React, { createContext, useContext, useReducer, useEffect, useCallback } from 'react';
+import { STORAGE_KEYS } from './storageKeys.js';
+import { apiPost, attemptTokenRefresh } from './apiClient.js';
 
-const API_BASE = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
-
-// ─── Storage Keys ─────────────────────────────────────────────────────────────
-const STORAGE_KEYS = {
-  ACCESS_TOKEN: 'ims_access_token',
-  REFRESH_TOKEN: 'ims_refresh_token',
-  USER: 'ims_user',
-  SESSION_ID: 'ims_session_id',
-};
-
-// Exported reference so apiClient.js can read tokens without importing the context
-export const STORAGE_KEYS_REF = STORAGE_KEYS;
+export { STORAGE_KEYS };
 
 // ─── Initial State ────────────────────────────────────────────────────────────
 function getInitialState() {
@@ -118,24 +109,17 @@ export function AuthProvider({ children }) {
   const [state, dispatch] = useReducer(authReducer, undefined, getInitialState);
 
   /**
-   * Login: POST /auth/login
+   * Login: POST /auth/login via central apiClient
    * Role is determined EXCLUSIVELY by the server from credentials.
    * The login UI provides username+password only — no role selection.
    */
   const login = useCallback(async (usernameOrEmail, password) => {
     dispatch({ type: 'LOGIN_START' });
     try {
-      const response = await fetch(`${API_BASE}/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: usernameOrEmail.trim(), password }),
+      const data = await apiPost('/api/auth/login', {
+        username: usernameOrEmail.trim(),
+        password,
       });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.detail || 'Authentication failed. Check your credentials.');
-      }
 
       const user = {
         id: data.user_id,
@@ -160,29 +144,24 @@ export function AuthProvider({ children }) {
 
       return { success: true, user };
     } catch (err) {
-      dispatch({ type: 'LOGIN_FAILURE', payload: { error: err.message } });
-      return { success: false, error: err.message };
+      const errorMessage = err.message || 'Authentication failed. Check your credentials.';
+      dispatch({ type: 'LOGIN_FAILURE', payload: { error: errorMessage } });
+      return { success: false, error: errorMessage };
     }
   }, []);
 
   /**
-   * Logout: POST /auth/logout → wipe ALL state → force full app remount
+   * Logout: POST /api/auth/logout via central apiClient → wipe ALL state → force full app remount
    * This is the ONLY safe way to switch users — no data from previous session survives.
    */
   const logout = useCallback(async () => {
-    const token = sessionStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
     const sessionId = sessionStorage.getItem(STORAGE_KEYS.SESSION_ID);
 
-    // Best-effort server-side session invalidation (don't block on failure)
+    // Best-effort server-side session invalidation via central apiClient
     try {
-      await fetch(`${API_BASE}/auth/logout`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({ session_id: sessionId }),
-      });
+      if (sessionId) {
+        await apiPost('/api/auth/logout', { session_id: sessionId });
+      }
     } catch {
       // Ignore network errors on logout — local wipe always happens
     }
@@ -230,7 +209,6 @@ export function AuthProvider({ children }) {
   };
 
   return React.createElement(AuthContext.Provider, { value }, children);
-
 }
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
@@ -241,14 +219,13 @@ export function useAuth() {
 }
 
 /**
- * Capability check using SERVER-ISSUED permissions (from JWT, stored in user object).
- * This is the authoritative check — it uses the permissions array returned by the server,
- * NOT the local ROLE_PERMISSIONS map.
+ * Capability check using SERVER-ISSUED permissions.
  *
- * Falls back to local map if no server permissions available (degraded mode).
+ * The client never derives permissions from role names.
+ * Missing permissions fail closed.
  */
 export function usePermission(permission) {
   const { user } = useAuth();
   if (!user) return false;
-  return user.permissions?.includes(permission) ?? false;
+  return user.permissions?.includes(permission) === true;
 }

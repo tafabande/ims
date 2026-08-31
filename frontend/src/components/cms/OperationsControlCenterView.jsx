@@ -26,14 +26,6 @@ export default function OperationsControlCenterView({ currentUser, onShowToast }
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  // Local state for role permission overrides preview
-  const [roleMatrix, setRoleMatrix] = useState(ROLE_PERMISSIONS);
-
-  // Fetch settings on mount
-  useEffect(() => {
-    fetchSettings();
-  }, []);
-
   const fetchSettings = async () => {
     setLoading(true);
     try {
@@ -51,6 +43,33 @@ export default function OperationsControlCenterView({ currentUser, onShowToast }
       setLoading(false);
     }
   };
+
+  // Fetch settings on mount
+  useEffect(() => {
+    let isMounted = true;
+    const loadInitialSettings = async () => {
+      try {
+        const data = await apiGet('/settings');
+        const map = {};
+        if (Array.isArray(data)) {
+          data.forEach((s) => {
+            map[s.key] = s.value;
+          });
+        }
+        if (isMounted) setSettings(map);
+      } catch (err) {
+        if (isMounted && onShowToast) {
+          onShowToast('error', 'Configuration Error', 'Failed to fetch operational configuration.');
+        }
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
+    loadInitialSettings();
+    return () => {
+      isMounted = false;
+    };
+  }, [onShowToast]);
 
   const handleInputChange = (key, value) => {
     setSettings((prev) => ({ ...prev, [key]: value }));
@@ -115,7 +134,7 @@ export default function OperationsControlCenterView({ currentUser, onShowToast }
         <div style={{ display: 'flex', gap: '10px' }}>
           <button 
             className="btn btn-secondary" 
-            onClick={fetchSettings}
+            onClick={() => { setLoading(true); fetchSettings(); }}
             disabled={loading || saving}
             style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
           >

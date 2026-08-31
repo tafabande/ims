@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Lock, User, ArrowRight, AlertCircle, Loader, Mail } from 'lucide-react';
+import { apiGet } from '../../utils/apiClient';
 import { useAuth } from '../../utils/authStore';
 
 /**
@@ -19,8 +20,7 @@ export default function LoginView({ onLoginSuccess }) {
 
   // Fetch IT admin contact info (public endpoint, no auth required)
   useEffect(() => {
-    fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/settings/contact`)
-      .then((r) => r.json())
+    apiGet('/api/settings/contact')
       .then((data) => setAdminContact(data))
       .catch(() => {}); // fail silently — login still works
   }, []);

@@ -27,7 +27,7 @@ from app.services.iam_service import (
     verify_password,
 )
 
-router = APIRouter(prefix="/auth", tags=["IAM & Authentication"])
+router = APIRouter(prefix="/api/auth", tags=["IAM & Authentication"])
 
 
 @router.post("/login", response_model=TokenResponse)

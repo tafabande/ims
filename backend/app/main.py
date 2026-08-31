@@ -56,14 +56,6 @@ from app.services.cache_service import get_cache_stats
 _ENVIRONMENT = os.getenv("ENVIRONMENT", "development").lower()
 _IS_PRODUCTION = _ENVIRONMENT == "production"
 
-# Create DB tables automatically in local development/test only
-if not _IS_PRODUCTION and os.getenv("AUTO_CREATE_TABLES", "false").lower() == "true":
-    try:
-        Base.metadata.create_all(bind=engine, checkfirst=True)
-    except Exception as e:
-        print(f"Schema notice: {e}")
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # NEVER seed sample users or predictable default credentials in production
@@ -138,8 +130,6 @@ app.include_router(notifications.router)
 app.include_router(cases.router)
 app.include_router(health.router)
 app.include_router(registries.router)
-
-
 app.include_router(stocktakes.router)
 app.include_router(promotions.router)
 app.include_router(reservations.router)
@@ -161,18 +151,9 @@ app.include_router(work_sessions.router)
 @app.get("/")
 def read_root():
     return {
-        "system": "IMS API Gateway & Microservices Engine",
+        "system": "IMS API Gateway",
         "version": "4.0.0",
         "status": "operational",
-        "domain_architecture": "Employee Separation • Hierarchical Category Trees • Referential Protection",
-        "concurrency": "PostgreSQL Pessimistic Row-Level Locking (SELECT ... FOR UPDATE)",
-        "idempotency": "24-Hour Key Deduplication Engine Active",
-        "cors_policy": "Explicit Origins & Methods Enabled",
-        "allowed_origins": cors_origins,
-        "persistence": "PostgreSQL Source-of-Truth",
-        "cache": "Redis Cache-Aside Layer",
-        "security": "WAF -> NGINX -> Redis RateLimiter -> Idempotency -> Explicit CORS -> FastAPI -> PostgreSQL",
-        "docs_url": "/docs",
     }
 
 

@@ -12,9 +12,9 @@
  * - Role is NEVER sent as a client header — it lives in the JWT only
  */
 
-import { STORAGE_KEYS_REF } from './authStore.js';
+import { STORAGE_KEYS } from './storageKeys.js';
 
-const API_BASE = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
+const API_BASE = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/\/$/, '');
 
 const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 const NON_RETRYABLE_STATUSES = new Set([400, 403, 404, 409, 422]);
@@ -46,20 +46,30 @@ function generateUUID() {
 }
 
 function getStoredToken() {
-  return sessionStorage.getItem('ims_access_token');
+  return sessionStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
 }
 
 function getStoredRefreshToken() {
-  return sessionStorage.getItem('ims_refresh_token');
+  return sessionStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
 }
 
 function updateStoredToken(token) {
-  sessionStorage.setItem('ims_access_token', token);
+  sessionStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, token);
 }
 
 function clearAllStorage() {
-  ['ims_access_token', 'ims_refresh_token', 'ims_user', 'ims_session_id'].forEach((k) =>
+  Object.values(STORAGE_KEYS).forEach((k) =>
     sessionStorage.removeItem(k)
+  );
+}
+
+function isAuthenticationEndpoint(path) {
+  const normalizedPath = (path || '').split('?')[0].toLowerCase().replace(/\/$/, '');
+  return (
+    normalizedPath === '/api/auth/login' ||
+    normalizedPath === '/api/auth/refresh' ||
+    normalizedPath === '/auth/login' ||
+    normalizedPath === '/auth/refresh'
   );
 }
 
@@ -70,7 +80,7 @@ function normalizeError(status, data, requestId) {
   switch (status) {
     case 401:
       category = ERROR_CATEGORIES.AUTHENTICATION_REQUIRED;
-      message = 'Session expired or authentication required. Please log in again.';
+      message = data?.detail || data?.message || 'Session expired or authentication required. Please log in again.';
       break;
     case 403:
       category = ERROR_CATEGORIES.PERMISSION_DENIED;
@@ -78,11 +88,11 @@ function normalizeError(status, data, requestId) {
       break;
     case 404:
       category = ERROR_CATEGORIES.SERVER_ERROR;
-      message = 'The requested resource was not found.';
+      message = data?.detail || 'The requested resource was not found.';
       break;
     case 409:
       category = ERROR_CATEGORIES.CONFLICT;
-      message = 'Resource conflict detected. Please refresh and try again.';
+      message = data?.detail || 'Resource conflict detected. Please refresh and try again.';
       break;
     case 422:
       category = ERROR_CATEGORIES.VALIDATION_ERROR;
@@ -90,7 +100,7 @@ function normalizeError(status, data, requestId) {
       break;
     case 429:
       category = ERROR_CATEGORIES.RATE_LIMITED;
-      message = 'Too many requests. Please wait a moment before trying again.';
+      message = data?.detail || 'Too many requests. Please wait a moment before trying again.';
       break;
     case 502:
     case 503:
@@ -123,7 +133,7 @@ export async function attemptTokenRefresh() {
     }
 
     try {
-      const response = await fetch(`${API_BASE}/auth/refresh`, {
+      const response = await fetch(`${API_BASE}/api/auth/refresh`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ refresh_token: refreshToken }),
@@ -159,7 +169,8 @@ export async function attemptTokenRefresh() {
  * @param {number} maxAttempts - max retry attempts for transient errors
  */
 export async function apiFetch(path, options = {}, maxAttempts = 4, baseDelayMs = 1000, maxDelayMs = 8000) {
-  const url = path.startsWith('http') ? path : `${API_BASE}${path}`;
+  const formattedPath = (path.startsWith('/') && !path.startsWith('/api/')) ? `/api${path}` : path;
+  const url = formattedPath.startsWith('http') ? formattedPath : `${API_BASE}${formattedPath}`;
   const method = (options.method || 'GET').toUpperCase();
   const requestId = options.requestId || `req-${generateUUID().substring(0, 8)}`;
   const csrfToken = getCookie('csrf_token') || sessionStorage.getItem('csrf_token') || '';
@@ -194,9 +205,9 @@ export async function apiFetch(path, options = {}, maxAttempts = 4, baseDelayMs 
     try {
       const response = await fetch(url, { ...options, method, headers: buildHeaders() });
 
-      // 401 — attempt single token refresh, then retry
+      // 401 — attempt single token refresh for authenticated sessions (skip for auth endpoints)
       if (response.status === 401) {
-        if (attempt === 1) {
+        if (!isAuthenticationEndpoint(formattedPath) && attempt === 1) {
           console.warn(`[AUTH] 401 on ${url}. Attempting token refresh...`);
           const newToken = await attemptTokenRefresh();
           if (newToken) {

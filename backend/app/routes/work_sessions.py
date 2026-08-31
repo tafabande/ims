@@ -9,7 +9,7 @@ from app.database import get_db
 from app.dependencies import UserContext, get_current_user, require_permission
 from app.models import SessionEvent, WorkSession
 
-router = APIRouter(prefix="/work-sessions", tags=["Operational Work Sessions"])
+router = APIRouter(prefix="/api/work-sessions", tags=["Operational Work Sessions"])
 
 VALID_TRANSITIONS = {
     "SCHEDULED": ["OPEN", "CANCELLED"],

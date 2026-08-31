@@ -60,26 +60,3 @@ def set_session_rls_context(db, location_id: str | None = None, org_id: str | No
         if org_id:
             db.execute(text("SELECT set_config('app.org_id', :org, true)"), {"org": str(org_id)})
 
-
-# Auto-migrate missing columns for SQLite local dev
-with engine.connect() as conn:
-    for stmt in [
-        "ALTER TABLE integration_accounts ADD COLUMN description TEXT;",
-        "ALTER TABLE import_batches ADD COLUMN file_size INTEGER DEFAULT 0;",
-        "ALTER TABLE import_batches ADD COLUMN column_mapping_json TEXT;",
-        "ALTER TABLE import_batches ADD COLUMN storage_path VARCHAR(255);",
-        "ALTER TABLE import_batches ADD COLUMN approval_id INTEGER;",
-        "ALTER TABLE purchases ADD COLUMN work_session_id INTEGER;",
-        "ALTER TABLE purchases ADD COLUMN work_session_code VARCHAR(50);",
-        "ALTER TABLE sales ADD COLUMN work_session_id INTEGER;",
-        "ALTER TABLE sales ADD COLUMN work_session_code VARCHAR(50);",
-        "ALTER TABLE inventory_transactions ADD COLUMN work_session_id INTEGER;",
-        "ALTER TABLE inventory_transactions ADD COLUMN work_session_code VARCHAR(50);",
-        "ALTER TABLE cases ADD COLUMN work_session_id INTEGER;",
-        "ALTER TABLE cases ADD COLUMN work_session_code VARCHAR(50);",
-    ]:
-        try:
-            conn.execute(text(stmt))
-            conn.commit()
-        except Exception:
-            pass

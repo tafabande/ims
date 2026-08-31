@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Bell, Sun, Moon, UserCircle, Command, LogOut, ChevronDown, ShieldCheck } from 'lucide-react';
 
 /**
@@ -20,7 +20,7 @@ export default function Navbar({
 
   useEffect(() => {
     import('../../utils/apiClient').then(({ apiGet }) => {
-      apiGet('/notifications')
+      apiGet('/api/notifications')
         .then(res => {
           if (Array.isArray(res)) setNotificationsList(res);
         })

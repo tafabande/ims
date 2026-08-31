@@ -83,6 +83,6 @@ def test_user_provision_and_otp_activation_lifecycle():
     assert res_act.json()["status"] == "ACTIVE"
 
     # 8. User can now authenticate with the newly activated credentials
-    login_res = client.post("/auth/login", json={"username": email, "password": new_password})
+    login_res = client.post("/api/auth/login", json={"username": email, "password": new_password})
     assert login_res.status_code == 200
     assert "access_token" in login_res.json()

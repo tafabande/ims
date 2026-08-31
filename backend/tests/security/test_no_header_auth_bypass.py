@@ -84,19 +84,19 @@ def test_revoked_session_id_in_jwt_is_rejected():
     in the database, protected endpoints reject requests with HTTP 401.
     """
     client = TestClient(app)
-    login_res = client.post("/auth/login", json={"username": "admin", "password": "adminpassword"})
+    login_res = client.post("/api/auth/login", json={"username": "admin", "password": "adminpassword"})
     assert login_res.status_code == 200
     token = login_res.json()["access_token"]
     headers = {"Authorization": f"Bearer {token}"}
 
-    sessions_res = client.get("/auth/sessions", headers=headers)
+    sessions_res = client.get("/api/auth/sessions", headers=headers)
     assert sessions_res.status_code == 200
     session_id = sessions_res.json()[0]["session_id"]
 
-    revoke_res = client.post(f"/auth/revoke-session/{session_id}", headers=headers)
+    revoke_res = client.post(f"/api/auth/revoke-session/{session_id}", headers=headers)
     assert revoke_res.status_code == 200
 
-    protected_res = client.get("/auth/sessions", headers=headers)
+    protected_res = client.get("/api/auth/sessions", headers=headers)
     assert protected_res.status_code == 401
     assert "revoked or expired" in protected_res.json()["detail"].lower()
 

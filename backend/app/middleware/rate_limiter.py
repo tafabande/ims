@@ -27,8 +27,11 @@ memory_counter = {}
 
 ROUTE_LIMITS = {
     "/auth/login": {"limit": 5, "window": 60},
+    "/api/auth/login": {"limit": 5, "window": 60},
     "/inventory/adjustments": {"limit": 20, "window": 60},
+    "/api/inventory/adjustments": {"limit": 20, "window": 60},
     "/sales": {"limit": 30, "window": 60},
+    "/api/sales": {"limit": 30, "window": 60},
     "default": {"limit": 60, "window": 60},
 }
 

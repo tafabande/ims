@@ -9,7 +9,7 @@ from app.database import get_db
 from app.dependencies import UserContext, get_current_user, require_permission
 from app.models import AuditLogRecord
 
-router = APIRouter(prefix="/audit", tags=["Security Audit Log Service"])
+router = APIRouter(prefix="/api/audit", tags=["Security Audit Log Service"])
 
 
 class AuditEvent(BaseModel):
@@ -26,37 +26,6 @@ class CreateAuditEventRequest(BaseModel):
     action: str
     status: str = "SUCCESS"
     details: str
-
-
-AUDIT_LOG_STORE: list[dict] = [
-    {
-        "id": "LOG-8801",
-        "user": "Alice Admin",
-        "action": "USER_LOGIN",
-        "ip": "192.168.1.105",
-        "status": "SUCCESS",
-        "timestamp": "2026-08-25T08:00:12Z",
-        "details": "Admin authentication via MFA token",
-    },
-    {
-        "id": "LOG-8802",
-        "user": "Bob Manager",
-        "action": "CREATE_PURCHASE_ORDER",
-        "ip": "192.168.1.112",
-        "status": "SUCCESS",
-        "timestamp": "2026-08-25T09:15:33Z",
-        "details": "Issued PO-2026-002 to OmniHardware ($3,250.00)",
-    },
-    {
-        "id": "LOG-8803",
-        "user": "Charlie Staff",
-        "action": "PROCESS_SALE",
-        "ip": "192.168.1.120",
-        "status": "SUCCESS",
-        "timestamp": "2026-08-25T09:10:00Z",
-        "details": "Processed INV-2026-103 with stock deduction",
-    },
-]
 
 
 @router.get("/logs", response_model=list[AuditEvent])
@@ -82,9 +51,6 @@ def get_audit_logs(
             )
         )
 
-    # Combine with seed items if database records are empty
-    if not results:
-        return [AuditEvent(**item) for item in AUDIT_LOG_STORE]
     return results
 
 
@@ -112,15 +78,5 @@ def record_audit_event(
     db.add(log_entry)
     db.commit()
 
-    memory_record = {
-        "id": event_id,
-        "user": current_user.full_name,
-        "action": event_in.action,
-        "ip": client_ip,
-        "status": event_in.status,
-        "details": event_in.details,
-        "timestamp": datetime.now(UTC).isoformat(),
-    }
-    AUDIT_LOG_STORE.insert(0, memory_record)
-
     return {"status": "recorded", "event_id": event_id}
+

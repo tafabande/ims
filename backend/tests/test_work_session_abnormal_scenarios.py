@@ -46,7 +46,7 @@ def test_server_side_session_ownership_enforcement():
     """
     # 1. User A (user_id=101) starts a session
     start_resp = client.post(
-        "/work-sessions/start",
+        "/api/work-sessions/start",
         params={
             "session_type": "SALES",
             "location_name": "Harare Store #01",
@@ -60,7 +60,7 @@ def test_server_side_session_ownership_enforcement():
 
     # 2. User B (user_id=102, Staff) attempts to pause User A's session -> REJECTED (403)
     hijack_pause = client.put(
-        f"/work-sessions/{session_id}/state",
+        f"/api/work-sessions/{session_id}/state",
         params={"status": "PAUSED"},
         headers={"x-user-id": "102", "x-user-role": "STAFF"},
     )
@@ -69,7 +69,7 @@ def test_server_side_session_ownership_enforcement():
 
     # 3. User B (user_id=102, Staff) attempts to close User A's session -> REJECTED (403)
     hijack_close = client.post(
-        f"/work-sessions/{session_id}/close",
+        f"/api/work-sessions/{session_id}/close",
         params={"actual_counted_cash": 300.0},
         headers={"x-user-id": "102", "x-user-role": "STAFF"},
     )
@@ -78,12 +78,12 @@ def test_server_side_session_ownership_enforcement():
 
     # Clean up User A's session
     client.put(
-        f"/work-sessions/{session_id}/state",
+        f"/api/work-sessions/{session_id}/state",
         params={"status": "CLOSING"},
         headers={"x-user-id": "101", "x-user-role": "APP_ADMIN"},
     )
     client.post(
-        f"/work-sessions/{session_id}/close",
+        f"/api/work-sessions/{session_id}/close",
         params={"actual_counted_cash": 300.0},
         headers={"x-user-id": "101", "x-user-role": "APP_ADMIN"},
     )
@@ -99,7 +99,7 @@ def test_invalid_state_transitions_rejected():
 
     # Start session for user_id=102
     start_resp = client.post(
-        "/work-sessions/start",
+        "/api/work-sessions/start",
         params={
             "session_type": "SALES",
             "location_name": "Harare Store #01",
@@ -113,7 +113,7 @@ def test_invalid_state_transitions_rejected():
 
     # Attempt illegal transition: ACTIVE -> CLOSED directly without count reconciliation
     invalid_close = client.put(
-        f"/work-sessions/{session_id}/state",
+        f"/api/work-sessions/{session_id}/state",
         params={"status": "CLOSED"},
         headers=auth_headers,
     )
@@ -122,12 +122,12 @@ def test_invalid_state_transitions_rejected():
 
     # Transition ACTIVE -> CLOSING -> CLOSED (Valid)
     client.put(
-        f"/work-sessions/{session_id}/state",
+        f"/api/work-sessions/{session_id}/state",
         params={"status": "CLOSING"},
         headers=auth_headers,
     )
     close_resp = client.post(
-        f"/work-sessions/{session_id}/close",
+        f"/api/work-sessions/{session_id}/close",
         params={"actual_counted_cash": 100.0},
         headers=auth_headers,
     )
@@ -135,7 +135,7 @@ def test_invalid_state_transitions_rejected():
 
     # Attempt illegal transition: CLOSED -> ACTIVE (Re-opening closed session)
     reopen_resp = client.put(
-        f"/work-sessions/{session_id}/state",
+        f"/api/work-sessions/{session_id}/state",
         params={"status": "ACTIVE"},
         headers=auth_headers,
     )
@@ -152,7 +152,7 @@ def test_duplicate_active_session_creation_rejected():
 
     # 1. Start first session for user_id=103
     start_resp1 = client.post(
-        "/work-sessions/start",
+        "/api/work-sessions/start",
         params={
             "session_type": "SALES",
             "location_name": "Harare Store #01",
@@ -166,7 +166,7 @@ def test_duplicate_active_session_creation_rejected():
 
     # 2. Attempt starting second simultaneous session for same user (user_id=103) -> REJECTED (400)
     start_resp2 = client.post(
-        "/work-sessions/start",
+        "/api/work-sessions/start",
         params={
             "session_type": "GOODS_RECEIVING",
             "location_name": "Harare Store #01",
@@ -180,12 +180,12 @@ def test_duplicate_active_session_creation_rejected():
 
     # Clean up session
     client.put(
-        f"/work-sessions/{session1_id}/state",
+        f"/api/work-sessions/{session1_id}/state",
         params={"status": "CLOSING"},
         headers=auth_headers,
     )
     client.post(
-        f"/work-sessions/{session1_id}/close",
+        f"/api/work-sessions/{session1_id}/close",
         params={"actual_counted_cash": 200.0},
         headers=auth_headers,
     )
@@ -195,14 +195,14 @@ def test_abandoned_and_forced_closed_sessions():
     """
     Abnormal Scenario 4: Abandoned Session & Managerial Forced Closure.
     Operator leaves terminal unattended (session state -> ABANDONED / PAUSED).
-    Store Manager executes emergency `POST /work-sessions/{id}/force-close`.
+    Store Manager executes emergency `POST /api/work-sessions/{id}/force-close`.
     """
     staff_headers = {"x-user-id": "104", "x-user-role": "STAFF"}
     mgr_headers = {"x-user-id": "2", "x-user-role": "MANAGER"}
 
     # 1. Start session for user_id=104
     start_resp = client.post(
-        "/work-sessions/start",
+        "/api/work-sessions/start",
         params={
             "session_type": "STOCK_COUNT",
             "location_name": "Harare Warehouse",
@@ -216,14 +216,14 @@ def test_abandoned_and_forced_closed_sessions():
 
     # 2. Transition state ACTIVE -> ABANDONED (operator network drop / timeout)
     client.put(
-        f"/work-sessions/{session_id}/state",
+        f"/api/work-sessions/{session_id}/state",
         params={"status": "ABANDONED"},
         headers=staff_headers,
     )
 
     # 3. Manager forces closure of abandoned session
     force_close = client.post(
-        f"/work-sessions/{session_id}/force-close",
+        f"/api/work-sessions/{session_id}/force-close",
         params={"reason": "Operator went off-shift without closing cash till."},
         headers=mgr_headers,
     )
@@ -232,7 +232,7 @@ def test_abandoned_and_forced_closed_sessions():
 
     # 4. Verify immutable event trail records FORCED_CLOSED_BY_MANAGER
     timeline_resp = client.get(
-        f"/work-sessions/{session_id}/timeline",
+        f"/api/work-sessions/{session_id}/timeline",
         headers=mgr_headers,
     )
     assert timeline_resp.status_code == 200

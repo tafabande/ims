@@ -21,7 +21,7 @@ def test_work_session_lifecycle_and_float_reconciliation():
 
     # 1. Start Work Session
     start_resp = client.post(
-        "/work-sessions/start",
+        "/api/work-sessions/start",
         params={
             "session_type": "SALES",
             "location_name": "Harare Store #01",
@@ -39,7 +39,7 @@ def test_work_session_lifecycle_and_float_reconciliation():
 
     # 2. Pause Session
     pause_resp = client.put(
-        f"/work-sessions/{session_id}/state",
+        f"/api/work-sessions/{session_id}/state",
         params={"status": "PAUSED"},
         headers=auth_headers,
     )
@@ -48,7 +48,7 @@ def test_work_session_lifecycle_and_float_reconciliation():
 
     # 3. Resume Session
     resume_resp = client.put(
-        f"/work-sessions/{session_id}/state",
+        f"/api/work-sessions/{session_id}/state",
         params={"status": "ACTIVE"},
         headers=auth_headers,
     )
@@ -57,7 +57,7 @@ def test_work_session_lifecycle_and_float_reconciliation():
 
     # 4. Close Session & Calculate Variance (-$30.00 Shortage)
     close_resp = client.post(
-        f"/work-sessions/{session_id}/close",
+        f"/api/work-sessions/{session_id}/close",
         params={"actual_counted_cash": 470.0, "notes": "Cash shortage -$30.00"},
         headers=auth_headers,
     )
@@ -70,7 +70,7 @@ def test_work_session_lifecycle_and_float_reconciliation():
 
     # 5. Fetch Session Event Timeline
     timeline_resp = client.get(
-        f"/work-sessions/{session_id}/timeline",
+        f"/api/work-sessions/{session_id}/timeline",
         headers=auth_headers,
     )
     assert timeline_resp.status_code == 200
