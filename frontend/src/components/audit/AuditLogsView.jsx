@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   ShieldAlert, 
   Terminal, 
@@ -16,40 +16,63 @@ import {
   List,
   GitCommit
 } from 'lucide-react';
-
-const AUDIT_EVENTS = [];
+import { apiGet } from '../../utils/apiClient';
 
 export default function AuditLogsView({ transactions, onShowToast }) {
+  const [logs, setLogs] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('ALL');
   const [viewMode, setViewMode] = useState('timeline'); // 'timeline' or 'table'
 
-  const filteredLogs = AUDIT_EVENTS.filter(evt => {
+  useEffect(() => {
+    let isMounted = true;
+    const fetchAuditLogs = async () => {
+      try {
+        const data = await apiGet('/audit/logs');
+        if (isMounted && Array.isArray(data)) {
+          setLogs(data);
+        }
+      } catch (err) {
+        if (isMounted && onShowToast) {
+          onShowToast('error', 'Audit Log Error', 'Failed to fetch security audit trail.');
+        }
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
+    fetchAuditLogs();
+    return () => {
+      isMounted = false;
+    };
+  }, [onShowToast]);
+
+  const filteredLogs = logs.filter(evt => {
     const matchesSearch = 
-      evt.user.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      evt.action.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      evt.details.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      evt.ip.includes(searchTerm);
+      (evt.user || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (evt.action || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (evt.details || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (evt.ip || '').includes(searchTerm);
     
     const matchesStatus = selectedStatus === 'ALL' || evt.status === selectedStatus;
 
     return matchesSearch && matchesStatus;
   });
 
-  const successCount = AUDIT_EVENTS.filter(e => e.status === 'SUCCESS').length;
-  const warnCount = AUDIT_EVENTS.filter(e => e.status === 'WARN').length;
-  const uniqueIps = new Set(AUDIT_EVENTS.map(e => e.ip)).size;
+  const successCount = logs.filter(e => e.status === 'SUCCESS').length;
+  const warnCount = logs.filter(e => e.status === 'WARN').length;
+  const uniqueIps = new Set(logs.map(e => e.ip || '127.0.0.1')).size;
 
   const exportAuditCSV = () => {
     const headers = ["Event ID", "Operator", "Role", "Action", "IP Address", "Status", "Details", "Before/After Change", "Timestamp"];
-    const rows = AUDIT_EVENTS.map(evt => [
+    const rows = logs.map(evt => [
       evt.id,
-      `"${evt.user}"`,
-      evt.role,
+      `"${evt.user || ''}"`,
+      evt.role || 'STAFF',
       evt.action,
       evt.ip,
       evt.status,
-      `"${evt.details}"`,
+      `"${evt.details || ''}"`,
       `"${evt.before_after || ''}"`,
       `"${evt.timestamp}"`
     ]);
@@ -101,7 +124,7 @@ export default function AuditLogsView({ transactions, onShowToast }) {
             TOTAL AUDITED EVENTS
           </div>
           <div style={{ fontSize: '1.8rem', fontWeight: 800, fontFamily: 'var(--font-mono)', color: 'var(--color-accent)' }}>
-            {auditEvents.length}
+            {logs.length}
           </div>
           <div style={{ fontSize: '0.7rem', color: 'var(--color-ink-dim)', marginTop: '4px' }}>
             ● Append-only immutable log
