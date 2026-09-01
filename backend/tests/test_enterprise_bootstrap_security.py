@@ -51,7 +51,7 @@ def clean_bootstrap_db():
 
 
 def test_status_endpoint_information_disclosure_prevention(clean_bootstrap_db):
-    """Scenario 10: Status endpoint must NOT disclose internal table counts."""
+    """Scenario 10: Status endpoint must NOT disclose internal table counts or installation ID."""
     client = TestClient(app)
     response = client.get("/api/auth/status")
     assert response.status_code == 200
@@ -59,9 +59,10 @@ def test_status_endpoint_information_disclosure_prevention(clean_bootstrap_db):
     
     assert "is_initialized" in data
     assert "setup_required" in data
-    assert "installation_id" in data
+    assert "system_name" in data
     
-    # Must NOT expose sensitive table volumes
+    # Must NOT expose sensitive table volumes or internal installation identifiers
+    assert "installation_id" not in data
     assert "user_count" not in data
     assert "product_count" not in data
     assert "store_count" not in data
@@ -74,7 +75,7 @@ def test_bootstrap_without_token_forbidden(clean_bootstrap_db):
     payload = {
         "full_name": "Root Admin",
         "email": "root@enterprise.co.zw",
-        "password": "Password123!",
+        "password": "EnterprisePassphrase2026!",
         "bootstrap_token": "",
     }
     response = client.post("/api/auth/initialize-root-admin", json=payload)
@@ -93,7 +94,7 @@ def test_bootstrap_with_wrong_token_forbidden(clean_bootstrap_db):
     payload = {
         "full_name": "Root Admin",
         "email": "root@enterprise.co.zw",
-        "password": "Password123!",
+        "password": "EnterprisePassphrase2026!",
         "bootstrap_token": "WRONG-INVALID-TOKEN-SECRET-12345",
     }
     response = client.post("/api/auth/initialize-root-admin", json=payload)
@@ -127,7 +128,7 @@ def test_bootstrap_with_valid_token_success(clean_bootstrap_db):
     payload = {
         "full_name": "System Root Admin",
         "email": "admin@enterprise.co.zw",
-        "password": "SecurePassword2026!",
+        "password": "EnterpriseRootSecurePassphrase2026!",
         "bootstrap_token": raw_secret,
     }
     response = client.post("/api/auth/initialize-root-admin", json=payload)
@@ -163,7 +164,7 @@ def test_bootstrap_twice_fails_conflict(clean_bootstrap_db):
     payload = {
         "full_name": "First Admin",
         "email": "first@enterprise.co.zw",
-        "password": "SecurePassword2026!",
+        "password": "EnterpriseRootSecurePassphrase2026!",
         "bootstrap_token": raw_secret,
     }
     res1 = client.post("/api/auth/initialize-root-admin", json=payload)
@@ -172,12 +173,61 @@ def test_bootstrap_twice_fails_conflict(clean_bootstrap_db):
     payload2 = {
         "full_name": "Second Admin",
         "email": "second@enterprise.co.zw",
-        "password": "SecurePassword2026!",
+        "password": "EnterpriseRootSecurePassphrase2026!",
         "bootstrap_token": raw_secret,
     }
     res2 = client.post("/api/auth/initialize-root-admin", json=payload2)
     assert res2.status_code == 409
     assert "System is already initialized" in res2.json()["detail"]
+
+
+def test_bootstrap_remains_disabled_even_if_all_users_deleted(clean_bootstrap_db):
+    """Scenario 9 (Chaa Critical Invariant): Once initialized, bootstrap remains permanently disabled even if all users are deleted."""
+    raw_secret, secret_hash = get_or_generate_bootstrap_secret()
+    db = SessionLocal()
+    try:
+        inst = get_or_create_installation(db)
+        inst.bootstrap_token_hash = secret_hash
+        inst.status = "BOOTSTRAP_PENDING"
+        db.commit()
+    finally:
+        db.close()
+
+    client = TestClient(app)
+    payload = {
+        "full_name": "Initial Admin",
+        "email": "initial@enterprise.co.zw",
+        "password": "EnterpriseRootSecurePassphrase2026!",
+        "bootstrap_token": raw_secret,
+    }
+    res1 = client.post("/api/auth/initialize-root-admin", json=payload)
+    assert res1.status_code == 200
+
+    # Simulate catastrophic user table deletion
+    db2 = SessionLocal()
+    try:
+        db2.query(SessionRecord).delete()
+        # Set FK to None first to allow user deletion
+        inst_rec = db2.query(EnterpriseInstallation).first()
+        inst_rec.initialized_by_user_id = None
+        db2.commit()
+        db2.query(User).delete()
+        db2.commit()
+        assert db2.query(User).count() == 0
+        assert inst_rec.status == "INITIALIZED"
+    finally:
+        db2.close()
+
+    # Attempt re-bootstrap when user_count == 0 but installation status is INITIALIZED
+    payload2 = {
+        "full_name": "Attacker Admin",
+        "email": "attacker@enterprise.co.zw",
+        "password": "EnterpriseRootSecurePassphrase2026!",
+        "bootstrap_token": raw_secret,
+    }
+    res2 = client.post("/api/auth/initialize-root-admin", json=payload2)
+    assert res2.status_code == 409
+    assert "System is already initialized. Bootstrap authorization has been permanently disabled." in res2.json()["detail"]
 
 
 def test_bootstrap_secret_never_logged_in_audit_records(clean_bootstrap_db):
@@ -196,7 +246,7 @@ def test_bootstrap_secret_never_logged_in_audit_records(clean_bootstrap_db):
     payload = {
         "full_name": "Audit Target Admin",
         "email": "audit@enterprise.co.zw",
-        "password": "SuperSecretPassword999!",
+        "password": "SuperSecretPassphraseAuditTarget2026!",
         "bootstrap_token": raw_secret,
     }
     res = client.post("/api/auth/initialize-root-admin", json=payload)
@@ -209,13 +259,13 @@ def test_bootstrap_secret_never_logged_in_audit_records(clean_bootstrap_db):
         for log in audit_logs:
             if log.details:
                 assert raw_secret not in log.details
-                assert "SuperSecretPassword999!" not in log.details
+                assert "SuperSecretPassphraseAuditTarget2026!" not in log.details
     finally:
         db2.close()
 
 
-def test_password_policy_enforcement(clean_bootstrap_db):
-    """Weak passwords must be rejected at bootstrap."""
+def test_nist_sp_800_63b_passphrase_policy(clean_bootstrap_db):
+    """NIST SP 800-63B Passphrase Policy: Min 15 chars, supports multi-word passphrases, rejects blocklisted."""
     raw_secret, secret_hash = get_or_generate_bootstrap_secret()
     db = SessionLocal()
     try:
@@ -227,15 +277,34 @@ def test_password_policy_enforcement(clean_bootstrap_db):
         db.close()
 
     client = TestClient(app)
-    payload = {
-        "full_name": "Weak Admin",
-        "email": "weak@enterprise.co.zw",
-        "password": "simplepassword",
+
+    # 1. Under 15 characters -> rejected
+    res_short = client.post("/api/auth/initialize-root-admin", json={
+        "full_name": "Short Admin",
+        "email": "short@enterprise.co.zw",
+        "password": "Password1234!",  # 13 chars
         "bootstrap_token": raw_secret,
-    }
-    res = client.post("/api/auth/initialize-root-admin", json=payload)
-    assert res.status_code == 400
-    assert "Password policy violation" in res.json()["detail"]
+    })
+    assert res_short.status_code in [400, 422]
+
+    # 2. Blocklisted common password -> rejected
+    res_blocked = client.post("/api/auth/initialize-root-admin", json={
+        "full_name": "Common Admin",
+        "email": "common@enterprise.co.zw",
+        "password": "correcthorsebatterystaple",
+        "bootstrap_token": raw_secret,
+    })
+    assert res_blocked.status_code == 400
+    assert "Password policy violation" in res_blocked.json()["detail"]
+
+    # 3. Valid multi-word passphrase without artificial special character rules -> accepted
+    res_valid = client.post("/api/auth/initialize-root-admin", json={
+        "full_name": "Valid Admin",
+        "email": "valid@enterprise.co.zw",
+        "password": "correct horse battery staple enterprise 2026",
+        "bootstrap_token": raw_secret,
+    })
+    assert res_valid.status_code == 200
 
 
 def test_concurrent_bootstrap_attempts_exactly_one_succeeds(clean_bootstrap_db):
@@ -255,7 +324,7 @@ def test_concurrent_bootstrap_attempts_exactly_one_succeeds(clean_bootstrap_db):
         payload = {
             "full_name": f"Admin Worker {worker_id}",
             "email": f"worker{worker_id}@enterprise.co.zw",
-            "password": "SecurePassword2026!",
+            "password": "EnterpriseConcurrentPassphrase2026!",
             "bootstrap_token": raw_secret,
         }
         return client.post("/api/auth/initialize-root-admin", json=payload)

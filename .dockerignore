@@ -1,0 +1,29 @@
+# Dependency & Cache Directories
+node_modules/
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+*.log
+
+# Secrets & Environment Files
+.env
+.env.*
+!.env.example
+.bootstrap_token
+*.bootstrap_token
+.bootstrap_secret
+*.sqlite
+*.sqlite3
+*.db
+backups/
+
+# Git & IDE Files
+.git
+.github
+.vscode
+.idea
+.DS_Store

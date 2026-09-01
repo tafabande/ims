@@ -55,10 +55,18 @@ def get_or_generate_bootstrap_secret() -> tuple[str, str]:
         except Exception:
             raw_secret = secrets.token_urlsafe(32)
             TOKEN_FILE_PATH.write_text(raw_secret, encoding="utf-8")
+            try:
+                os.chmod(TOKEN_FILE_PATH, 0o600)
+            except Exception:
+                pass
     else:
         raw_secret = secrets.token_urlsafe(32)
         try:
             TOKEN_FILE_PATH.write_text(raw_secret, encoding="utf-8")
+            try:
+                os.chmod(TOKEN_FILE_PATH, 0o600)
+            except Exception:
+                pass
         except Exception:
             pass
 
@@ -88,7 +96,7 @@ def get_or_create_installation(db: Session) -> EnterpriseInstallation:
 def get_public_system_status(db: Session) -> SystemStatusResponse:
     """
     Public system status endpoint (information-disclosure safe).
-    Does NOT leak internal table row counts (users, products, stores).
+    Does NOT leak internal table row counts or internal installation IDs.
     """
     inst = get_or_create_installation(db)
     user_count = db.query(User).count()
@@ -99,7 +107,6 @@ def get_public_system_status(db: Session) -> SystemStatusResponse:
     return SystemStatusResponse(
         is_initialized=is_initialized,
         setup_required=setup_required,
-        installation_id=inst.installation_id,
         system_name="Enterprise IMS",
         version="1.0.0",
     )
@@ -122,19 +129,50 @@ def is_trusted_network(client_ip: str) -> bool:
         return False
 
 
+# Known common/compromised password blocklist (NIST SP 800-63B requirement)
+COMMON_PASSWORD_BLOCKLIST = {
+    "password12345678",
+    "adminadminadminadmin",
+    "correcthorsebatterystaple",
+    "123456789012345",
+    "1234567890123456",
+    "qwertyuiopasdfgh",
+    "abcdefghijklmno",
+    "administrator12345",
+}
+
+
 def validate_password_strength(password: str) -> None:
     """
-    Enforces production enterprise password quality standards for root administration.
+    Enforces modern NIST SP 800-63B password & passphrase standards:
+    - Minimum length: 15 characters.
+    - Maximum length: 128 characters.
+    - Spaces and multi-word passphrases fully supported.
+    - No archaic composition rules (no mandatory special character / digit requirement).
+    - Rejects known breached, repetitive, or sequential passwords.
     """
-    if len(password) < 8:
+    if len(password) < 15:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Password policy violation: Root Administrator password must be at least 8 characters.",
+            detail="Password policy violation: Root Administrator password/passphrase must be at least 15 characters (NIST SP 800-63B standard).",
         )
-    if not re.search(r"[A-Z]", password) or not re.search(r"[a-z]", password) or not re.search(r"[0-9]", password):
+    if len(password) > 128:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Password policy violation: Root Administrator password must contain uppercase, lowercase, and numeric characters.",
+            detail="Password policy violation: Password cannot exceed 128 characters.",
+        )
+
+    normalized = password.strip().lower()
+    if normalized in COMMON_PASSWORD_BLOCKLIST:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password policy violation: The provided password is too common or known to be breached. Please choose a unique passphrase.",
+        )
+
+    if len(set(password)) < 4:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password policy violation: Password contains too few unique characters.",
         )
 
 
@@ -210,7 +248,12 @@ def bootstrap_root_administrator(
         )
 
     # 6. Password Policy Validation
-    validate_password_strength(payload.password)
+    try:
+        validate_password_strength(payload.password)
+    except HTTPException:
+        inst.status = "BOOTSTRAP_PENDING"
+        db.commit()
+        raise
 
     try:
         # 7. Create Root Governance Administrator (USR-000001)

@@ -79,8 +79,8 @@ export default function LoginView({ onLoginSuccess }) {
       return;
     }
 
-    if (initPassword.length < 8) {
-      setValidationError('Password must be at least 8 characters and contain letters and numbers.');
+    if (initPassword.length < 15) {
+      setValidationError('Password/passphrase must be at least 15 characters (NIST SP 800-63B standard).');
       return;
     }
 
@@ -275,7 +275,7 @@ export default function LoginView({ onLoginSuccess }) {
                     style={{ paddingLeft: '36px' }}
                     value={initPassword}
                     onChange={(e) => { setInitPassword(e.target.value); setValidationError(''); }}
-                    placeholder="Min 8 chars, mixed case & numbers"
+                    placeholder="Min 15 chars (passphrase recommended)"
                     required
                     disabled={isLoading}
                   />

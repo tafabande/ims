@@ -24,6 +24,9 @@ htmlcov/
 .env
 .env.*
 !.env.example
+.bootstrap_token
+*.bootstrap_token
+.bootstrap_secret
 *.sqlite
 *.sqlite3
 *.db
@@ -38,3 +41,4 @@ backups/
 .idea/
 .DS_Store
 Thumbs.db
+
