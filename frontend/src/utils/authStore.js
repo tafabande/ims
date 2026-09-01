@@ -198,12 +198,51 @@ export function AuthProvider({ children }) {
     return newToken;
   }, [logout]);
 
+  const initializeRootAdmin = useCallback(async (fullName, email, password) => {
+    dispatch({ type: 'LOGIN_START' });
+    try {
+      const data = await apiPost('/api/auth/initialize-root-admin', {
+        full_name: fullName,
+        email: email,
+        password: password,
+      });
+
+      const user = {
+        id: data.user_id,
+        userCode: data.user_code,
+        fullName: data.full_name,
+        email: data.email,
+        role: data.role,
+        permissions: data.permissions || [],
+      };
+
+      persistSession(data.access_token, data.refresh_token, user, data.session_id);
+
+      dispatch({
+        type: 'LOGIN_SUCCESS',
+        payload: {
+          token: data.access_token,
+          refreshToken: data.refresh_token,
+          user,
+          sessionId: data.session_id,
+        },
+      });
+
+      return { success: true, user };
+    } catch (err) {
+      const errorMessage = err.message || 'Initialization failed.';
+      dispatch({ type: 'LOGIN_FAILURE', payload: { error: errorMessage } });
+      return { success: false, error: errorMessage };
+    }
+  }, []);
+
   const clearError = useCallback(() => dispatch({ type: 'CLEAR_ERROR' }), []);
 
   const value = {
     ...state,
     login,
     logout,
+    initializeRootAdmin,
     refreshAccessToken,
     clearError,
   };

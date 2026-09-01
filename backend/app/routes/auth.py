@@ -17,17 +17,110 @@ from app.dependencies import (
     UserContext,
     get_current_user,
 )
-from app.models import SessionRecord, User
-from app.schemas import LoginRequest, RefreshTokenRequest, TokenResponse
+from app.models import Product, SessionRecord, Store, User
+from app.schemas import (
+    InitializeRootAdminRequest,
+    LoginRequest,
+    RefreshTokenRequest,
+    SystemStatusResponse,
+    TokenResponse,
+)
 from app.services.iam_service import (
     ROLE_PERMISSIONS,
     create_access_token,
     create_refresh_token,
+    hash_password,
     hash_refresh_token,
     verify_password,
 )
 
 router = APIRouter(prefix="/api/auth", tags=["IAM & Authentication"])
+
+
+@router.get("/status", response_model=SystemStatusResponse)
+def get_system_initialization_status(db: Session = Depends(get_db)):
+    """
+    Public system status endpoint:
+    Checks whether enterprise data and root administrator credentials exist in the database.
+    If is_initialized is False, frontend prompts First-Time Enterprise Setup instead of blank login.
+    """
+    user_count = db.query(User).count()
+    product_count = db.query(Product).count()
+    store_count = db.query(Store).count()
+    has_enterprise_data = (user_count > 0 or product_count > 0 or store_count > 0)
+
+    return SystemStatusResponse(
+        is_initialized=(user_count > 0),
+        user_count=user_count,
+        product_count=product_count,
+        store_count=store_count,
+        has_enterprise_data=has_enterprise_data,
+        system_name="Enterprise IMS",
+        version="1.0.0",
+    )
+
+
+@router.post("/initialize-root-admin", response_model=TokenResponse)
+def initialize_root_administrator(
+    payload: InitializeRootAdminRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """
+    Bootstrap initial root administrator for a fresh enterprise install.
+    Strictly guarded: ONLY permitted when user_count == 0.
+    """
+    user_count = db.query(User).count()
+    if user_count > 0:
+        raise HTTPException(
+            status_code=400,
+            detail="System is already initialized. Enterprise administrator accounts exist.",
+        )
+
+    root_user = User(
+        user_code="USR-000001",
+        email=payload.email.strip().lower(),
+        full_name=payload.full_name.strip(),
+        hashed_password=hash_password(payload.password),
+        role="ADMIN",
+        department="Executive IT",
+        active=True,
+    )
+    db.add(root_user)
+    db.commit()
+    db.refresh(root_user)
+
+    # Issue initial access & refresh token
+    permissions = ROLE_PERMISSIONS.get("ADMIN", ["*"])
+    access_token = create_access_token(user_id=str(root_user.id), role="ADMIN", permissions=permissions)
+    refresh_token = create_refresh_token(user_id=str(root_user.id))
+
+    session_id = str(uuid.uuid4())
+    session_rec = SessionRecord(
+        id=session_id,
+        user_id=root_user.id,
+        refresh_token_hash=hash_refresh_token(refresh_token),
+        device_info=request.headers.get("User-Agent", "Web Client"),
+        ip_address=request.client.host if request.client else "127.0.0.1",
+        is_active=True,
+        expires_at=datetime.now(UTC) + timedelta(days=7),
+    )
+    db.add(session_rec)
+    db.commit()
+
+    return TokenResponse(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        token_type="bearer",
+        expires_in=900,
+        user_id=str(root_user.id),
+        user_code=root_user.user_code,
+        full_name=root_user.full_name,
+        email=root_user.email,
+        role="ADMIN",
+        permissions=permissions,
+        session_id=session_id,
+    )
 
 
 @router.post("/login", response_model=TokenResponse)

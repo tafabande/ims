@@ -28,6 +28,22 @@ class RefreshTokenRequest(BaseModel):
     refresh_token: str
 
 
+class SystemStatusResponse(BaseModel):
+    is_initialized: bool
+    user_count: int
+    product_count: int
+    store_count: int
+    has_enterprise_data: bool
+    system_name: str = "Enterprise IMS"
+    version: str = "1.0.0"
+
+
+class InitializeRootAdminRequest(BaseModel):
+    full_name: str = Field(..., min_length=2, max_length=200)
+    email: str = Field(..., min_length=5, max_length=255)
+    password: str = Field(..., min_length=6, max_length=128)
+
+
 # User Management Schemas
 class UserCreate(BaseModel):
     email: str

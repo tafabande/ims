@@ -7,7 +7,8 @@ import {
   Sliders, 
   ShieldCheck, 
   Users, 
-  FileText 
+  FileText,
+  Database,
 } from 'lucide-react';
 
 import StaffDashboard from './StaffDashboard';
@@ -99,6 +100,63 @@ export default function DashboardView({
           )}
         </div>
       </div>
+
+      {/* ZERO ENTERPRISE MASTER DATA BANNER */}
+      {(!products || products.length === 0) && (
+        <div
+          style={{
+            padding: '20px 24px',
+            background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(37, 99, 235, 0.04) 100%)',
+            border: '1px solid rgba(59, 130, 246, 0.25)',
+            borderRadius: 'var(--radius-lg)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '16px',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', maxWidth: '800px' }}>
+            <div
+              style={{
+                width: '44px',
+                height: '44px',
+                borderRadius: '10px',
+                background: 'var(--color-accent)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#fff',
+                flexShrink: 0,
+              }}
+            >
+              <Database size={24} />
+            </div>
+            <div>
+              <h3 style={{ fontSize: '1rem', fontWeight: 800, margin: '0 0 4px 0', color: 'var(--color-ink)' }}>
+                No Enterprise Data Loaded Yet
+              </h3>
+              <p style={{ fontSize: '0.8125rem', color: 'var(--color-ink-muted)', margin: 0, lineHeight: 1.4 }}>
+                This IMS instance has no catalog products or stock movements recorded. Launch the <strong>Enterprise Data Intake Gateway</strong> to import your canonical data templates (Products, Customers, Suppliers, Opening Stock).
+              </p>
+            </div>
+          </div>
+          <button
+            className="btn btn-primary"
+            onClick={() => onNavigate('data_intake')}
+            style={{
+              padding: '10px 18px',
+              fontSize: '0.875rem',
+              fontWeight: 700,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+            }}
+          >
+            <Database size={16} /> Launch Data Intake Gateway
+          </button>
+        </div>
+      )}
 
       {/* DYNAMIC ROLE-BASED DASHBOARD ROUTING */}
       {(roleName === 'STAFF' || roleName === 'STAFF_SELLER') && (
