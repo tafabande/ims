@@ -37,6 +37,7 @@ from app.services.iam_service import (
 router = APIRouter(prefix="/api/auth", tags=["IAM & Authentication"])
 
 
+from app.middleware.security import get_client_ip
 from app.services.bootstrap_service import (
     bootstrap_root_administrator,
     get_public_system_status,
@@ -65,7 +66,7 @@ def initialize_root_administrator(
     - Transactionally transitions installation lifecycle to INITIALIZED.
     - Emits ENTERPRISE_INITIALIZED audit event and permanently disables bootstrap.
     """
-    client_ip = request.client.host if request.client else "127.0.0.1"
+    client_ip = get_client_ip(request)
     user_agent = request.headers.get("User-Agent", "Web Client")
     return bootstrap_root_administrator(
         db=db,

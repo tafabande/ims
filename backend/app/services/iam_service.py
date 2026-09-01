@@ -213,22 +213,24 @@ except Exception:
 def hash_password(password: str) -> str:
     """
     Production-grade password hashing primitive using bcrypt (OWASP & Chaa production recommendation).
-    Safely truncates at 72 bytes to avoid bcrypt backend crashes on passwords > 72 bytes.
+    For passphrases > 72 bytes, pre-hashes with SHA-256 to ensure all entropy is preserved with zero truncation.
     """
     if not password:
         password = ""
-    pwd_bytes = password.encode("utf-8")[:72]
+    raw_bytes = password.encode("utf-8")
+    pwd_bytes = hashlib.sha256(raw_bytes).digest() if len(raw_bytes) > 72 else raw_bytes
+
     if HAS_BCRYPT:
         salt = bcrypt.gensalt()
         return bcrypt.hashpw(pwd_bytes, salt).decode("utf-8")
     if pwd_context is not None:
         try:
-            return pwd_context.hash(password[:72])
+            return pwd_context.hash(password if len(raw_bytes) <= 72 else pwd_bytes.hex())
         except Exception:
             pass
     # Fallback to PBKDF2-HMAC-SHA256
     salt = os.urandom(16)
-    derived = hashlib.pbkdf2_hmac("sha256", pwd_bytes, salt, 100_000)
+    derived = hashlib.pbkdf2_hmac("sha256", raw_bytes, salt, 100_000)
     return f"$pbkdf2-sha256$100000${base64.b64encode(salt).decode('utf-8')}${base64.b64encode(derived).decode('utf-8')}"
 
 
@@ -239,12 +241,20 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify raw password against stored hash using constant-time comparison with fallback for legacy hashes"""
     if not plain_password or not hashed_password:
         return False
-    pwd_bytes = plain_password.encode("utf-8")[:72]
+    raw_bytes = plain_password.encode("utf-8")
+    pwd_bytes = hashlib.sha256(raw_bytes).digest() if len(raw_bytes) > 72 else raw_bytes
+
     try:
         if hashed_password.startswith(("$2a$", "$2b$", "$2y$")) and HAS_BCRYPT:
-            return bcrypt.checkpw(pwd_bytes, hashed_password.encode("utf-8"))
+            # Check pre-hashed or direct
+            if bcrypt.checkpw(pwd_bytes, hashed_password.encode("utf-8")):
+                return True
+            # Also check direct if length > 72 in case legacy hash was truncated
+            if len(raw_bytes) > 72 and bcrypt.checkpw(raw_bytes[:72], hashed_password.encode("utf-8")):
+                return True
+            return False
         if pwd_context is not None and pwd_context.identify(hashed_password):
-            return pwd_context.verify(plain_password[:72], hashed_password)
+            return pwd_context.verify(plain_password if len(raw_bytes) <= 72 else pwd_bytes.hex(), hashed_password)
     except Exception:
         pass
 
@@ -256,7 +266,7 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
                 iterations = int(parts[2])
                 salt = base64.b64decode(parts[3])
                 expected = base64.b64decode(parts[4])
-                derived = hashlib.pbkdf2_hmac("sha256", pwd_bytes, salt, iterations)
+                derived = hashlib.pbkdf2_hmac("sha256", raw_bytes, salt, iterations)
                 return hmac.compare_digest(derived, expected)
         except Exception:
             pass

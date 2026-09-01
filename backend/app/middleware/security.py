@@ -12,13 +12,14 @@ from starlette.responses import JSONResponse
 _ENVIRONMENT = os.getenv("ENVIRONMENT", "development").lower()
 _IS_PRODUCTION = _ENVIRONMENT == "production"
 
-# Only trust X-Forwarded-For from these IPs (configure via env for your proxy layer)
-TRUSTED_PROXY_IPS = set(filter(None, os.getenv("TRUSTED_PROXY_IPS", "127.0.0.1,::1").split(",")))
+def get_trusted_proxy_ips() -> set[str]:
+    return set(filter(None, os.getenv("TRUSTED_PROXY_IPS", "127.0.0.1,::1").split(",")))
 
 
 def get_client_ip(request: Request) -> str:
     peer_ip = request.client.host if request.client else "127.0.0.1"
-    if peer_ip not in TRUSTED_PROXY_IPS:
+    trusted_proxies = get_trusted_proxy_ips()
+    if peer_ip not in trusted_proxies:
         return peer_ip
 
     forwarded = request.headers.get("X-Forwarded-For")
