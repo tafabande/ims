@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from app.models import Product, StockTransfer, StockTransferItem, Store
+from app.models import Product, StockTransfer, StockTransferItem, Store, StoreStock
 from app.services.inventory_service import process_stock_adjustment
 
 
@@ -31,23 +31,61 @@ def create_stock_transfer(db: Session, transfer_data, user_name: str = "System O
     db.add(transfer)
     db.flush()
 
-    for item in transfer_data.items:
-        # Check source product stock
-        product = db.query(Product).filter(Product.id == item.product_id).first()
+    # Sort transfer items deterministically by product_id to prevent deadlocks
+    sorted_items = sorted(transfer_data.items, key=lambda x: getattr(x, "product_id", getattr(x, "id", 0)))
+
+    for item in sorted_items:
+        # 1. Lock and validate global product
+        product = db.query(Product).filter(Product.id == item.product_id).with_for_update().first()
         if not product:
             raise HTTPException(status_code=404, detail=f"Product ID {item.product_id} not found")
 
-        if product.available_quantity < item.quantity:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Insufficient stock for '{product.name}' at source store. Available: {product.available_quantity}, Requested: {item.quantity}",
+        # 2. Lock & update source store stock
+        src_stock = (
+            db.query(StoreStock)
+            .filter(StoreStock.store_id == source_store.id, StoreStock.product_id == item.product_id)
+            .with_for_update()
+            .first()
+        )
+        if src_stock:
+            avail_src = src_stock.quantity - src_stock.reserved_quantity
+            if avail_src < item.quantity:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Insufficient store stock for '{product.name}' at source store #{source_store.store_code}. Available: {avail_src}, Requested: {item.quantity}",
+                )
+            src_stock.quantity -= item.quantity
+        else:
+            # Fallback to global product available stock if store_stock record absent
+            if product.available_quantity < item.quantity:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Insufficient stock for '{product.name}' at source store. Available: {product.available_quantity}, Requested: {item.quantity}",
+                )
+
+        # 3. Lock & update destination store stock
+        dst_stock = (
+            db.query(StoreStock)
+            .filter(StoreStock.store_id == dest_store.id, StoreStock.product_id == item.product_id)
+            .with_for_update()
+            .first()
+        )
+        if not dst_stock:
+            dst_stock = StoreStock(
+                store_id=dest_store.id,
+                product_id=item.product_id,
+                quantity=item.quantity,
+                reserved_quantity=0,
             )
+            db.add(dst_stock)
+        else:
+            dst_stock.quantity += item.quantity
 
         t_item = StockTransferItem(transfer_id=transfer.id, product_id=item.product_id, quantity=item.quantity)
         db.add(t_item)
 
         # Single transaction dual inventory movement ledger entries:
-        # 1) Deduct from source
+        # 1) Deduct from source ledger audit
         process_stock_adjustment(
             db=db,
             product_id=item.product_id,
@@ -59,7 +97,7 @@ def create_stock_transfer(db: Session, transfer_data, user_name: str = "System O
             reason_category="INTER_STORE_TRANSFER",
         )
 
-        # 2) Receive into destination (or global catalog stock increment)
+        # 2) Receive into destination ledger audit
         process_stock_adjustment(
             db=db,
             product_id=item.product_id,

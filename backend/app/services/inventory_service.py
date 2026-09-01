@@ -63,13 +63,23 @@ def process_stock_adjustment(
         created_at=datetime.now(UTC),
     )
     db.add(tx)
+
+    # Invalidate Redis product catalog & dashboard cache on every stock adjustment
+    try:
+        from app.services.cache_service import invalidate_pattern
+        invalidate_pattern("products:*")
+        invalidate_pattern("product:*")
+        invalidate_pattern("dashboard:*")
+    except Exception:
+        pass
+
     return product
 
 
 def process_sale_transaction(db: Session, customer_id: int, items: list, payment_method: str, user_name: str):
     """
     Processes a complete sale atomically.
-    Validates available stock for all items, creates Sale + SaleItems, decrements stock with row locking, and logs snapshots.
+    Validates available stock for all items, creates Sale + SaleItems, decrements stock with deterministic row locking (sorted by product_id), and logs snapshots.
     """
     try:
         # Ensure customer exists or auto-provision walk-in customer record
@@ -87,7 +97,10 @@ def process_sale_transaction(db: Session, customer_id: int, items: list, payment
         total_amount = 0.0
         sale_items_data = []
 
-        for item in items:
+        # Deterministic Lock Acquisition Order (Sort by product_id ASC to prevent deadlocks)
+        sorted_items = sorted(items, key=lambda x: getattr(x, "product_id", getattr(x, "id", 0)))
+
+        for item in sorted_items:
             product = db.query(Product).filter(Product.id == item.product_id).with_for_update().first()
             if not product:
                 raise HTTPException(status_code=404, detail=f"Product ID {item.product_id} not found")
@@ -133,6 +146,15 @@ def process_sale_transaction(db: Session, customer_id: int, items: list, payment
 
         db.commit()
         db.refresh(sale)
+
+        # Invalidate Redis Product Catalog Cache on Stock Deduction
+        try:
+            from app.services.cache_service import invalidate_pattern
+            invalidate_pattern("products:*")
+            invalidate_pattern("dashboard:*")
+        except Exception:
+            pass
+
         return sale
 
     except Exception:
@@ -142,16 +164,20 @@ def process_sale_transaction(db: Session, customer_id: int, items: list, payment
 
 def process_receive_purchase(db: Session, purchase_id: int, user_name: str = "System Operator"):
     """
-    Receives a Purchase Order, increments inventory stock with before/after snapshots, and marks PO RECEIVED.
+    Receives a Purchase Order with row-level locking (.with_for_update()), increments inventory stock with before/after snapshots, and marks PO RECEIVED.
     """
-    purchase = db.query(Purchase).filter(Purchase.id == purchase_id).first()
+    # Exclusive row locking on Purchase Order header to prevent concurrent double-receive
+    purchase = db.query(Purchase).filter(Purchase.id == purchase_id).with_for_update().first()
     if not purchase:
         raise HTTPException(status_code=404, detail="Purchase Order not found")
 
     if purchase.status == "RECEIVED":
         raise HTTPException(status_code=400, detail="Purchase Order has already been received.")
 
-    for p_item in purchase.items:
+    # Sort purchase items by product_id for deterministic lock ordering
+    sorted_p_items = sorted(purchase.items, key=lambda x: x.product_id)
+
+    for p_item in sorted_p_items:
         process_stock_adjustment(
             db=db,
             product_id=p_item.product_id,
@@ -167,6 +193,15 @@ def process_receive_purchase(db: Session, purchase_id: int, user_name: str = "Sy
     purchase.received_at = datetime.now(UTC)
     db.commit()
     db.refresh(purchase)
+
+    # Invalidate Redis Product Catalog Cache on Stock Receiving
+    try:
+        from app.services.cache_service import invalidate_pattern
+        invalidate_pattern("products:*")
+        invalidate_pattern("dashboard:*")
+    except Exception:
+        pass
+
     return purchase
 
 

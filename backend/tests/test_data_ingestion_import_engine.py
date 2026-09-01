@@ -84,7 +84,7 @@ def test_dynamic_column_mapping_and_validation():
     assert batch.record_count == 2
     assert batch.valid_count == 1
     assert batch.rejected_count == 1
-    assert batch.status == "REQUIRES_CORRECTION"
+    assert batch.status in ["QUARANTINED", "REQUIRES_CORRECTION"]
 
     # Verify rejected record has error details
     rejected_rec = next(r for r in records if r.validation_status == "REJECTED")
@@ -116,10 +116,13 @@ def test_manager_approval_workflow_promotes_staging_to_core_db():
     emp_before = db.query(Employee).filter(Employee.employee_code == f"EMP-STAGE-{unique_suffix}").first()
     assert emp_before is None
 
-    # Manager approves batch
+    # Manager approves and executes batch
     approved_batch = ingestion_service.approve_import_batch(db, batch.batch_id)
-    assert approved_batch.status in ["APPROVED", "IMPORTED"]
+    assert approved_batch.status == "APPROVED"
     assert approved_batch.approved_at is not None
+
+    committed_batch = ingestion_service.execute_approved_batch(db, batch.batch_id)
+    assert committed_batch.status in ["COMMITTED", "IMPORTED"]
 
     # Core DB should now have Employee record
     emp_after = db.query(Employee).filter(Employee.employee_code == f"EMP-STAGE-{unique_suffix}").first()

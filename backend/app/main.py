@@ -24,6 +24,7 @@ from app.routes import (
     health,
     import_export,
     imports,
+    intake,
     integrations,
     integrity,
     inventory,
@@ -145,6 +146,7 @@ app.include_router(integrity.router)
 app.include_router(import_export.router)
 app.include_router(integrations.router)
 app.include_router(imports.router)
+app.include_router(intake.router)
 app.include_router(work_sessions.router)
 
 

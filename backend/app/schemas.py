@@ -1069,10 +1069,16 @@ class ImportRecordResponse(BaseModel):
     id: int
     batch_id: str
     row_number: int
+    external_id: str | None = None
+    canonical_id: str | None = None
+    action_type: str = "CREATE"
     raw_data_json: str
     normalized_data_json: str | None = None
+    before_snapshot_json: str | None = None
+    diff_json: str | None = None
     validation_status: str
     error_message: str | None = None
+    error_details_json: str | None = None
     imported_entity_id: str | None = None
     model_config = ConfigDict(from_attributes=True)
 
@@ -1082,23 +1088,145 @@ class ImportBatchResponse(BaseModel):
     batch_id: str
     filename: str
     file_hash: str
+    content_hash: str | None = None
+    approved_content_hash: str | None = None
     file_size: int | None = 0
     uploader_user_id: int | None = None
     source_type: str
+    source_system: str | None = "LOCAL_UPLOAD"
+    schema_version: str | None = None
+    source_reference: str | None = None
+    risk_level: str | None = "LOW"
     entity_type: str
     record_count: int
     valid_count: int
     rejected_count: int
+    created_records_count: int | None = 0
+    updated_records_count: int | None = 0
+    unchanged_records_count: int | None = 0
     status: str
     column_mapping_json: str | None = None
     storage_path: str | None = None
     approval_id: int | None = None
+    case_id: str | None = None
+    reconciliation_json: str | None = None
+    reconciliation_delta: float | None = 0.0
     created_at: datetime
     approved_at: datetime | None = None
     approved_by_user_id: int | None = None
     is_duplicate_warning: bool = False
     previous_batch_id: str | None = None
     model_config = ConfigDict(from_attributes=True)
+
+
+class BatchPreviewResponse(BaseModel):
+    batch_id: str
+    entity_type: str
+    risk_level: str
+    status: str
+    content_hash: str | None = None
+    total_records: int
+    valid_records: int
+    rejected_records: int
+    create_count: int
+    update_count: int
+    no_change_count: int
+    requires_approval: bool
+    uploader_user_id: int | None = None
+
+
+class BatchReconciliationResponse(BaseModel):
+    batch_id: str
+    entity_type: str
+    source_system: str
+    status: str
+    total_imported: int
+    accepted_count: int
+    rejected_count: int
+    created_count: int
+    updated_count: int
+    unchanged_count: int
+    reconciliation_delta: float
+    is_reconciled: bool
+    checksum: str | None = None
+    reconciliation_summary: dict[str, Any]
+
+
+class ImportReconciliationRecordResponse(BaseModel):
+    id: int
+    batch_id: str
+    entity_type: str
+    source_system: str
+    total_records: int
+    accepted_count: int
+    rejected_count: int
+    created_count: int
+    updated_count: int
+    unchanged_count: int
+    reconciliation_delta: float
+    is_reconciled: bool
+    previous_checksum: str | None = None
+    checksum: str
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ExternalEntityMappingHistoryResponse(BaseModel):
+    id: int
+    mapping_id: int | None = None
+    entity_type: str
+    source_system: str
+    external_id: str
+    old_internal_code: str | None = None
+    new_internal_code: str
+    reason: str | None = None
+    changed_by_user_id: int | None = None
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+
+
+class ExternalEntityMappingResponse(BaseModel):
+    id: int
+    entity_type: str
+    internal_code: str
+    source_system: str
+    external_id: str
+    metadata_json: str | None = None
+    created_at: datetime
+    updated_at: datetime | None = None
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ExternalEntityMappingCreate(BaseModel):
+    entity_type: str
+    internal_code: str
+    source_system: str
+    external_id: str
+    metadata_json: str | None = None
+
+
+class DataDictionaryFieldSchema(BaseModel):
+    field_name: str
+    canonical_name: str
+    data_type: str  # string, float, int, date, boolean
+    required: bool
+    description: str
+    aliases: list[str] = []
+    example: str | None = None
+    is_identifier: bool = False
+    risk_factor: str = "LOW"  # LOW, HIGH
+
+
+class DataDictionaryContractResponse(BaseModel):
+    entity_type: str
+    schema_version: str
+    category: str  # MASTER_DATA, TRANSACTIONAL, REFERENCE
+    risk_level: str  # LOW, HIGH
+    description: str
+    supported_sources: list[str]  # API, CSV, XLSX, MANUAL
+    fields: list[DataDictionaryFieldSchema]
+
 
 
 class ColumnMappingRequest(BaseModel):

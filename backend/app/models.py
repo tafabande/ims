@@ -10,6 +10,8 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    UniqueConstraint,
+    event,
 )
 from sqlalchemy.orm import relationship
 
@@ -1014,27 +1016,45 @@ class BLEDeviceLocation(Base):
 
 
 class ImportBatch(Base):
+    """
+    Enterprise Import Batch:
+    State Machine Lifecycle:
+    UPLOADED -> PARSING -> VALIDATING -> QUARANTINED -> READY_FOR_COMMIT / PENDING_APPROVAL -> APPROVED -> COMMITTING -> COMMITTED
+    Failure states: VALIDATION_FAILED, REJECTED, COMMIT_FAILED, PARTIALLY_COMMITTED, CANCELLED
+    """
     __tablename__ = "import_batches"
 
     id = Column(Integer, primary_key=True, index=True)
     batch_id = Column(String(50), unique=True, index=True, nullable=False)  # e.g. IMP-2026-00041
     filename = Column(String(255), nullable=False)
-    file_hash = Column(String(64), index=True, nullable=False)  # SHA-256
+    file_hash = Column(String(64), index=True, nullable=False)  # SHA-256 of raw file
+    content_hash = Column(String(64), nullable=True)  # SHA-256 fingerprint across all staged normalized rows
+    approved_content_hash = Column(String(64), nullable=True)  # Frozen approval snapshot fingerprint
     file_size = Column(Integer, default=0)
     uploader_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     source_type = Column(String(50), default="CSV")  # CSV, EXCEL, API, MANUAL
+    source_system = Column(String(100), default="LOCAL_UPLOAD")  # HR_SYSTEM, LEGACY_POS, ACCOUNTING_ERP, FINANCE_EXCEL, etc.
+    schema_version = Column(String(50), nullable=True)  # e.g. EMPLOYEE-2.1, PRODUCT-1.0
+    source_reference = Column(String(255), nullable=True)  # Webhook trace ID, sync batch reference, etc.
+    risk_level = Column(String(20), default="LOW")  # LOW, HIGH
     entity_type = Column(
         String(50), nullable=False
     )  # PRODUCTS, EMPLOYEES, CUSTOMERS, SUPPLIERS, OPENING_STOCK, PURCHASES, SALES
     record_count = Column(Integer, default=0)
     valid_count = Column(Integer, default=0)
     rejected_count = Column(Integer, default=0)
+    created_records_count = Column(Integer, default=0)
+    updated_records_count = Column(Integer, default=0)
+    unchanged_records_count = Column(Integer, default=0)
     status = Column(
-        String(50), default="STAGED"
-    )  # STAGED, VALIDATED, REQUIRES_CORRECTION, PENDING_APPROVAL, APPROVED, REJECTED, IMPORTED, FAILED
+        String(50), default="UPLOADED"
+    )  # UPLOADED, PARSING, VALIDATING, QUARANTINED, READY_FOR_COMMIT, PENDING_APPROVAL, APPROVED, COMMITTING, COMMITTED, VALIDATION_FAILED, REJECTED, COMMIT_FAILED, PARTIALLY_COMMITTED, CANCELLED
     column_mapping_json = Column(Text, nullable=True)  # Business -> IMS field mapping JSON
     storage_path = Column(String(255), nullable=True)
     approval_id = Column(Integer, ForeignKey("approval_requests.id"), nullable=True)
+    case_id = Column(String(50), nullable=True)  # Links to CaseRecord if high-risk approval is required
+    reconciliation_json = Column(Text, nullable=True)  # Immutable post-commit reconciliation report
+    reconciliation_delta = Column(Float, default=0.0)  # Unexplained variance delta (must be 0.0)
     created_at = Column(DateTime, default=datetime.utcnow)
     approved_at = Column(DateTime, nullable=True)
     approved_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
@@ -1050,13 +1070,102 @@ class ImportRecord(Base):
     id = Column(Integer, primary_key=True, index=True)
     batch_id = Column(String(50), ForeignKey("import_batches.batch_id"), nullable=False)
     row_number = Column(Integer, nullable=False)
+    external_id = Column(String(150), index=True, nullable=True)  # Identifier from source system
+    canonical_id = Column(String(150), index=True, nullable=True)  # Canonical internal identifier
+    action_type = Column(String(50), default="CREATE")  # CREATE, UPDATE, NO_CHANGE, REJECT
     raw_data_json = Column(Text, nullable=False)
     normalized_data_json = Column(Text, nullable=True)
+    before_snapshot_json = Column(Text, nullable=True)  # Pre-existing entity state in domain DB
+    diff_json = Column(Text, nullable=True)  # Exact field-level delta (e.g. price: $95 -> $99)
     validation_status = Column(String(50), default="VALID")  # VALID, REJECTED, WARNING
     error_message = Column(Text, nullable=True)
+    error_details_json = Column(Text, nullable=True)  # Structured field errors JSON
     imported_entity_id = Column(String(100), nullable=True)  # ID or Code of created entity after approval
 
     batch = relationship("ImportBatch", back_populates="records")
+
+
+class ImportReconciliationRecord(Base):
+    """
+    Append-only audit ledger verifying post-commit reconciliation equation:
+    total == accepted + rejected AND accepted == created + updated + unchanged AND unexplained_delta == 0
+    Cryptographically sealed with SHA-256 hash chaining (previous_checksum + current_record).
+    Immutability enforced at ORM level: updates and deletes are strictly blocked.
+    """
+    __tablename__ = "import_reconciliation_records"
+
+    id = Column(Integer, primary_key=True, index=True)
+    batch_id = Column(String(50), ForeignKey("import_batches.batch_id"), nullable=False, index=True)
+    entity_type = Column(String(50), nullable=False)
+    source_system = Column(String(100), nullable=False)
+    total_records = Column(Integer, nullable=False)
+    accepted_count = Column(Integer, nullable=False)
+    rejected_count = Column(Integer, nullable=False)
+    created_count = Column(Integer, nullable=False)
+    updated_count = Column(Integer, nullable=False)
+    unchanged_count = Column(Integer, nullable=False)
+    reconciliation_delta = Column(Float, default=0.0)
+    is_reconciled = Column(Boolean, default=True)
+    previous_checksum = Column(String(64), nullable=True)  # Hash chain link to prior reconciliation seal
+    checksum = Column(String(64), nullable=False)  # Cryptographic SHA-256 seal
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class ExternalEntityMapping(Base):
+    """
+    Canonical Identity Mapping:
+    Maps external identifiers (e.g. HR System EMP-492) to IMS Canonical internal IDs (e.g. EMP-00128).
+    Strict Unique Constraint: (entity_type, source_system, external_id) prevents duplicate entity creation.
+    """
+    __tablename__ = "external_entity_mappings"
+    __table_args__ = (
+        UniqueConstraint("entity_type", "source_system", "external_id", name="uq_external_entity_mapping"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    entity_type = Column(String(50), index=True, nullable=False)  # EMPLOYEE, PRODUCT, CUSTOMER, SUPPLIER, LOCATION, etc.
+    internal_code = Column(String(100), index=True, nullable=False)  # e.g. EMP-00128, PRD-00421
+    source_system = Column(String(100), index=True, nullable=False)  # e.g. HR_SYSTEM, LEGACY_POS, ACCOUNTING_ERP
+    external_id = Column(String(150), index=True, nullable=False)  # e.g. EMP-492, SKU-OLD-99
+    is_locked = Column(Boolean, default=False)  # Prevents silent remapping without explicit reconciliation audit
+    remapping_audit_json = Column(Text, nullable=True)
+    metadata_json = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class ExternalEntityMappingHistory(Base):
+    """
+    Append-only audit ledger tracking every remapping change for external identity lineage.
+    Immutability enforced at ORM level: updates and deletes are strictly blocked.
+    """
+    __tablename__ = "external_entity_mapping_histories"
+
+    id = Column(Integer, primary_key=True, index=True)
+    mapping_id = Column(Integer, ForeignKey("external_entity_mappings.id"), nullable=True, index=True)
+    entity_type = Column(String(50), nullable=False)
+    source_system = Column(String(100), nullable=False)
+    external_id = Column(String(150), nullable=False)
+    old_internal_code = Column(String(100), nullable=True)
+    new_internal_code = Column(String(100), nullable=False)
+    reason = Column(Text, nullable=True)
+    changed_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+# =========================================================================
+# TECHNICAL ENFORCEMENT: Append-Only Immutability Event Listeners
+# =========================================================================
+
+def _block_immutable_mutation(mapper, connection, target):
+    raise PermissionError(
+        f"Security Boundary Violation: {target.__class__.__name__} is an append-only audit record and cannot be updated or deleted."
+    )
+
+event.listen(ImportReconciliationRecord, "before_update", _block_immutable_mutation)
+event.listen(ImportReconciliationRecord, "before_delete", _block_immutable_mutation)
+event.listen(ExternalEntityMappingHistory, "before_update", _block_immutable_mutation)
+event.listen(ExternalEntityMappingHistory, "before_delete", _block_immutable_mutation)
 
 
 class IntegrationAccount(Base):
@@ -1067,7 +1176,8 @@ class IntegrationAccount(Base):
     name = Column(String(150), nullable=False)  # e.g. Accounting ERP System
     description = Column(Text, nullable=True)
     status = Column(String(50), default="ACTIVE")  # ACTIVE, SUSPENDED, REVOKED
-    scopes_json = Column(Text, default="[]")  # e.g. ["products:read", "sales:create"]
+    allowed_source_system = Column(String(100), nullable=True)  # e.g. HR_WORKDAY, SAP_ERP, LEGACY_POS
+    scopes_json = Column(Text, default="[]")  # e.g. ["employees:write", "products:read"]
     created_at = Column(DateTime, default=datetime.utcnow)
     expires_at = Column(DateTime, nullable=True)
 
@@ -1080,9 +1190,12 @@ class IntegrationApiKey(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     account_id = Column(String(50), ForeignKey("integration_accounts.account_id"), nullable=False)
-    api_key_hash = Column(String(128), unique=True, index=True, nullable=False)  # Hashed key
+    key_id = Column(String(50), unique=True, index=True, nullable=True)  # e.g. ik_7f3a89bc (O(1) prefix lookup)
+    api_key_hash = Column(String(128), unique=True, index=True, nullable=False)  # Hashed secret key
     prefix = Column(String(20), nullable=False)  # e.g. ims_live_a1b2
     name = Column(String(100), nullable=False)  # e.g. Production Secret Key
+    status = Column(String(50), default="ACTIVE")  # ACTIVE, EXPIRING, EXPIRED, REVOKED
+    rotated_from_key_id = Column(String(50), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     last_used_at = Column(DateTime, nullable=True)
     revoked_at = Column(DateTime, nullable=True)

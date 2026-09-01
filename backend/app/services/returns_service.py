@@ -15,7 +15,8 @@ def process_return_order(
     user_name: str = "System Operator",
     user_emp_id: int | None = None,
 ) -> ReturnOrder:
-    sale = db.query(Sale).filter(Sale.id == return_data.sale_id).first()
+    # Lock Sale header exclusively with .with_for_update() to prevent race conditions on return balances
+    sale = db.query(Sale).filter(Sale.id == return_data.sale_id).with_for_update().first()
     if not sale:
         raise HTTPException(status_code=404, detail="Original Sale Invoice not found")
 

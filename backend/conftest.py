@@ -3,7 +3,7 @@ from fastapi import Depends, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials
 
 import app.models  # Register all domain models with Base metadata
-from app.database import Base, SessionLocal, engine, get_db
+from app.database import Base, SessionLocal, engine, get_db, install_database_immutability_triggers
 from app.dependencies import UserContext, get_current_user, security
 from app.main import app
 from app.models import User
@@ -81,6 +81,7 @@ def initialize_database():
     """Drop and recreate fresh schema once per test session to guarantee all model columns exist"""
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
+    install_database_immutability_triggers(engine)
     db = SessionLocal()
     try:
         seed_test_users(db)
@@ -92,6 +93,7 @@ def initialize_database():
 @pytest.fixture(autouse=True)
 def setup_and_teardown_db():
     Base.metadata.create_all(bind=engine)
+    install_database_immutability_triggers(engine)
     db = SessionLocal()
     try:
         seed_test_users(db)

@@ -23,7 +23,13 @@ import {
 } from 'lucide-react';
 
 export default function DataIntakeView({ onShowToast }) {
-  const [activeSubTab, setActiveSubTab] = useState('dashboard'); // 'dashboard' | 'wizard' | 'history' | 'templates' | 'approvals' | 'integrations' | 'exports'
+  const [activeSubTab, setActiveSubTab] = useState('dashboard'); // 'dashboard' | 'wizard' | 'history' | 'templates' | 'mappings' | 'approvals' | 'integrations' | 'exports'
+  const [canonicalContracts, setCanonicalContracts] = useState([]);
+  const [externalMappings, setExternalMappings] = useState([
+    { id: 1, entity_type: 'EMPLOYEES', source_system: 'HR_WORKDAY', external_id: 'EMP-492', internal_code: 'EMP-00128', created_at: '2026-08-25' },
+    { id: 2, entity_type: 'PRODUCTS', source_system: 'LEGACY_POS', external_id: 'SKU-OLD-99', internal_code: 'SKU-LOGI-MX3S', created_at: '2026-08-24' },
+    { id: 3, entity_type: 'SUPPLIERS', source_system: 'ACCOUNTING_ERP', external_id: 'VEND-8812', internal_code: 'TechCorp International', created_at: '2026-08-20' },
+  ]);
 
   // Telemetry & State Data
   const [metrics, setMetrics] = useState({
@@ -41,6 +47,9 @@ export default function DataIntakeView({ onShowToast }) {
       filename: 'employees_august.xlsx',
       entity_type: 'EMPLOYEES',
       source_type: 'EXCEL',
+      source_system: 'HR_WORKDAY',
+      schema_version: 'EMPLOYEE-2.1',
+      risk_level: 'HIGH',
       record_count: 250,
       valid_count: 243,
       rejected_count: 7,
@@ -52,6 +61,9 @@ export default function DataIntakeView({ onShowToast }) {
       filename: 'opening_stock_harare.csv',
       entity_type: 'OPENING_STOCK',
       source_type: 'CSV',
+      source_system: 'STORE_COUNT',
+      schema_version: 'STOCK-1.0',
+      risk_level: 'HIGH',
       record_count: 120,
       valid_count: 120,
       rejected_count: 0,
@@ -63,6 +75,9 @@ export default function DataIntakeView({ onShowToast }) {
       filename: 'suppliers_q3.xlsx',
       entity_type: 'SUPPLIERS',
       source_type: 'EXCEL',
+      source_system: 'FINANCE_EXCEL',
+      schema_version: 'SUPPLIER-1.0',
+      risk_level: 'LOW',
       record_count: 45,
       valid_count: 45,
       rejected_count: 0,
@@ -74,6 +89,7 @@ export default function DataIntakeView({ onShowToast }) {
   // Import Wizard State
   const [wizardStep, setWizardStep] = useState(1); // 1: Upload, 2: Column Mapping, 3: Validation, 4: Preview & Approve
   const [selectedEntity, setSelectedEntity] = useState('products');
+  const [sourceSystemInput, setSourceSystemInput] = useState('LOCAL_UPLOAD');
   const [rawFile, setRawFile] = useState(null);
   const [fileHeaders, setFileHeaders] = useState(['Product SKU', 'Item Name', 'Unit Cost', 'Selling Price', 'Reorder Level']);
   const [columnMapping, setColumnMapping] = useState({
@@ -113,7 +129,7 @@ export default function DataIntakeView({ onShowToast }) {
   const [newAccountScopes, setNewAccountScopes] = useState(['products:read', 'sales:create']);
   const [createdApiKeySecret, setCreatedApiKeySecret] = useState(null);
 
-  // Fetch Dashboard Metrics on Mount
+  // Fetch Dashboard Metrics, Contracts & Mappings on Mount
   useEffect(() => {
     fetch('/api/imports/intake-dashboard')
       .then(res => res.json())
@@ -121,9 +137,21 @@ export default function DataIntakeView({ onShowToast }) {
         if (data.metrics) setMetrics(data.metrics);
         if (data.recent_activity) setRecentActivity(data.recent_activity);
       })
-      .catch(() => {
-        // Fallback mock data already set in state
-      });
+      .catch(() => {});
+
+    fetch('/api/intake/dictionary')
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) setCanonicalContracts(data);
+      })
+      .catch(() => {});
+
+    fetch('/api/intake/mappings')
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data) && data.length > 0) setExternalMappings(data);
+      })
+      .catch(() => {});
   }, []);
 
   // Wizard Handlers
@@ -270,7 +298,8 @@ export default function DataIntakeView({ onShowToast }) {
           { id: 'dashboard', label: 'Data Intake Overview', icon: Layers },
           { id: 'wizard', label: 'Import Center Wizard', icon: Upload },
           { id: 'history', label: 'Import History & Provenance', icon: History },
-          { id: 'templates', label: 'Import Templates', icon: FileSpreadsheet },
+          { id: 'templates', label: 'Data Dictionary & Templates', icon: FileSpreadsheet },
+          { id: 'mappings', label: 'Canonical Identity Mappings', icon: Database },
           { id: 'approvals', label: 'Pending Approvals', icon: FileCheck },
           { id: 'integrations', label: 'API Integrations & Keys', icon: Key },
           { id: 'exports', label: 'Data Export Center', icon: Download }
@@ -748,49 +777,153 @@ export default function DataIntakeView({ onShowToast }) {
         </div>
       )}
 
-      {/* TAB 4: IMPORT TEMPLATES */}
+      {/* TAB 4: DATA DICTIONARY & VERSIONED TEMPLATES */}
       {activeSubTab === 'templates' && (
         <div>
-          <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '8px' }}>Download Pre-built Spreadsheet Templates</h3>
-          <p style={{ fontSize: '13px', color: 'var(--color-text-secondary)', marginBottom: '24px' }}>
-            Download ready-to-use CSV/Excel templates containing standard headers, sample rows, and instructions.
-          </p>
+          <div style={{ marginBottom: '24px' }}>
+            <h3 style={{ fontSize: '18px', fontWeight: '700', margin: '0 0 6px 0' }}>Enterprise Canonical Data Dictionary & Versioned Templates</h3>
+            <p style={{ fontSize: '13px', color: 'var(--color-text-secondary)', margin: 0 }}>
+              Central enterprise schema contracts governing validation, API integration contracts, and system-generated versioned import templates.
+            </p>
+          </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
-            {[
-              { entity: 'products', name: 'Products Template', desc: 'SKU, Name, Category, Cost, Price, Reorder Level, Unit', file: 'products_template.csv' },
-              { entity: 'employees', name: 'Employees Template', desc: 'Employee No, First Name, Last Name, Email, Phone, Position', file: 'employees_template.csv' },
-              { entity: 'suppliers', name: 'Suppliers Template', desc: 'Supplier Name, Contact Person, Email, Phone, Address', file: 'suppliers_template.csv' },
-              { entity: 'opening_stock', name: 'Opening Stock Template', desc: 'SKU, Quantity, Unit Cost', file: 'opening_stock_template.csv' },
-              { entity: 'customers', name: 'Customers Template', desc: 'Customer Name, Email, Phone', file: 'customers_template.csv' },
-              { entity: 'purchases', name: 'Purchase Receipts Template', desc: 'PO Number, Supplier, Date, SKU, Quantity, Unit Cost', file: 'purchases_template.csv' }
-            ].map(t => (
-              <div key={t.entity} style={{ background: 'var(--color-paper)', border: '1px solid var(--color-rule)', borderRadius: 'var(--radius-sm)', padding: '20px' }}>
-                <FileSpreadsheet size={28} style={{ color: 'var(--color-accent)', marginBottom: '12px' }} />
-                <h4 style={{ fontSize: '15px', fontWeight: '700', margin: '0 0 6px 0' }}>{t.name}</h4>
-                <p style={{ fontSize: '12px', color: 'var(--color-text-secondary)', margin: '0 0 16px 0' }}>{t.desc}</p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '20px' }}>
+            {(canonicalContracts.length > 0 ? canonicalContracts : [
+              { entity_type: 'EMPLOYEES', schema_version: 'EMPLOYEE-2.1', category: 'MASTER_DATA', risk_level: 'HIGH', description: 'Enterprise Employee & Staff Master Data Schema', supported_sources: ['API', 'CSV', 'XLSX', 'MANUAL'], fields: [] },
+              { entity_type: 'PRODUCTS', schema_version: 'PRODUCT-1.0', category: 'MASTER_DATA', risk_level: 'LOW', description: 'Master Catalog of Stock Items, Parts, and SKUs', supported_sources: ['API', 'CSV', 'XLSX', 'MANUAL'], fields: [] },
+              { entity_type: 'CUSTOMERS', schema_version: 'CUSTOMER-1.0', category: 'MASTER_DATA', risk_level: 'LOW', description: 'Commercial & Retail Customer Master Records', supported_sources: ['API', 'CSV', 'XLSX', 'MANUAL'], fields: [] },
+              { entity_type: 'SUPPLIERS', schema_version: 'SUPPLIER-1.0', category: 'MASTER_DATA', risk_level: 'LOW', description: 'Approved Vendors, Manufacturers & Wholesale Distributors', supported_sources: ['API', 'CSV', 'XLSX', 'MANUAL'], fields: [] },
+              { entity_type: 'OPENING_STOCK', schema_version: 'STOCK-1.0', category: 'TRANSACTIONAL', risk_level: 'HIGH', description: 'Initial Physical Inventory Balances & Valuation', supported_sources: ['API', 'CSV', 'XLSX'], fields: [] },
+              { entity_type: 'PURCHASES', schema_version: 'PURCHASE-1.0', category: 'TRANSACTIONAL', risk_level: 'HIGH', description: 'Purchase Orders & Goods Received Notes (GRN)', supported_sources: ['API', 'CSV', 'XLSX'], fields: [] },
+              { entity_type: 'SALES', schema_version: 'SALE-1.0', category: 'TRANSACTIONAL', risk_level: 'HIGH', description: 'Historical POS Sales Receipts & Invoices', supported_sources: ['API', 'CSV', 'XLSX'], fields: [] },
+            ]).map(contract => (
+              <div key={contract.entity_type} style={{ background: 'var(--color-paper)', border: '1px solid var(--color-rule)', borderRadius: 'var(--radius-sm)', padding: '20px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <FileSpreadsheet size={22} style={{ color: 'var(--color-accent)' }} />
+                      <h4 style={{ fontSize: '15px', fontWeight: '700', margin: 0 }}>{contract.entity_type}</h4>
+                    </div>
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <span style={{ fontSize: '11px', fontFamily: 'monospace', fontWeight: '700', background: 'var(--color-canvas)', border: '1px solid var(--color-rule)', padding: '2px 6px', borderRadius: '4px', color: 'var(--color-accent)' }}>
+                        {contract.schema_version}
+                      </span>
+                      <span style={{ fontSize: '11px', fontWeight: '700', padding: '2px 6px', borderRadius: '4px', background: contract.risk_level === 'HIGH' ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.15)', color: contract.risk_level === 'HIGH' ? '#ef4444' : '#10b981' }}>
+                        {contract.risk_level} RISK
+                      </span>
+                    </div>
+                  </div>
+
+                  <p style={{ fontSize: '12px', color: 'var(--color-text-secondary)', margin: '0 0 12px 0', lineHeight: 1.4 }}>
+                    {contract.description}
+                  </p>
+
+                  <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)', marginBottom: '14px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                    <span style={{ fontWeight: '600' }}>Sources:</span>
+                    {contract.supported_sources.map(src => (
+                      <span key={src} style={{ background: 'var(--color-canvas)', padding: '1px 6px', borderRadius: '3px', border: '1px solid var(--color-rule)' }}>
+                        {src}
+                      </span>
+                    ))}
+                  </div>
+
+                  {contract.fields && contract.fields.length > 0 && (
+                    <div style={{ marginBottom: '16px', maxHeight: '120px', overflowY: 'auto', border: '1px solid var(--color-rule)', borderRadius: 'var(--radius-xs)', background: 'var(--color-canvas)', padding: '8px' }}>
+                      <div style={{ fontSize: '11px', fontWeight: '700', marginBottom: '4px', color: 'var(--color-text-secondary)' }}>CANONICAL FIELDS:</div>
+                      {contract.fields.map(f => (
+                        <div key={f.field_name} style={{ fontSize: '11px', display: 'flex', justifyContent: 'space-between', padding: '2px 0', borderBottom: '1px dotted var(--color-rule)' }}>
+                          <span><strong>{f.field_name}</strong> {f.required && <span style={{ color: '#ef4444' }}>*</span>}</span>
+                          <span style={{ fontFamily: 'monospace', color: 'var(--color-text-secondary)' }}>{f.data_type}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
                 <a
-                  href={`/api/imports/templates/${t.entity}`}
-                  download={t.file}
+                  href={`/api/intake/templates/${contract.entity_type}`}
+                  download={`IMS_Template_${contract.entity_type}_${contract.schema_version}.csv`}
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
+                    justifyContent: 'center',
                     gap: '6px',
-                    padding: '8px 14px',
+                    padding: '9px 14px',
                     background: 'var(--color-canvas)',
                     border: '1px solid var(--color-rule)',
                     borderRadius: 'var(--radius-xs)',
                     color: 'var(--color-text)',
                     fontSize: '12px',
                     fontWeight: '600',
-                    textDecoration: 'none'
+                    textDecoration: 'none',
+                    transition: 'all 0.15s ease'
                   }}
                 >
-                  <Download size={14} /> Download Template
+                  <Download size={14} /> Download Versioned Template ({contract.schema_version})
                 </a>
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* TAB: CANONICAL IDENTITY MAPPINGS (RECONCILIATION) */}
+      {activeSubTab === 'mappings' && (
+        <div style={{ background: 'var(--color-paper)', border: '1px solid var(--color-rule)', borderRadius: 'var(--radius-sm)', padding: '24px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+            <div>
+              <h3 style={{ fontSize: '16px', fontWeight: '700', margin: 0 }}>Cross-System Canonical Identity Mappings</h3>
+              <p style={{ fontSize: '13px', color: 'var(--color-text-secondary)', margin: '4px 0 0 0' }}>
+                Maintains bi-directional reconciliation between external source IDs and internal IMS Canonical Entity IDs.
+              </p>
+            </div>
+            <button
+              onClick={() => {
+                fetch('/api/intake/mappings')
+                  .then(r => r.json())
+                  .then(d => { if (Array.isArray(d)) setExternalMappings(d); });
+                onShowToast('info', 'Reconciliation Refreshed', 'Identity mappings updated from PostgreSQL ledger.');
+              }}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 14px', background: 'var(--color-canvas)', border: '1px solid var(--color-rule)', borderRadius: 'var(--radius-xs)', fontSize: '12px', cursor: 'pointer' }}
+            >
+              <RefreshCw size={14} /> Refresh Mappings
+            </button>
+          </div>
+
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid var(--color-rule)', textAlign: 'left', color: 'var(--color-text-secondary)' }}>
+                <th style={{ padding: '10px' }}>Entity Type</th>
+                <th style={{ padding: '10px' }}>External System</th>
+                <th style={{ padding: '10px' }}>External Source ID</th>
+                <th style={{ padding: '10px' }}></th>
+                <th style={{ padding: '10px' }}>IMS Canonical ID / Code</th>
+                <th style={{ padding: '10px' }}>Created / Synced</th>
+              </tr>
+            </thead>
+            <tbody>
+              {externalMappings.map(m => (
+                <tr key={m.id} style={{ borderBottom: '1px solid var(--color-rule)' }}>
+                  <td style={{ padding: '12px', fontWeight: '700' }}>{m.entity_type}</td>
+                  <td style={{ padding: '12px' }}>
+                    <span style={{ fontSize: '11px', fontFamily: 'monospace', background: 'var(--color-canvas)', padding: '2px 8px', borderRadius: '4px', border: '1px solid var(--color-rule)' }}>
+                      {m.source_system}
+                    </span>
+                  </td>
+                  <td style={{ padding: '12px', fontFamily: 'monospace', color: '#ef4444', fontWeight: '600' }}>
+                    {m.external_id}
+                  </td>
+                  <td style={{ padding: '12px', color: 'var(--color-text-secondary)' }}>⟷</td>
+                  <td style={{ padding: '12px', fontFamily: 'monospace', color: '#10b981', fontWeight: '700' }}>
+                    {m.internal_code}
+                  </td>
+                  <td style={{ padding: '12px', color: 'var(--color-text-secondary)', fontSize: '12px' }}>
+                    {m.created_at ? new Date(m.created_at).toLocaleDateString() : 'N/A'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 
