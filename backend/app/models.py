@@ -52,6 +52,21 @@ class AuditLogRecord(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
+class EnterpriseInstallation(Base):
+    __tablename__ = "enterprise_installations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    installation_id = Column(String(50), unique=True, index=True, nullable=False)  # e.g. INST-2026-A1B2C3
+    status = Column(String(50), nullable=False, default="BOOTSTRAP_PENDING")  # BOOTSTRAP_PENDING, INITIALIZING, INITIALIZED, BOOTSTRAP_DISABLED
+    bootstrap_token_hash = Column(String(128), nullable=True)  # SHA-256 digest of one-time bootstrap secret
+    initialized_at = Column(DateTime, nullable=True)
+    initialized_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    bootstrap_consumed_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    initialized_by = relationship("User")
+
+
 class Department(Base):
     __tablename__ = "departments"
 

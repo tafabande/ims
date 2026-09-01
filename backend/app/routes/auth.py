@@ -37,27 +37,19 @@ from app.services.iam_service import (
 router = APIRouter(prefix="/api/auth", tags=["IAM & Authentication"])
 
 
+from app.services.bootstrap_service import (
+    bootstrap_root_administrator,
+    get_public_system_status,
+)
+
+
 @router.get("/status", response_model=SystemStatusResponse)
 def get_system_initialization_status(db: Session = Depends(get_db)):
     """
-    Public system status endpoint:
-    Checks whether enterprise data and root administrator credentials exist in the database.
-    If is_initialized is False, frontend prompts First-Time Enterprise Setup instead of blank login.
+    Public system status endpoint (information-disclosure safe).
+    Checks whether the enterprise installation lifecycle has completed bootstrap.
     """
-    user_count = db.query(User).count()
-    product_count = db.query(Product).count()
-    store_count = db.query(Store).count()
-    has_enterprise_data = (user_count > 0 or product_count > 0 or store_count > 0)
-
-    return SystemStatusResponse(
-        is_initialized=(user_count > 0),
-        user_count=user_count,
-        product_count=product_count,
-        store_count=store_count,
-        has_enterprise_data=has_enterprise_data,
-        system_name="Enterprise IMS",
-        version="1.0.0",
-    )
+    return get_public_system_status(db)
 
 
 @router.post("/initialize-root-admin", response_model=TokenResponse)
@@ -67,59 +59,19 @@ def initialize_root_administrator(
     db: Session = Depends(get_db),
 ):
     """
-    Bootstrap initial root administrator for a fresh enterprise install.
-    Strictly guarded: ONLY permitted when user_count == 0.
+    Secure One-Time Bootstrap of Primary Root Administrator:
+    - Requires valid one-time bootstrap authorization token.
+    - Restricted to trusted local/internal interfaces.
+    - Transactionally transitions installation lifecycle to INITIALIZED.
+    - Emits ENTERPRISE_INITIALIZED audit event and permanently disables bootstrap.
     """
-    user_count = db.query(User).count()
-    if user_count > 0:
-        raise HTTPException(
-            status_code=400,
-            detail="System is already initialized. Enterprise administrator accounts exist.",
-        )
-
-    root_user = User(
-        user_code="USR-000001",
-        email=payload.email.strip().lower(),
-        full_name=payload.full_name.strip(),
-        hashed_password=hash_password(payload.password),
-        role="ADMIN",
-        department="Executive IT",
-        active=True,
-    )
-    db.add(root_user)
-    db.commit()
-    db.refresh(root_user)
-
-    # Issue initial access & refresh token
-    permissions = ROLE_PERMISSIONS.get("ADMIN", ["*"])
-    access_token = create_access_token(user_id=str(root_user.id), role="ADMIN", permissions=permissions)
-    refresh_token = create_refresh_token(user_id=str(root_user.id))
-
-    session_id = str(uuid.uuid4())
-    session_rec = SessionRecord(
-        id=session_id,
-        user_id=root_user.id,
-        refresh_token_hash=hash_refresh_token(refresh_token),
-        device_info=request.headers.get("User-Agent", "Web Client"),
-        ip_address=request.client.host if request.client else "127.0.0.1",
-        is_active=True,
-        expires_at=datetime.now(UTC) + timedelta(days=7),
-    )
-    db.add(session_rec)
-    db.commit()
-
-    return TokenResponse(
-        access_token=access_token,
-        refresh_token=refresh_token,
-        token_type="bearer",
-        expires_in=900,
-        user_id=str(root_user.id),
-        user_code=root_user.user_code,
-        full_name=root_user.full_name,
-        email=root_user.email,
-        role="ADMIN",
-        permissions=permissions,
-        session_id=session_id,
+    client_ip = request.client.host if request.client else "127.0.0.1"
+    user_agent = request.headers.get("User-Agent", "Web Client")
+    return bootstrap_root_administrator(
+        db=db,
+        payload=payload,
+        client_ip=client_ip,
+        user_agent=user_agent,
     )
 
 

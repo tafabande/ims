@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Lock, User, ArrowRight, AlertCircle, Loader, Mail, Database, ShieldCheck, CheckCircle2, Sparkles } from 'lucide-react';
+import { Box, Lock, User, ArrowRight, AlertCircle, Loader, Mail, Database, ShieldCheck, CheckCircle2, Sparkles, Key } from 'lucide-react';
 import { apiGet } from '../../utils/apiClient';
 import { useAuth } from '../../utils/authStore';
 
@@ -10,7 +10,7 @@ import { useAuth } from '../../utils/authStore';
  * - Automatically checks /api/auth/status on load.
  * - If NO enterprise data or user accounts exist (uninitialized deployment):
  *   Renders the First-Time Enterprise Setup screen to bootstrap the Root Administrator
- *   instead of showing an un-actionable blank login prompt.
+ *   requiring a mandatory one-time server bootstrap token instead of an unauthenticated form.
  * - If enterprise accounts exist:
  *   Renders the standard enterprise authentication screen.
  */
@@ -20,7 +20,7 @@ export default function LoginView({ onLoginSuccess }) {
   // System Initialization State
   const [isStatusLoading, setIsStatusLoading] = useState(true);
   const [isInitialized, setIsInitialized] = useState(true);
-  const [systemStats, setSystemStats] = useState(null);
+  const [installationId, setInstallationId] = useState(null);
 
   // Standard Login Form State
   const [usernameOrEmail, setUsernameOrEmail] = useState('');
@@ -32,6 +32,7 @@ export default function LoginView({ onLoginSuccess }) {
   const [initEmail, setInitEmail] = useState('admin@ims.co.zw');
   const [initPassword, setInitPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [bootstrapToken, setBootstrapToken] = useState('');
   const [validationError, setValidationError] = useState('');
 
   // Check system status on mount
@@ -40,7 +41,7 @@ export default function LoginView({ onLoginSuccess }) {
     apiGet('/api/auth/status')
       .then((data) => {
         setIsInitialized(Boolean(data.is_initialized));
-        setSystemStats(data);
+        setInstallationId(data.installation_id);
       })
       .catch(() => {
         // Fallback to regular login if status endpoint fails
@@ -73,13 +74,13 @@ export default function LoginView({ onLoginSuccess }) {
     clearError();
     setValidationError('');
 
-    if (!fullName.trim() || !initEmail.trim() || !initPassword.trim()) {
-      setValidationError('Please complete all required fields.');
+    if (!fullName.trim() || !initEmail.trim() || !initPassword.trim() || !bootstrapToken.trim()) {
+      setValidationError('Please complete all required fields, including the one-time bootstrap token.');
       return;
     }
 
-    if (initPassword.length < 6) {
-      setValidationError('Password must be at least 6 characters.');
+    if (initPassword.length < 8) {
+      setValidationError('Password must be at least 8 characters and contain letters and numbers.');
       return;
     }
 
@@ -88,7 +89,7 @@ export default function LoginView({ onLoginSuccess }) {
       return;
     }
 
-    const result = await initializeRootAdmin(fullName.trim(), initEmail.trim(), initPassword);
+    const result = await initializeRootAdmin(fullName.trim(), initEmail.trim(), initPassword, bootstrapToken.trim());
     if (result.success) {
       onLoginSuccess(result.user);
     }
@@ -116,7 +117,7 @@ export default function LoginView({ onLoginSuccess }) {
   }
 
   // =========================================================================
-  // VIEW 1: FIRST-TIME ENTERPRISE SETUP (NO CREDENTIALS EXIST)
+  // VIEW 1: FIRST-TIME ENTERPRISE SETUP (REQUIRES BOOTSTRAP SECRET)
   // =========================================================================
   if (!isInitialized) {
     return (
@@ -133,7 +134,7 @@ export default function LoginView({ onLoginSuccess }) {
         <div
           style={{
             width: '100%',
-            maxWidth: '520px',
+            maxWidth: '540px',
             background: 'var(--color-paper-2)',
             border: '1px solid var(--color-rule)',
             borderRadius: 'var(--radius-lg)',
@@ -142,7 +143,7 @@ export default function LoginView({ onLoginSuccess }) {
           }}
         >
           {/* Header */}
-          <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+          <div style={{ textAlign: 'center', marginBottom: '22px' }}>
             <div
               style={{
                 width: '52px',
@@ -160,21 +161,21 @@ export default function LoginView({ onLoginSuccess }) {
               <Database size={28} />
             </div>
             <h1 style={{ fontSize: '1.45rem', fontWeight: 800, color: 'var(--color-ink)', letterSpacing: '-0.02em' }}>
-              Enterprise IMS Setup
+              Enterprise IMS Bootstrap
             </h1>
-            <p style={{ fontSize: '0.875rem', color: 'var(--color-ink-muted)', marginTop: '4px' }}>
-              Fresh Deployment • First-Time Initialization
+            <p style={{ fontSize: '0.8125rem', color: 'var(--color-ink-muted)', marginTop: '4px' }}>
+              Installation ID: <span style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--color-accent)' }}>{installationId || 'PENDING'}</span>
             </p>
           </div>
 
           {/* Prominent No Enterprise Data Notice */}
           <div
             style={{
-              padding: '16px',
+              padding: '14px 16px',
               background: 'rgba(59, 130, 246, 0.08)',
               border: '1px solid rgba(59, 130, 246, 0.25)',
               borderRadius: 'var(--radius-md)',
-              marginBottom: '24px',
+              marginBottom: '20px',
               display: 'flex',
               gap: '12px',
             }}
@@ -182,9 +183,9 @@ export default function LoginView({ onLoginSuccess }) {
             <ShieldCheck size={22} style={{ color: 'var(--color-accent)', flexShrink: 0, marginTop: '2px' }} />
             <div style={{ fontSize: '0.8125rem', lineHeight: '1.45', color: 'var(--color-ink-dim)' }}>
               <strong style={{ color: 'var(--color-ink)', display: 'block', marginBottom: '3px', fontSize: '0.875rem' }}>
-                No Enterprise Data or Credentials Initialized
+                One-Time Deployment Authorization Required
               </strong>
-              The database is currently empty with no registered users. Create the primary <strong>Root Administrator</strong> account below to initialize the system and unlock the <strong>Enterprise Data Intake Gateway</strong>.
+              Enter the one-time <strong>Bootstrap Token</strong> (configured via <code style={{ color: 'var(--color-accent)' }}>BOOTSTRAP_SECRET</code> or stored in the server's <code style={{ color: 'var(--color-accent)' }}>.bootstrap_token</code> file) to initialize the primary Root Administrator.
             </div>
           </div>
 
@@ -210,9 +211,27 @@ export default function LoginView({ onLoginSuccess }) {
           )}
 
           {/* Root Admin Bootstrap Form */}
-          <form onSubmit={handleInitSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <form onSubmit={handleInitSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
             <div>
-              <label className="input-label" style={{ fontWeight: 600, fontSize: '0.8125rem' }}>Administrator Full Name</label>
+              <label className="input-label" style={{ fontWeight: 600, fontSize: '0.8125rem' }}>One-Time Bootstrap Authorization Token *</label>
+              <div style={{ position: 'relative' }}>
+                <Key size={16} color="var(--color-accent)" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+                <input
+                  type="password"
+                  className="input-field"
+                  style={{ paddingLeft: '36px', fontFamily: 'monospace' }}
+                  value={bootstrapToken}
+                  onChange={(e) => { setBootstrapToken(e.target.value); setValidationError(''); }}
+                  placeholder="Paste server one-time bootstrap secret"
+                  required
+                  disabled={isLoading}
+                  autoFocus
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="input-label" style={{ fontWeight: 600, fontSize: '0.8125rem' }}>Root Administrator Full Name *</label>
               <div style={{ position: 'relative' }}>
                 <User size={16} color="var(--color-ink-dim)" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
                 <input
@@ -229,7 +248,7 @@ export default function LoginView({ onLoginSuccess }) {
             </div>
 
             <div>
-              <label className="input-label" style={{ fontWeight: 600, fontSize: '0.8125rem' }}>Root Administrator Email</label>
+              <label className="input-label" style={{ fontWeight: 600, fontSize: '0.8125rem' }}>Root Administrator Email *</label>
               <div style={{ position: 'relative' }}>
                 <Mail size={16} color="var(--color-ink-dim)" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
                 <input
@@ -247,7 +266,7 @@ export default function LoginView({ onLoginSuccess }) {
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
               <div>
-                <label className="input-label" style={{ fontWeight: 600, fontSize: '0.8125rem' }}>Root Password</label>
+                <label className="input-label" style={{ fontWeight: 600, fontSize: '0.8125rem' }}>Root Password *</label>
                 <div style={{ position: 'relative' }}>
                   <Lock size={16} color="var(--color-ink-dim)" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
                   <input
@@ -256,7 +275,7 @@ export default function LoginView({ onLoginSuccess }) {
                     style={{ paddingLeft: '36px' }}
                     value={initPassword}
                     onChange={(e) => { setInitPassword(e.target.value); setValidationError(''); }}
-                    placeholder="Min 6 characters"
+                    placeholder="Min 8 chars, mixed case & numbers"
                     required
                     disabled={isLoading}
                   />
@@ -264,7 +283,7 @@ export default function LoginView({ onLoginSuccess }) {
               </div>
 
               <div>
-                <label className="input-label" style={{ fontWeight: 600, fontSize: '0.8125rem' }}>Confirm Password</label>
+                <label className="input-label" style={{ fontWeight: 600, fontSize: '0.8125rem' }}>Confirm Password *</label>
                 <div style={{ position: 'relative' }}>
                   <Lock size={16} color="var(--color-ink-dim)" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
                   <input
@@ -304,12 +323,12 @@ export default function LoginView({ onLoginSuccess }) {
               {isLoading ? (
                 <>
                   <Loader size={16} className="animate-spin" />
-                  Bootstrapping Root Administrator...
+                  Verifying Token &amp; Bootstrapping...
                 </>
               ) : (
                 <>
                   <Sparkles size={16} />
-                  Initialize Enterprise &amp; Create Root Admin
+                  Authorize &amp; Initialize Root Administrator
                 </>
               )}
             </button>
@@ -318,8 +337,8 @@ export default function LoginView({ onLoginSuccess }) {
           {/* Architecture info footer */}
           <div
             style={{
-              marginTop: '24px',
-              paddingTop: '16px',
+              marginTop: '20px',
+              paddingTop: '14px',
               borderTop: '1px solid var(--color-rule)',
               fontSize: '0.75rem',
               color: 'var(--color-ink-muted)',
@@ -328,8 +347,8 @@ export default function LoginView({ onLoginSuccess }) {
               justifyContent: 'space-between',
             }}
           >
-            <span>IMS Canonical Data Architecture</span>
-            <span style={{ color: 'var(--color-accent)', fontWeight: 600 }}>v1.0.0 Ready</span>
+            <span>IMS Zero-Trust Installation Boundary</span>
+            <span style={{ color: 'var(--color-accent)', fontWeight: 600 }}>Secure Bootstrap Protocol</span>
           </div>
         </div>
       </div>

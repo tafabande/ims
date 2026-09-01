@@ -198,13 +198,14 @@ export function AuthProvider({ children }) {
     return newToken;
   }, [logout]);
 
-  const initializeRootAdmin = useCallback(async (fullName, email, password) => {
+  const initializeRootAdmin = useCallback(async (fullName, email, password, bootstrapToken) => {
     dispatch({ type: 'LOGIN_START' });
     try {
       const data = await apiPost('/api/auth/initialize-root-admin', {
         full_name: fullName,
         email: email,
         password: password,
+        bootstrap_token: bootstrapToken,
       });
 
       const user = {

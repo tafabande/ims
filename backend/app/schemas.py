@@ -30,10 +30,8 @@ class RefreshTokenRequest(BaseModel):
 
 class SystemStatusResponse(BaseModel):
     is_initialized: bool
-    user_count: int
-    product_count: int
-    store_count: int
-    has_enterprise_data: bool
+    setup_required: bool
+    installation_id: str
     system_name: str = "Enterprise IMS"
     version: str = "1.0.0"
 
@@ -41,7 +39,8 @@ class SystemStatusResponse(BaseModel):
 class InitializeRootAdminRequest(BaseModel):
     full_name: str = Field(..., min_length=2, max_length=200)
     email: str = Field(..., min_length=5, max_length=255)
-    password: str = Field(..., min_length=6, max_length=128)
+    password: str = Field(..., min_length=8, max_length=128)
+    bootstrap_token: str = Field(..., min_length=10, max_length=256)
 
 
 # User Management Schemas
