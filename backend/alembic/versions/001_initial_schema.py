@@ -255,8 +255,10 @@ def upgrade() -> None:
     op.create_index("ix_employees_employee_code", "employees", ["employee_code"], unique=True)
     op.create_index("ix_employees_email", "employees", ["email"], unique=True)
 
-    # Add deferred FK constraint on stores.manager_id -> employees.id
-    op.create_foreign_key("fk_store_manager_id", "stores", "employees", ["manager_id"], ["id"], use_alter=True)
+    # Add deferred FK constraint on stores.manager_id -> employees.id (PostgreSQL / RDBMS only; SQLite handles FKs at runtime)
+    bind = op.get_bind()
+    if bind.dialect.name != "sqlite":
+        op.create_foreign_key("fk_store_manager_id", "stores", "employees", ["manager_id"], ["id"], use_alter=True)
 
     # 16. warehouses
     op.create_table(

@@ -25,10 +25,8 @@ from app.models import (
 )
 from app.services.data_dictionary_service import (
     get_contract_for_entity,
-    resolve_field_aliases,
 )
 from app.services.template_service import extract_template_version_from_content
-
 
 # Standard Canonical Schema Mappings for Dynamic Auto-Mapping
 ENTITY_FIELD_SCHEMAS: dict[str, dict[str, list[str]]] = {
@@ -1445,14 +1443,14 @@ def get_import_lineage_trace(db: Session, entity_type: str, entity_id: str) -> d
     Inventory Transaction -> Ledger Event -> Reconciliation Record (Hash Chain)
     """
     entity_key = entity_type.upper()
-    
+
     # 1. Resolve domain entity
     domain_record = None
     canonical_id = str(entity_id)
     if entity_key in ["PRODUCT", "PRODUCTS"]:
         p = db.query(Product).filter(
-            (Product.sku == str(entity_id)) | 
-            (Product.product_code == str(entity_id)) | 
+            (Product.sku == str(entity_id)) |
+            (Product.product_code == str(entity_id)) |
             (Product.id == (int(entity_id) if str(entity_id).isdigit() else -1))
         ).first()
         if p:
@@ -1468,8 +1466,8 @@ def get_import_lineage_trace(db: Session, entity_type: str, entity_id: str) -> d
             }
     elif entity_key in ["EMPLOYEE", "EMPLOYEES"]:
         e = db.query(Employee).filter(
-            (Employee.employee_code == str(entity_id)) | 
-            (Employee.email == str(entity_id)) | 
+            (Employee.employee_code == str(entity_id)) |
+            (Employee.email == str(entity_id)) |
             (Employee.id == (int(entity_id) if str(entity_id).isdigit() else -1))
         ).first()
         if e:
@@ -1484,7 +1482,7 @@ def get_import_lineage_trace(db: Session, entity_type: str, entity_id: str) -> d
             }
     elif entity_key in ["SUPPLIER", "SUPPLIERS"]:
         s = db.query(Supplier).filter(
-            (Supplier.name == str(entity_id)) | 
+            (Supplier.name == str(entity_id)) |
             (Supplier.id == (int(entity_id) if str(entity_id).isdigit() else -1))
         ).first()
         if s:
@@ -1492,7 +1490,7 @@ def get_import_lineage_trace(db: Session, entity_type: str, entity_id: str) -> d
             domain_record = {"id": s.id, "name": s.name, "email": s.email, "phone": s.phone}
     elif entity_key in ["CUSTOMER", "CUSTOMERS"]:
         c = db.query(Customer).filter(
-            (Customer.name == str(entity_id)) | 
+            (Customer.name == str(entity_id)) |
             (Customer.id == (int(entity_id) if str(entity_id).isdigit() else -1))
         ).first()
         if c:
@@ -1501,7 +1499,7 @@ def get_import_lineage_trace(db: Session, entity_type: str, entity_id: str) -> d
 
     # 2. Find ExternalEntityMapping & History
     mappings = db.query(ExternalEntityMapping).filter(
-        (ExternalEntityMapping.internal_code == canonical_id) | 
+        (ExternalEntityMapping.internal_code == canonical_id) |
         (ExternalEntityMapping.external_id == str(entity_id))
     ).all()
     mapping_list = []
@@ -1534,8 +1532,8 @@ def get_import_lineage_trace(db: Session, entity_type: str, entity_id: str) -> d
     records = (
         db.query(ImportRecord)
         .filter(
-            (ImportRecord.canonical_id == canonical_id) | 
-            (ImportRecord.external_id == str(entity_id)) | 
+            (ImportRecord.canonical_id == canonical_id) |
+            (ImportRecord.external_id == str(entity_id)) |
             (ImportRecord.imported_entity_id == str(entity_id)) |
             (ImportRecord.canonical_id == str(entity_id))
         )
@@ -1599,14 +1597,14 @@ def get_import_lineage_trace(db: Session, entity_type: str, entity_id: str) -> d
         tx_query = db.query(InventoryTransaction)
         if prod_id and seen_batch_ids:
             tx_query = tx_query.filter(
-                (InventoryTransaction.reference.in_(list(seen_batch_ids))) | 
+                (InventoryTransaction.reference.in_(list(seen_batch_ids))) |
                 (InventoryTransaction.product_id == prod_id)
             )
         elif prod_id:
             tx_query = tx_query.filter(InventoryTransaction.product_id == prod_id)
         elif seen_batch_ids:
             tx_query = tx_query.filter(InventoryTransaction.reference.in_(list(seen_batch_ids)))
-        
+
         for t in tx_query.all():
             txs.append({
                 "id": t.id,

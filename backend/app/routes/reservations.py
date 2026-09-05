@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -37,7 +37,8 @@ def reserve_cart_stock(
         ttl_minutes=payload.ttl_minutes or 15,
     )
 
-    ttl_remaining = max(0, int((cart.expires_at - datetime.utcnow()).total_seconds()))
+    now_naive = datetime.now(UTC).replace(tzinfo=None)
+    ttl_remaining = max(0, int((cart.expires_at - now_naive).total_seconds()))
     res_data = CartResponse.model_validate(cart)
     res_data.ttl_remaining_seconds = ttl_remaining
     return res_data
@@ -53,7 +54,8 @@ def get_cart_status(
     if not cart:
         raise HTTPException(status_code=404, detail=f"Cart ID {cart_id} not found.")
 
-    ttl_remaining = max(0, int((cart.expires_at - datetime.utcnow()).total_seconds()))
+    now_naive = datetime.now(UTC).replace(tzinfo=None)
+    ttl_remaining = max(0, int((cart.expires_at - now_naive).total_seconds()))
     res_data = CartResponse.model_validate(cart)
     res_data.ttl_remaining_seconds = ttl_remaining
     return res_data

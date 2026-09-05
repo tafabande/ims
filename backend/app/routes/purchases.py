@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
@@ -51,7 +51,8 @@ def create_purchase(
     db: Session = Depends(get_db),
     current_user: dict = Depends(require_permission("purchases:create")),
 ):
-    po_num = f"PO-2026-{int(datetime.utcnow().timestamp())}"
+    now_utc = datetime.now(UTC)
+    po_num = f"PO-2026-{int(now_utc.timestamp())}"
     total_amount = sum(item.quantity * item.unit_price for item in purchase_in.items)
 
     po = Purchase(
@@ -59,7 +60,7 @@ def create_purchase(
         supplier_id=purchase_in.supplier_id,
         status="DRAFT",  # Enforce DRAFT initial state
         total_amount=total_amount,
-        created_at=datetime.utcnow(),
+        created_at=now_utc.replace(tzinfo=None),
     )
     db.add(po)
     db.flush()
@@ -112,7 +113,7 @@ def transition_purchase_state(
 
     po.status = target
     if target == "RECEIVED":
-        po.received_at = datetime.utcnow()
+        po.received_at = datetime.now(UTC).replace(tzinfo=None)
 
     db.commit()
     db.refresh(po)

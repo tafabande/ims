@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Bell, Sun, Moon, UserCircle, Command, LogOut, ChevronDown, ShieldCheck } from 'lucide-react';
+import { apiGet, apiPost } from '../../utils/apiClient';
 
 /**
  * Navbar — displays the real authenticated user's name, email, and role.
@@ -19,13 +20,11 @@ export default function Navbar({
   const [notificationsList, setNotificationsList] = useState([]);
 
   useEffect(() => {
-    import('../../utils/apiClient').then(({ apiGet }) => {
-      apiGet('/api/notifications')
-        .then(res => {
-          if (Array.isArray(res)) setNotificationsList(res);
-        })
-        .catch(() => {});
-    });
+    apiGet('/api/notifications')
+      .then(res => {
+        if (Array.isArray(res)) setNotificationsList(res);
+      })
+      .catch(() => {});
   }, []);
 
   const unreadCount = notificationsList.filter(n => !n.read_at).length;
@@ -35,13 +34,11 @@ export default function Navbar({
   const userCode = currentUser?.userCode || currentUser?.user_code || '';
 
   const handleMarkAllRead = () => {
-    import('../../utils/apiClient').then(({ apiPost }) => {
-      apiPost('/notifications/read-all', {})
-        .then(() => {
-          setNotificationsList(prev => prev.map(n => ({ ...n, read_at: new Date().toISOString() })));
-        })
-        .catch(() => {});
-    });
+    apiPost('/notifications/read-all', {})
+      .then(() => {
+        setNotificationsList(prev => prev.map(n => ({ ...n, read_at: new Date().toISOString() })));
+      })
+      .catch(() => {});
   };
 
   return (
@@ -93,7 +90,7 @@ export default function Navbar({
             onClick={() => setShowNotificationsMenu(!showNotificationsMenu)}
             style={{
               background: 'var(--color-paper-2)',
-              border: unreadCount > 0 ? '1px solid rgba(59, 130, 246, 0.4)' : '1px solid var(--color-rule)',
+              border: unreadCount > 0 ? '1px solid var(--color-accent)' : '1px solid var(--color-rule)',
               borderRadius: 'var(--radius-sm)',
               padding: '6px 12px',
               color: 'var(--color-ink)',
@@ -103,13 +100,13 @@ export default function Navbar({
               gap: '8px',
               fontSize: '0.8125rem',
               fontWeight: 600,
-              boxShadow: unreadCount > 0 ? '0 0 8px rgba(59, 130, 246, 0.2)' : 'none'
+              boxShadow: unreadCount > 0 ? 'var(--elevation-warm)' : 'none'
             }}
             title="System Operational Notifications"
           >
-            <Bell size={16} color={unreadCount > 0 ? '#3b82f6' : 'var(--color-ink-muted)'} />
+            <Bell size={16} color={unreadCount > 0 ? 'var(--color-accent)' : 'var(--color-ink-muted)'} />
             {unreadCount > 0 && (
-              <span style={{ background: '#3b82f6', color: '#ffffff', borderRadius: '10px', padding: '1px 6px', fontSize: '0.7rem', fontWeight: 800 }}>
+              <span style={{ background: 'var(--color-accent)', color: '#1c1917', borderRadius: '10px', padding: '1px 6px', fontSize: '0.7rem', fontWeight: 800 }}>
                 {unreadCount}
               </span>
             )}
@@ -154,8 +151,8 @@ export default function Navbar({
                       style={{
                         padding: '10px',
                         borderRadius: 'var(--radius-xs)',
-                        background: n.read_at ? 'var(--color-paper-2)' : 'rgba(59, 130, 246, 0.08)',
-                        borderLeft: n.read_at ? '2px solid transparent' : '2px solid #3b82f6',
+                        background: n.read_at ? 'var(--color-paper-2)' : 'var(--color-accent-subtle)',
+                        borderLeft: n.read_at ? '2px solid transparent' : '2px solid var(--color-accent)',
                         display: 'flex',
                         flexDirection: 'column',
                         gap: '2px'

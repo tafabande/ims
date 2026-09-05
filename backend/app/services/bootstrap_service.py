@@ -17,7 +17,6 @@ import hashlib
 import hmac
 import ipaddress
 import os
-import re
 import secrets
 import uuid
 from datetime import UTC, datetime, timedelta
@@ -213,7 +212,7 @@ def bootstrap_root_administrator(
     inst_query = db.query(EnterpriseInstallation).order_by(EnterpriseInstallation.id.asc())
     if db.bind and db.bind.dialect.name == "postgresql":
         inst_query = inst_query.with_for_update()
-    
+
     inst = inst_query.first()
     if not inst:
         inst = get_or_create_installation(db)

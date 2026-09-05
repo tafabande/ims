@@ -116,6 +116,16 @@ ROLE_PERMISSIONS = {
         "suppliers.manage",
         "customers.manage",
         "shifts.manage",
+        "organisation.manage",
+        "organisation:manage",
+        "warehouses.manage",
+        "categories.manage",
+        "system.deploy",
+        "system.backup",
+        "system.restore",
+        "system.logs",
+        "system.health",
+        "system.metrics",
     ],
     # 3. MANAGER — Full operational authority. NO user management or system config.
     # SOD: MANAGER cannot create/disable system users or change server settings.

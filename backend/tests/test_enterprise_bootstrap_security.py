@@ -18,16 +18,12 @@ Test Scenarios:
 10. Public status endpoint exposes zero reconnaissance / table counts
 """
 
-import hashlib
-import os
-import uuid
 from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy.orm import Session
 
-from app.database import Base, SessionLocal, engine, get_db, install_database_immutability_triggers
+from app.database import Base, SessionLocal, engine, install_database_immutability_triggers
 from app.main import app
 from app.models import AuditLogRecord, EnterpriseInstallation, SessionRecord, User
 from app.services.bootstrap_service import (
@@ -56,11 +52,11 @@ def test_status_endpoint_information_disclosure_prevention(clean_bootstrap_db):
     response = client.get("/api/auth/status")
     assert response.status_code == 200
     data = response.json()
-    
+
     assert "is_initialized" in data
     assert "setup_required" in data
     assert "system_name" in data
-    
+
     # Must NOT expose sensitive table volumes or internal installation identifiers
     assert "installation_id" not in data
     assert "user_count" not in data
@@ -105,7 +101,7 @@ def test_bootstrap_with_wrong_token_forbidden(clean_bootstrap_db):
 def test_bootstrap_with_valid_token_success(clean_bootstrap_db):
     """Scenario 1: Valid bootstrap token creates Root Administrator and initializes lifecycle."""
     raw_secret, secret_hash = get_or_generate_bootstrap_secret()
-    
+
     db = SessionLocal()
     try:
         inst = db.query(EnterpriseInstallation).first()

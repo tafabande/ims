@@ -6,7 +6,7 @@ canonical headers, format documentation, and sample guidance rows.
 
 import csv
 import io
-from datetime import datetime
+from datetime import UTC, datetime
 
 from app.services.data_dictionary_service import get_contract_for_entity
 
@@ -26,13 +26,13 @@ def generate_csv_template(entity_type: str, include_sample_row: bool = True) -> 
     writer = csv.writer(output)
 
     # 1. Write Versioned Header Comment
-    timestamp = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
+    timestamp = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
     output.write(
         f"# IMS Enterprise Import Template | Entity: {contract['entity_type']} | "
         f"Schema: {schema_version} | Generated: {timestamp}\n"
     )
     output.write(
-        f"# Rules: Required fields marked (*). Do not alter column names.\n"
+        "# Rules: Required fields marked (*). Do not alter column names.\n"
     )
 
     # 2. Field Names (Canonical column headers)

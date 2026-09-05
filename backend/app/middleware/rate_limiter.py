@@ -40,13 +40,12 @@ class DistributedRateLimiterMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         path = request.url.path
 
-        # Bypass health, docs, and CORS OPTIONS preflight requests
-        if request.method == "OPTIONS" or path in [
-            "/health",
-            "/",
-            "/docs",
-            "/openapi.json",
-        ]:
+        # Bypass health, metrics, docs, and CORS OPTIONS preflight requests
+        if (
+            request.method == "OPTIONS"
+            or path.startswith("/health")
+            or path in ["/", "/docs", "/openapi.json", "/metrics", "/redoc"]
+        ):
             return await call_next(request)
 
         client_ip = get_client_ip(request)

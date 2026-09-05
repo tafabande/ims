@@ -8,22 +8,17 @@ Comprehensive Automated Tests for Hardened Enterprise Data Intake Architecture:
 6. Strict Database-level Uniqueness on ExternalEntityMapping.
 """
 
-import hashlib
 import json
 import uuid
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy.orm import Session
 
 from app.database import Base, SessionLocal, engine
 from app.main import app
 from app.models import (
     Category,
-    Department,
     ExternalEntityMapping,
-    ImportBatch,
-    ImportRecord,
     IntegrationAccount,
     IntegrationApiKey,
     InventoryTransaction,

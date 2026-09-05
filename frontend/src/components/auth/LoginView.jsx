@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Lock, User, ArrowRight, AlertCircle, Loader, Mail, Database, ShieldCheck, CheckCircle2, Sparkles, Key } from 'lucide-react';
+import { Box, Lock, User, ArrowRight, AlertCircle, Loader, Mail, ShieldCheck, Key } from 'lucide-react';
 import { apiGet } from '../../utils/apiClient';
 import { useAuth } from '../../utils/authStore';
 
@@ -37,7 +37,6 @@ export default function LoginView({ onLoginSuccess }) {
 
   // Check system status on mount
   useEffect(() => {
-    setIsStatusLoading(true);
     apiGet('/api/auth/status')
       .then((data) => {
         setIsInitialized(Boolean(data.is_initialized));
@@ -143,49 +142,66 @@ export default function LoginView({ onLoginSuccess }) {
           }}
         >
           {/* Header */}
-          <div style={{ textAlign: 'center', marginBottom: '22px' }}>
+          <div style={{ textAlign: 'center', marginBottom: '24px' }}>
             <div
               style={{
-                width: '52px',
-                height: '52px',
-                borderRadius: '12px',
-                background: 'linear-gradient(135deg, var(--color-accent) 0%, #2563eb 100%)',
+                width: '44px',
+                height: '44px',
+                borderRadius: 'var(--radius-sm)',
+                background: 'var(--color-accent)',
                 display: 'inline-flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#ffffff',
+                color: '#1c1917',
                 marginBottom: '14px',
-                boxShadow: '0 4px 14px rgba(37, 99, 235, 0.3)',
+                boxShadow: 'var(--elevation-warm)',
               }}
             >
-              <Database size={28} />
+              <Box size={24} />
             </div>
             <h1 style={{ fontSize: '1.45rem', fontWeight: 800, color: 'var(--color-ink)', letterSpacing: '-0.02em' }}>
-              Enterprise IMS Bootstrap
+              Enterprise IMS Onboarding
             </h1>
             <p style={{ fontSize: '0.8125rem', color: 'var(--color-ink-muted)', marginTop: '4px' }}>
-              Installation ID: <span style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--color-accent)' }}>{installationId || 'PENDING'}</span>
+              Initial System Deployment &amp; Administrator Bootstrap
             </p>
+            {installationId && (
+              <div style={{ marginTop: '8px' }}>
+                <span
+                  style={{
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: '0.72rem',
+                    padding: '3px 8px',
+                    background: 'var(--color-paper-surface)',
+                    border: '1px solid var(--color-rule)',
+                    borderRadius: 'var(--radius-xs)',
+                    color: 'var(--color-accent)',
+                  }}
+                >
+                  Installation ID: {installationId}
+                </span>
+              </div>
+            )}
           </div>
 
-          {/* Prominent No Enterprise Data Notice */}
+          {/* Prominent One-Time Authorization Notice */}
           <div
             style={{
               padding: '14px 16px',
-              background: 'rgba(59, 130, 246, 0.08)',
-              border: '1px solid rgba(59, 130, 246, 0.25)',
+              background: 'var(--color-accent-subtle)',
+              border: '1px solid var(--color-rule-strong)',
               borderRadius: 'var(--radius-md)',
               marginBottom: '20px',
               display: 'flex',
               gap: '12px',
             }}
           >
-            <ShieldCheck size={22} style={{ color: 'var(--color-accent)', flexShrink: 0, marginTop: '2px' }} />
+            <ShieldCheck size={20} style={{ color: 'var(--color-accent)', flexShrink: 0, marginTop: '2px' }} />
             <div style={{ fontSize: '0.8125rem', lineHeight: '1.45', color: 'var(--color-ink-dim)' }}>
               <strong style={{ color: 'var(--color-ink)', display: 'block', marginBottom: '3px', fontSize: '0.875rem' }}>
                 One-Time Deployment Authorization Required
               </strong>
-              Enter the one-time <strong>Bootstrap Token</strong> (configured via <code style={{ color: 'var(--color-accent)' }}>BOOTSTRAP_SECRET</code> or stored in the server's <code style={{ color: 'var(--color-accent)' }}>.bootstrap_token</code> file) to initialize the primary Root Administrator.
+              Enter the one-time <strong>Bootstrap Token</strong> (configured via <code style={{ color: 'var(--color-accent)', fontFamily: 'var(--font-mono)' }}>BOOTSTRAP_SECRET</code> or stored in the server's <code style={{ color: 'var(--color-accent)', fontFamily: 'var(--font-mono)' }}>.bootstrap_token</code> file) to initialize the primary Root Administrator.
             </div>
           </div>
 
@@ -305,7 +321,7 @@ export default function LoginView({ onLoginSuccess }) {
               className="btn btn-primary"
               style={{
                 marginTop: '10px',
-                padding: '13px 18px',
+                padding: '12px 18px',
                 fontSize: '0.875rem',
                 fontWeight: 700,
                 width: '100%',
@@ -315,8 +331,6 @@ export default function LoginView({ onLoginSuccess }) {
                 gap: '8px',
                 opacity: isLoading ? 0.7 : 1,
                 cursor: isLoading ? 'not-allowed' : 'pointer',
-                background: 'linear-gradient(135deg, var(--color-accent) 0%, #2563eb 100%)',
-                boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)',
               }}
               disabled={isLoading}
             >
@@ -327,8 +341,7 @@ export default function LoginView({ onLoginSuccess }) {
                 </>
               ) : (
                 <>
-                  <Sparkles size={16} />
-                  Authorize &amp; Initialize Root Administrator
+                  Authorize &amp; Initialize Root Administrator <ArrowRight size={16} />
                 </>
               )}
             </button>

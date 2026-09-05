@@ -184,7 +184,7 @@ def create_performance_target(
         "target_value": float(target_data.get("target_value", 200000.0)),
         "minimum_value": float(target_data.get("minimum_value", 150000.0)),
         "maximum_value": float(target_data.get("maximum_value", 250000.0)),
-        "created_by": "USR-AUTHENTICATED",
+        "created_by": getattr(auth_ctx, "user_code", None) or (auth_ctx.get("user_code") if isinstance(auth_ctx, dict) else "USR-ADMIN") or "USR-ADMIN",
         "status": "APPROVED",
     }
     MOCK_TARGETS.append(new_target)

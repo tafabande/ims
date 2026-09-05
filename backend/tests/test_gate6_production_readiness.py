@@ -100,7 +100,7 @@ def test_gate6_inventory_non_negative_invariant():
     """
     from app.database import SessionLocal
     from app.models import Category, Product
-    
+
     db = SessionLocal()
     try:
         cat = Category(name="Test Cables", code="CAT-TEST-01")
@@ -159,6 +159,6 @@ def test_gate6_postgresql_sole_source_of_truth():
     # Simulate Volatile Cache Wipe by re-querying service
     notifs = notification_service.list_user_notifications(user_id="EMP-G6-SOURCE-TRUTH", unread_only=False)
     target = next((item for item in notifs if item["id"] == n_id), None)
-    
+
     assert target is not None
     assert target["read_at"] is not None

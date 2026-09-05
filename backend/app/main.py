@@ -10,7 +10,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 import app.models  # Register all SQLAlchemy models in Base.metadata
-from app.database import Base, engine, get_db
+from app.database import get_db
 from app.middleware.idempotency import IdempotencyMiddleware
 from app.middleware.rate_limiter import DistributedRateLimiterMiddleware
 from app.middleware.request_correlation import RequestCorrelationMiddleware
@@ -59,6 +59,14 @@ _IS_PRODUCTION = _ENVIRONMENT == "production"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Enforce database-layer append-only immutability triggers on boot
+    try:
+        from app.database import install_database_immutability_triggers
+
+        install_database_immutability_triggers()
+    except Exception as exc:
+        print(f"Startup immutability trigger installation notice: {exc}")
+
     # NEVER seed sample users or predictable default credentials in production
     if not _IS_PRODUCTION and os.getenv("AUTO_SEED", "false").lower() == "true":
         try:
@@ -160,6 +168,7 @@ def read_root():
 
 
 @app.get("/health/live")
+@app.get("/health/liveness")
 def health_live():
     """
     Kubernetes / Docker Liveness Probe: Confirms the process is running and responding.
@@ -168,6 +177,7 @@ def health_live():
 
 
 @app.get("/health/ready")
+@app.get("/health/readiness")
 def health_ready(db: Session = Depends(get_db)):
     """
     Kubernetes / Docker Readiness Probe: Confirms DB and Redis are ready to accept traffic.

@@ -135,7 +135,8 @@ def checkout_cart_reservation(
             detail="IDOR Protection: Unauthorized access to cart reservation.",
         )
 
-    if cart.status != "ACTIVE" or cart.expires_at <= datetime.utcnow():
+    now_naive = datetime.now(UTC).replace(tzinfo=None)
+    if cart.status != "ACTIVE" or cart.expires_at <= now_naive:
         raise HTTPException(
             status_code=400,
             detail="Cart reservation has expired or is no longer active.",
@@ -266,7 +267,7 @@ def mark_pickup_collected(db: Session, pickup_code: str, staff_user_name: str) -
         raise HTTPException(status_code=400, detail="Pickup Order has already been collected.")
 
     pickup.status = "COLLECTED"
-    pickup.collected_at = datetime.utcnow()
+    pickup.collected_at = datetime.now(UTC).replace(tzinfo=None)
     pickup.collected_by_staff = staff_user_name
     db.commit()
     db.refresh(pickup)

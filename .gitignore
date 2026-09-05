@@ -23,7 +23,9 @@ htmlcov/
 # Environment & Local Secrets
 .env
 .env.*
+*.env
 !.env.example
+!*.env.example
 .bootstrap_token
 *.bootstrap_token
 .bootstrap_secret

@@ -11,9 +11,9 @@ State Machine:
 DRAFT -> SUBMITTED -> PENDING_REVIEW -> [ APPROVED | DENIED | CONTESTED | RETURNED | ESCALATED ] -> EXECUTED
 """
 
-from datetime import UTC, datetime
 import json
 import uuid
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy.orm import Session

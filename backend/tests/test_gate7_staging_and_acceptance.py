@@ -7,6 +7,7 @@ Tests environment isolation, secrets audit, and end-to-end platform flow:
 """
 
 import os
+
 from fastapi.testclient import TestClient
 
 from app.main import app
@@ -22,11 +23,11 @@ def test_gate7_secrets_audit_hygiene():
     """
     repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
     gitignore_path = os.path.join(repo_root, ".gitignore")
-    
+
     assert os.path.exists(gitignore_path)
-    with open(gitignore_path, "r", encoding="utf-8") as f:
+    with open(gitignore_path, encoding="utf-8") as f:
         content = f.read()
-    
+
     assert ".env" in content
     assert ".env.*" in content
 

@@ -5,6 +5,8 @@ echo "========================================================================="
 echo "        IMS FASTAPI BACKEND - CONTAINER ENTRYPOINT"
 echo "========================================================================="
 
+export PYTHONPATH=/app:${PYTHONPATH:-}
+
 echo "[1/2] Executing Versioned Database Schema Migrations (Alembic)..."
 alembic upgrade head
 

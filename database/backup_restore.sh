@@ -58,7 +58,7 @@ fi
 if [ -n "${BACKUP_S3_URI}" ]; then
     aws s3 cp "${FINAL_FILE}" "${BACKUP_S3_URI%/}/$(basename "${FINAL_FILE}")" --only-show-errors
     echo "Off-site upload completed: ${BACKUP_S3_URI}"
-elif [ "${ENVIRONMENT}" = "production" ]; then
+elif [ "${ENVIRONMENT}" = "production" ] && [ "${SKIP_S3_UPLOAD:-false}" != "true" ]; then
     echo "ERROR: BACKUP_S3_URI is required for production off-site backups." >&2
     exit 1
 fi

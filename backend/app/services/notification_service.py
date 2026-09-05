@@ -10,12 +10,14 @@ Features:
 7. Zero fake static mock notifications in production service.
 """
 
+import uuid
 from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
-import uuid
 
 from sqlalchemy.orm import Session
+
+from app.database import SessionLocal
 
 
 class NotificationType(str, Enum):
@@ -89,7 +91,7 @@ class PersistentNotificationService:
         now = datetime.now(UTC)
 
         if db:
-            from app.models import NotificationRecord, NotificationRecipientRecord, User
+            from app.models import NotificationRecipientRecord, NotificationRecord, User
 
             notif_rec = NotificationRecord(
                 notification_code=code,
@@ -169,7 +171,7 @@ class PersistentNotificationService:
 
         if db:
             try:
-                from app.models import NotificationRecord, NotificationRecipientRecord
+                from app.models import NotificationRecipientRecord, NotificationRecord
 
                 query = (
                     db.query(NotificationRecord, NotificationRecipientRecord)
@@ -248,7 +250,7 @@ class PersistentNotificationService:
 
         if db:
             try:
-                from app.models import NotificationRecord, NotificationRecipientRecord
+                from app.models import NotificationRecipientRecord, NotificationRecord
 
                 recip = (
                     db.query(NotificationRecipientRecord)

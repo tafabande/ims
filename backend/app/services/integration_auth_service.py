@@ -9,7 +9,7 @@ import hmac
 import json
 from datetime import UTC, datetime
 
-from fastapi import HTTPException, Security, status
+from fastapi import HTTPException, status
 from fastapi.security import APIKeyHeader
 from sqlalchemy.orm import Session
 

@@ -1,0 +1,6 @@
+FROM postgres:16-alpine
+
+# Pre-install backup tooling so internal/air-gapped production networks do not fail at runtime
+RUN apk add --no-cache bash openssl aws-cli
+
+ENTRYPOINT []

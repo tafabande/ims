@@ -6,7 +6,6 @@ from app.models import Sale
 from app.schemas import SaleCreate, SaleResponse
 from app.services.iam_service import require_permission
 from app.services.inventory_service import process_sale_transaction
-
 from app.services.settings_service import get_setting_value, update_setting
 
 router = APIRouter(prefix="/api/sales", tags=["Sales"])

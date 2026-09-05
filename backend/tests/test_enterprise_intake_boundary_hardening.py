@@ -13,24 +13,16 @@ Verifies the 10 mandatory architectural tests specified by Chaa:
 10. Inventory movement boundary defense (PRODUCTS cannot touch InventoryTransaction)
 """
 
-import hashlib
 import json
 import uuid
 from datetime import UTC, datetime
 
-import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy.orm import Session
 
 from app.database import Base, SessionLocal, engine
 from app.main import app
 from app.models import (
     Category,
-    Department,
-    Employee,
-    ExternalEntityMapping,
-    ExternalEntityMappingHistory,
-    ImportBatch,
     ImportReconciliationRecord,
     ImportRecord,
     IntegrationAccount,
@@ -40,12 +32,6 @@ from app.models import (
     User,
 )
 from app.services.iam_service import ROLE_PERMISSIONS, create_access_token
-from app.services.ingestion_service import (
-    approve_import_batch,
-    compute_batch_content_hash,
-    compute_batch_content_hash_from_db,
-    execute_approved_batch,
-)
 from app.services.integration_auth_service import hash_api_key
 
 Base.metadata.create_all(bind=engine, checkfirst=True)
@@ -339,11 +325,6 @@ def test_reconciliation_record_invariant_and_checksum():
     Verifies that post-commit reconciliation creates an append-only ImportReconciliationRecord
     confirming the invariant: total == accepted + rejected and accepted == created + updated + unchanged.
     """
-def test_reconciliation_record_invariant_and_checksum():
-    """
-    Verifies that post-commit reconciliation creates an append-only ImportReconciliationRecord
-    confirming the invariant: total == accepted + rejected and accepted == created + updated + unchanged.
-    """
     uploader_token = get_auth_token("uploader_rec@ims.co.zw", "STAFF", "Uploader Rec")
     admin_token = get_auth_token("admin_rec@ims.co.zw", "APP_ADMIN", "Admin Rec")
     uid = uuid.uuid4().hex[:6].upper()
@@ -442,7 +423,7 @@ def test_file_sha256_duplicate_defense():
     admin_token = get_auth_token("admin_dup@ims.co.zw", "APP_ADMIN", "Admin Dup")
     uid = uuid.uuid4().hex[:6].upper()
 
-    csv_content = f"employee_code,first_name,last_name,email,department\nEMP-DUP-{uid},Tafadzwa,Moyo,tmoyo_{uid.lower()}@corp.co.zw,Security\n".encode("utf-8")
+    csv_content = f"employee_code,first_name,last_name,email,department\nEMP-DUP-{uid},Tafadzwa,Moyo,tmoyo_{uid.lower()}@corp.co.zw,Security\n".encode()
 
     # First upload
     res1 = client.post(

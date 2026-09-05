@@ -16,7 +16,7 @@ from fastapi.testclient import TestClient
 
 from app.database import Base, SessionLocal, engine, install_database_immutability_triggers
 from app.main import app
-from app.models import EnterpriseInstallation, SessionRecord, User
+from app.models import EnterpriseInstallation
 from app.services.bootstrap_service import (
     get_or_create_installation,
     get_or_generate_bootstrap_secret,
@@ -65,7 +65,7 @@ def test_untrusted_direct_peer_header_spoofing_blocked(clean_topology_db):
         "X-Forwarded-For": "127.0.0.1",
         "X-Network-Context": "LAN",
     }
-    
+
     with patch.dict(os.environ, {"ENVIRONMENT": "production", "ALLOW_REMOTE_BOOTSTRAP": "false"}):
         res = client.post("/api/auth/initialize-root-admin", json=payload, headers=headers)
         assert res.status_code == 403
@@ -97,7 +97,7 @@ def test_trusted_proxy_forwarding_remote_client_blocked(clean_topology_db):
     headers = {
         "X-Forwarded-For": "104.244.42.1",
     }
-    
+
     with patch.dict(os.environ, {"ENVIRONMENT": "production", "TRUSTED_PROXY_IPS": "127.0.0.1", "ALLOW_REMOTE_BOOTSTRAP": "false"}):
         res = client.post("/api/auth/initialize-root-admin", json=payload, headers=headers)
         assert res.status_code == 403
@@ -111,12 +111,12 @@ def test_long_passphrase_full_entropy_no_silent_truncation():
     """
     base_passphrase = "correct horse battery staple enterprise 2026 " + ("a" * 50) + "1"
     tampered_passphrase = "correct horse battery staple enterprise 2026 " + ("a" * 50) + "2"
-    
+
     assert len(base_passphrase) > 72
     assert len(tampered_passphrase) > 72
-    
+
     hashed = hash_password(base_passphrase)
-    
+
     # Correct passphrase verifies
     assert verify_password(base_passphrase, hashed) is True
     # Tampered 100th character MUST fail verification (proves zero silent truncation at byte 72)

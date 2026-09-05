@@ -1,4 +1,9 @@
-from datetime import datetime
+from datetime import UTC, datetime
+
+
+def utc_now():
+    return datetime.now(UTC).replace(tzinfo=None)
+
 
 from sqlalchemy import (
     Boolean,
@@ -33,7 +38,7 @@ class User(Base):
     activation_otp_expires_at = Column(DateTime, nullable=True)
     activation_otp_attempts = Column(Integer, default=0)
     activation_nonce = Column(String(255), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
 
     sessions = relationship("SessionRecord", back_populates="user")
     employee = relationship("Employee", back_populates="user", uselist=False)
@@ -49,7 +54,7 @@ class AuditLogRecord(Base):
     client_ip = Column(String(50), nullable=False)
     status = Column(String(50), default="SUCCESS")
     details = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
 
 
 class EnterpriseInstallation(Base):
@@ -62,7 +67,7 @@ class EnterpriseInstallation(Base):
     initialized_at = Column(DateTime, nullable=True)
     initialized_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     bootstrap_consumed_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
 
     initialized_by = relationship("User")
 
@@ -74,7 +79,7 @@ class Department(Base):
     department_code = Column(String(50), unique=True, index=True, nullable=False)  # e.g. DEP-00001
     name = Column(String(100), nullable=False)
     description = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
 
     job_roles = relationship("JobRole", back_populates="department")
     employees = relationship("Employee", back_populates="department")
@@ -88,7 +93,7 @@ class JobRole(Base):
     name = Column(String(100), nullable=False)
     department_id = Column(Integer, ForeignKey("departments.id"), nullable=False)
     description = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
 
     department = relationship("Department", back_populates="job_roles")
     employees = relationship("Employee", back_populates="job_role")
@@ -116,7 +121,7 @@ class Employee(Base):
     manager_id = Column(Integer, ForeignKey("employees.id"), nullable=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=True)  # Optional 0..1 relationship
     status = Column(String(50), default="ACTIVE")  # ACTIVE, INACTIVE, SUSPENDED, TERMINATED
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
 
     department = relationship("Department", back_populates="employees")
     job_role = relationship("JobRole", back_populates="employees")
@@ -158,7 +163,7 @@ class SessionRecord(Base):
     device_info = Column(String(500), default="Web Browser / POS Terminal")
     ip_address = Column(String(50), default="127.0.0.1")
     is_active = Column(Boolean, default=True, name="active")  # DB column is 'active', Python attr is 'is_active'
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
     expires_at = Column(DateTime, nullable=False)
     revoked_at = Column(DateTime, nullable=True)
 
@@ -175,7 +180,7 @@ class FileRecord(Base):
     size_bytes = Column(Integer, nullable=False)
     sha256_hash = Column(String(64), nullable=False)
     uploaded_by = Column(String(255), default="System Operator")
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
 
 
 class Category(Base):
@@ -236,7 +241,7 @@ class Product(Base):
     unit = Column(String(20), default="Units")
     barcode = Column(String(100), index=True, nullable=True)
     active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
 
     __table_args__ = (
         CheckConstraint("stock_quantity >= 0", name="check_non_negative_stock"),
@@ -274,7 +279,7 @@ class InventoryTransaction(Base):
     )
     work_session_code = Column(String(50), nullable=True)
     notes = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
 
     product = relationship("Product", back_populates="transactions")
 
@@ -293,7 +298,7 @@ class Purchase(Base):
         nullable=True,
     )
     work_session_code = Column(String(50), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
     received_at = Column(DateTime, nullable=True)
 
     supplier = relationship("Supplier", back_populates="purchases")
@@ -328,7 +333,7 @@ class Sale(Base):
         nullable=True,
     )
     work_session_code = Column(String(50), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
     created_by = Column(String(255), nullable=True)
 
     customer = relationship("Customer", back_populates="sales")
@@ -365,7 +370,7 @@ class Store(Base):
 
     status = Column(String(50), default="ACTIVE")  # ACTIVE, INACTIVE, MAINTENANCE
     operating_hours = Column(String(255), default="08:00 - 18:00")
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
 
     manager = relationship("Employee", foreign_keys=[manager_id])
     warehouses = relationship("Warehouse", back_populates="store")
@@ -382,7 +387,7 @@ class Warehouse(Base):
     name = Column(String(100), nullable=False)
     is_default = Column(Boolean, default=True)
     status = Column(String(50), default="ACTIVE")
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
 
     store = relationship("Store", back_populates="warehouses")
 
@@ -397,7 +402,7 @@ class StoreStock(Base):
     quantity = Column(Integer, nullable=False, default=0)
     reserved_quantity = Column(Integer, nullable=False, default=0)
     reorder_level = Column(Integer, default=5)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
 
     store = relationship("Store")
     warehouse = relationship("Warehouse")
@@ -414,7 +419,7 @@ class Register(Base):
     status = Column(String(50), default="CLOSED")  # OPEN, CLOSED, MAINTENANCE
     current_operator_id = Column(Integer, ForeignKey("employees.id"), nullable=True)
     current_balance = Column(Float, default=0.0)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
 
     store = relationship("Store", back_populates="registers")
     current_operator = relationship("Employee", foreign_keys=[current_operator_id])
@@ -429,7 +434,7 @@ class Shift(Base):
     employee_id = Column(Integer, ForeignKey("employees.id"), nullable=False)
     store_id = Column(Integer, ForeignKey("stores.id"), nullable=False)
     register_id = Column(Integer, ForeignKey("registers.id"), nullable=False)
-    start_time = Column(DateTime, default=datetime.utcnow)
+    start_time = Column(DateTime, default=utc_now)
     end_time = Column(DateTime, nullable=True)
     opening_cash = Column(Float, nullable=False, default=0.0)
     sales_total = Column(Float, default=0.0)
@@ -439,7 +444,7 @@ class Shift(Base):
     variance = Column(Float, nullable=True)
     status = Column(String(50), default="OPEN")  # OPEN, CLOSED, RECONCILED
     supervisor_id = Column(Integer, ForeignKey("employees.id"), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
 
     employee = relationship("Employee", foreign_keys=[employee_id])
     store = relationship("Store", back_populates="shifts")
@@ -471,7 +476,7 @@ class ReturnOrder(Base):
     restock_approved = Column(Boolean, default=True)
     approved_by_emp_id = Column(Integer, ForeignKey("employees.id"), nullable=True)
     status = Column(String(50), default="COMPLETED")  # REQUESTED, APPROVED, REJECTED, COMPLETED
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
 
     sale = relationship("Sale")
     customer = relationship("Customer")
@@ -507,7 +512,7 @@ class StockTransfer(Base):
     requested_by_emp_id = Column(Integer, ForeignKey("employees.id"), nullable=True)
     approved_by_emp_id = Column(Integer, ForeignKey("employees.id"), nullable=True)
     notes = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
 
     source_store = relationship("Store", foreign_keys=[source_store_id])
     destination_store = relationship("Store", foreign_keys=[destination_store_id])
@@ -539,7 +544,7 @@ class Stocktake(Base):
     reason = Column(String(100), default="PERIODIC_AUDIT")  # PERIODIC_AUDIT, EXPIRY, DAMAGE, THEFT
     conducted_by_emp_id = Column(Integer, ForeignKey("employees.id"), nullable=True)
     approved_by_emp_id = Column(Integer, ForeignKey("employees.id"), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
 
     store = relationship("Store")
     warehouse = relationship("Warehouse")
@@ -579,7 +584,7 @@ class Promotion(Base):
     status = Column(String(50), default="PENDING")  # PENDING, ACTIVE, EXPIRED, DISABLED
     created_by_emp_id = Column(Integer, ForeignKey("employees.id"), nullable=True)
     approved_by_emp_id = Column(Integer, ForeignKey("employees.id"), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
 
     category = relationship("Category")
     product = relationship("Product")
@@ -598,7 +603,7 @@ class LocationBin(Base):
     zone = Column(String(50), nullable=False, default="ZONE-A")
     aisle = Column(String(50), nullable=False, default="AISLE-01")
     shelf = Column(String(50), nullable=False, default="SHELF-01")
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
 
     store = relationship("Store")
     warehouse = relationship("Warehouse")
@@ -613,8 +618,8 @@ class Cart(Base):
     store_id = Column(Integer, ForeignKey("stores.id"), nullable=False)
     status = Column(String(50), default="ACTIVE")  # ACTIVE, CONVERTED, EXPIRED, CANCELLED
     expires_at = Column(DateTime, nullable=False)  # 15-minute TTL
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
 
     store = relationship("Store")
     user = relationship("User")
@@ -630,7 +635,7 @@ class CartItem(Base):
     product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
     quantity = Column(Integer, nullable=False)
     unit_price = Column(Float, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
 
     cart = relationship("Cart", back_populates="items")
     product = relationship("Product")
@@ -647,7 +652,7 @@ class StockReservation(Base):
     warehouse_id = Column(Integer, ForeignKey("warehouses.id"), nullable=True)
     quantity = Column(Integer, nullable=False)
     status = Column(String(50), default="ACTIVE")  # ACTIVE, CONVERTED, EXPIRED, CANCELLED
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
     expires_at = Column(DateTime, nullable=False)
 
     cart = relationship("Cart", back_populates="reservations")
@@ -665,7 +670,7 @@ class StorePickupOrder(Base):
     store_id = Column(Integer, ForeignKey("stores.id"), nullable=False)
     customer_name = Column(String(100), nullable=False)
     status = Column(String(50), default="READY_FOR_COLLECTION")  # READY_FOR_COLLECTION, COLLECTED, CANCELLED
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
     collected_at = Column(DateTime, nullable=True)
     collected_by_staff = Column(String(100), nullable=True)
 
@@ -691,7 +696,7 @@ class ApprovalRequest(Base):
     notes = Column(Text, nullable=True)
     rejection_reason = Column(Text, nullable=True)
     payload_json = Column(Text, nullable=True)  # Serialized JSON payload for execution
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
     reviewed_at = Column(DateTime, nullable=True)
 
     requester = relationship("User", foreign_keys=[requester_id])
@@ -716,7 +721,7 @@ class ReconciliationException(Base):
     resolution_type = Column(
         String(50), nullable=True
     )  # REVERSAL_POSTED, DAMAGE_WRITEOFF, CORRECTION_ADJUSTMENT, SHRINKAGE_CONFIRMED
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
     resolved_at = Column(DateTime, nullable=True)
 
     store = relationship("Store")
@@ -736,10 +741,10 @@ class PriceRule(Base):
     staff_discount_limit_pct = Column(Float, default=2.0)  # Staff can negotiate up to 2%
     manager_discount_limit_pct = Column(Float, default=5.0)  # Manager can negotiate up to 5%
     negotiation_allowance_pct = Column(Float, default=5.0)  # Standard allowance %
-    effective_from = Column(DateTime, default=datetime.utcnow)
+    effective_from = Column(DateTime, default=utc_now)
     effective_until = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
 
     product = relationship("Product")
 
@@ -754,7 +759,7 @@ class PriceHistory(Base):
     min_allowed_price = Column(Float, nullable=False)
     reason = Column(String(255), nullable=True)
     changed_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
-    effective_from = Column(DateTime, default=datetime.utcnow)
+    effective_from = Column(DateTime, default=utc_now)
     effective_until = Column(DateTime, nullable=True)  # Null if current active price
 
     product = relationship("Product")
@@ -777,7 +782,7 @@ class GoodsReceipt(Base):
     )  # DRAFT, RECEIVING, PENDING_VERIFICATION, VERIFIED, PARTIALLY_ACCEPTED, ACCEPTED, REJECTED, CLOSED
     delivery_note_ref = Column(String(100), nullable=True)  # e.g. SUP-DEL-98124
     notes = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
     verified_at = Column(DateTime, nullable=True)
 
     purchase_order = relationship("Purchase")
@@ -821,7 +826,7 @@ class SupplierReturn(Base):
         String(50), default="DRAFT"
     )  # DRAFT, PENDING_APPROVAL, AUTHORISED, DISPATCHED, RECEIVED_BY_SUPPLIER, CREDIT_PENDING, CLOSED
     reason = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
     authorized_at = Column(DateTime, nullable=True)
     closed_at = Column(DateTime, nullable=True)
 
@@ -866,7 +871,7 @@ class SupplierInvoice(Base):
         String(50), default="UNVERIFIED"
     )  # MATCHED, MISMATCH_QTY, MISMATCH_COST, MISMATCH_BOTH
     mismatch_reason = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
 
     purchase_order = relationship("Purchase")
     supplier = relationship("Supplier")
@@ -881,7 +886,7 @@ class SystemSetting(Base):
     data_type = Column(String(50), default="float")  # float, int, string, bool, json
     category = Column(String(50), default="sales")  # inventory, sales, pricing, purchases, security
     description = Column(String(255), nullable=True)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
 
 
 class PaymentMethod(Base):
@@ -899,7 +904,7 @@ class PaymentMethod(Base):
     instructions = Column(Text, nullable=True)  # e.g. "Dial *151*2*2# Enter Merchant Code 304891"
     requires_pop = Column(Boolean, default=True)  # Requires Proof of Payment upload/reference
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
 
 
 class POPVerification(Base):
@@ -917,7 +922,7 @@ class POPVerification(Base):
     status = Column(String(50), default="PENDING_VERIFICATION")  # PENDING_VERIFICATION, VERIFIED, REJECTED
     rejection_reason = Column(Text, nullable=True)
     verified_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
     verified_at = Column(DateTime, nullable=True)
 
     payment_method = relationship("PaymentMethod")
@@ -935,12 +940,12 @@ class UserDevice(Base):
     fingerprint_hash = Column(String(64), index=True, nullable=False)  # SHA-256 fingerprint hash
     ip_address = Column(String(50), nullable=True)
     user_agent = Column(Text, nullable=True)
-    first_seen = Column(DateTime, default=datetime.utcnow)
-    last_seen = Column(DateTime, default=datetime.utcnow)
+    first_seen = Column(DateTime, default=utc_now)
+    last_seen = Column(DateTime, default=utc_now)
     is_trusted = Column(Boolean, default=True)
     is_revoked = Column(Boolean, default=False)
     risk_score = Column(Float, default=0.0)  # 0.0 (Safe) to 1.0 (High Risk)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
 
     user = relationship("User")
 
@@ -956,8 +961,8 @@ class UserSession(Base):
     ip_address = Column(String(50), nullable=True)
     user_agent = Column(Text, nullable=True)
     location_summary = Column(String(100), default="Harare Main Hub")
-    created_at = Column(DateTime, default=datetime.utcnow)
-    last_seen = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
+    last_seen = Column(DateTime, default=utc_now)
     expires_at = Column(DateTime, nullable=False)
     is_revoked = Column(Boolean, default=False)
     revoked_at = Column(DateTime, nullable=True)
@@ -986,7 +991,7 @@ class InventoryAnomaly(Base):
     risk_level = Column(String(50), default="MEDIUM")  # NORMAL, MONITOR, REVIEW, HIGH_RISK, CRITICAL
     status = Column(String(50), default="OPEN")  # OPEN, UNDER_INVESTIGATION, RESOLVED, DISMISSED
     reasons_json = Column(Text, nullable=True)  # JSON string of contributing risk factors
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
 
     product = relationship("Product")
     warehouse = relationship("Warehouse")
@@ -1005,7 +1010,7 @@ class InvestigationCase(Base):
     status = Column(String(50), default="OPEN")  # OPEN, IN_PROGRESS, RESOLVED, CLOSED
     assigned_to_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     resolution_notes = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
     closed_at = Column(DateTime, nullable=True)
 
     anomaly = relationship("InventoryAnomaly")
@@ -1025,7 +1030,7 @@ class BLEDeviceLocation(Base):
     rssi_dbm = Column(Integer, default=-65)  # Signal strength in dBm
     confidence_percentage = Column(Float, default=82.0)
     has_mismatch = Column(Boolean, default=False)
-    updated_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=utc_now)
 
     product = relationship("Product")
 
@@ -1070,7 +1075,7 @@ class ImportBatch(Base):
     case_id = Column(String(50), nullable=True)  # Links to CaseRecord if high-risk approval is required
     reconciliation_json = Column(Text, nullable=True)  # Immutable post-commit reconciliation report
     reconciliation_delta = Column(Float, default=0.0)  # Unexplained variance delta (must be 0.0)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
     approved_at = Column(DateTime, nullable=True)
     approved_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
 
@@ -1123,7 +1128,7 @@ class ImportReconciliationRecord(Base):
     is_reconciled = Column(Boolean, default=True)
     previous_checksum = Column(String(64), nullable=True)  # Hash chain link to prior reconciliation seal
     checksum = Column(String(64), nullable=False)  # Cryptographic SHA-256 seal
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
 
 
 class ExternalEntityMapping(Base):
@@ -1145,8 +1150,8 @@ class ExternalEntityMapping(Base):
     is_locked = Column(Boolean, default=False)  # Prevents silent remapping without explicit reconciliation audit
     remapping_audit_json = Column(Text, nullable=True)
     metadata_json = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
 
 
 class ExternalEntityMappingHistory(Base):
@@ -1165,7 +1170,7 @@ class ExternalEntityMappingHistory(Base):
     new_internal_code = Column(String(100), nullable=False)
     reason = Column(Text, nullable=True)
     changed_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
 
 
 # =========================================================================
@@ -1193,7 +1198,7 @@ class IntegrationAccount(Base):
     status = Column(String(50), default="ACTIVE")  # ACTIVE, SUSPENDED, REVOKED
     allowed_source_system = Column(String(100), nullable=True)  # e.g. HR_WORKDAY, SAP_ERP, LEGACY_POS
     scopes_json = Column(Text, default="[]")  # e.g. ["employees:write", "products:read"]
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
     expires_at = Column(DateTime, nullable=True)
 
     keys = relationship("IntegrationApiKey", back_populates="account", cascade="all, delete-orphan")
@@ -1211,7 +1216,7 @@ class IntegrationApiKey(Base):
     name = Column(String(100), nullable=False)  # e.g. Production Secret Key
     status = Column(String(50), default="ACTIVE")  # ACTIVE, EXPIRING, EXPIRED, REVOKED
     rotated_from_key_id = Column(String(50), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
     last_used_at = Column(DateTime, nullable=True)
     revoked_at = Column(DateTime, nullable=True)
 
@@ -1228,7 +1233,7 @@ class IntegrationActivityLog(Base):
     status_code = Column(Integer, nullable=False)
     ip_address = Column(String(50), nullable=True)
     request_id = Column(String(100), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
 
     account = relationship("IntegrationAccount", back_populates="activity_logs")
 
@@ -1251,7 +1256,7 @@ class Organisation(Base):
         String(100), default="Warehouse + Retail"
     )  # Single Store, Multi-Store, Warehouse + Retail, Distribution Network
     status = Column(String(50), default="ACTIVE")  # ACTIVE, SUSPENDED
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
 
     classification_history = relationship(
         "OrganisationClassificationHistory",
@@ -1270,7 +1275,7 @@ class OrganisationClassificationHistory(Base):
     new_value = Column(String(255), nullable=False)
     reason = Column(Text, nullable=True)
     changed_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
-    changed_at = Column(DateTime, default=datetime.utcnow)
+    changed_at = Column(DateTime, default=utc_now)
 
     organisation = relationship("Organisation", back_populates="classification_history")
     changed_by = relationship("User")
@@ -1321,8 +1326,8 @@ class OperationalCase(Base):
         nullable=True,
     )
     work_session_code = Column(String(50), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
     resolved_at = Column(DateTime, nullable=True)
 
     events = relationship("CaseEvent", back_populates="case", cascade="all, delete-orphan")
@@ -1347,7 +1352,7 @@ class CaseEvent(Base):
     new_status = Column(String(50), nullable=False)
     comment = Column(Text, nullable=True)  # Decision rationale or note
     metadata_json = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
 
     case = relationship("OperationalCase", back_populates="events")
 
@@ -1364,7 +1369,7 @@ class CaseAttachment(Base):
     file_name = Column(String(255), nullable=False)
     file_url = Column(String(500), nullable=False)
     uploaded_by = Column(String(100), nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
 
     case = relationship("OperationalCase", back_populates="attachments")
 
@@ -1405,7 +1410,7 @@ class WorkSession(Base):
     variance = Column(Float, nullable=False, default=0.0)
     total_sales_amount = Column(Float, nullable=False, default=0.0)
     total_refunds_amount = Column(Float, nullable=False, default=0.0)
-    started_at = Column(DateTime, default=datetime.utcnow)
+    started_at = Column(DateTime, default=utc_now)
     paused_at = Column(DateTime, nullable=True)
     closed_at = Column(DateTime, nullable=True)
     notes = Column(Text, nullable=True)
@@ -1430,7 +1435,7 @@ class SessionEvent(Base):
     entity_type = Column(String(50), nullable=True)  # Sale, Refund, Transfer, Product
     entity_id = Column(String(100), nullable=True)
     metadata_json = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
     work_session = relationship("WorkSession", back_populates="events")
 
 
@@ -1448,7 +1453,7 @@ class NotificationRecord(Base):
     resource_type = Column(String(50), nullable=True)  # CASE, WORK_SESSION, PURCHASE_ORDER, SALE
     resource_id = Column(String(100), nullable=True)  # e.g. REF-2026-0042
     created_by = Column(String(100), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
 
     recipients = relationship("NotificationRecipientRecord", back_populates="notification", cascade="all, delete-orphan")
 
@@ -1459,7 +1464,7 @@ class NotificationRecipientRecord(Base):
     id = Column(Integer, primary_key=True, index=True)
     notification_id = Column(Integer, ForeignKey("notification_records.id", ondelete="CASCADE"), nullable=False)
     user_id = Column(String(100), nullable=False, index=True)
-    delivered_at = Column(DateTime, default=datetime.utcnow)
+    delivered_at = Column(DateTime, default=utc_now)
     read_at = Column(DateTime, nullable=True)
     dismissed_at = Column(DateTime, nullable=True)
 

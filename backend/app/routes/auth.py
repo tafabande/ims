@@ -17,7 +17,7 @@ from app.dependencies import (
     UserContext,
     get_current_user,
 )
-from app.models import Product, SessionRecord, Store, User
+from app.models import SessionRecord, User
 from app.schemas import (
     InitializeRootAdminRequest,
     LoginRequest,
@@ -29,7 +29,6 @@ from app.services.iam_service import (
     ROLE_PERMISSIONS,
     create_access_token,
     create_refresh_token,
-    hash_password,
     hash_refresh_token,
     verify_password,
 )

@@ -12,14 +12,27 @@ from starlette.responses import JSONResponse
 _ENVIRONMENT = os.getenv("ENVIRONMENT", "development").lower()
 _IS_PRODUCTION = _ENVIRONMENT == "production"
 
+def is_trusted_proxy(peer_ip: str) -> bool:
+    trusted_raw = os.getenv("TRUSTED_PROXY_IPS", "127.0.0.1,::1")
+    for item in filter(None, trusted_raw.split(",")):
+        item = item.strip()
+        if item == "*" or item == peer_ip:
+            return True
+        try:
+            if "/" in item and ipaddress.ip_address(peer_ip) in ipaddress.ip_network(item, strict=False):
+                return True
+        except ValueError:
+            pass
+    return False
+
+
 def get_trusted_proxy_ips() -> set[str]:
     return set(filter(None, os.getenv("TRUSTED_PROXY_IPS", "127.0.0.1,::1").split(",")))
 
 
 def get_client_ip(request: Request) -> str:
     peer_ip = request.client.host if request.client else "127.0.0.1"
-    trusted_proxies = get_trusted_proxy_ips()
-    if peer_ip not in trusted_proxies:
+    if not is_trusted_proxy(peer_ip):
         return peer_ip
 
     forwarded = request.headers.get("X-Forwarded-For")
